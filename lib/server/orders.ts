@@ -376,6 +376,28 @@ export async function listOrders(
     delete o.quote_id;
     delete o.store_snapshot;
   });
+  if (isAll && rows.length > 0) {
+    const orderIds = rows.map((r: any) => r.id);
+    const allItems: any[] = [];
+    for (let i = 0; i < orderIds.length; i += 100) {
+      const slice = orderIds.slice(i, i + 100);
+      const placeholders = slice.map(() => "?").join(",");
+      const batchItems = await all(
+        `SELECT order_id,code,title,pages,unit_price,quantity FROM order_items WHERE order_id IN (${placeholders})`,
+        ...slice,
+      );
+      allItems.push(...batchItems);
+    }
+    const itemsByOrder = new Map<string, any[]>();
+    for (const it of allItems) {
+      const list = itemsByOrder.get(it.order_id) || [];
+      list.push(it);
+      itemsByOrder.set(it.order_id, list);
+    }
+    for (const r of rows) {
+      (r as any).items = itemsByOrder.get(r.id) || [];
+    }
+  }
   return { rows, total: total?.n || 0, page };
 }
 export function movementStatements(

@@ -2155,41 +2155,60 @@ function Orders({
           : (statuses[status] || status)
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, "-");
-      const filename = `orders-${statusSuffix}-${new Date().toISOString().slice(0, 10)}.csv`;
-      const csvContent = csv([
-        [
-          "Order ID",
-          "Date",
-          "Student Name",
-          "Phone",
-          "City",
-          "Address",
-          "Delivery Type",
-          "Order Status",
-          "Payment Status",
-          "Subtotal",
-          "Delivery Fee",
-          "Total",
-          "Instructions",
-        ],
-        ...rows.map((o: any) => [
-          o.reference,
-          new Date(o.created_at).toLocaleString(),
-          o.name,
-          o.phone,
-          o.city,
-          o.address,
-          o.delivery_type,
-          statuses[o.status] || o.status,
-          statuses[o.payment_status] || o.payment_status,
-          money(o.subtotal, o.currency),
-          money(o.delivery, o.currency),
-          money(o.total, o.currency),
-          o.instructions || "",
-        ]),
-      ]);
-      download(filename, csvContent);
-      toast.success(`Exported ${rows.length} order(s).`);
+      const filename = `orders-${statusSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      try {
+        const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
+        await exportOrdersExcel(rows, filename);
+        toast.success(`Exported ${rows.length} order(s) in theme format.`);
+      } catch (excelErr) {
+        // Fallback to structured CSV with book items
+        const csvRows: unknown[][] = [
+          [
+            "Order Number",
+            "Student Name",
+            "Date",
+            "Book Code",
+            "Book Name",
+            "Quantity",
+            "Unit Price",
+            "Item Total",
+            "Order Status",
+            "WhatsApp",
+            "City",
+          ],
+        ];
+
+        for (const o of rows) {
+          const items =
+            o.items && o.items.length > 0
+              ? o.items
+              : [{ code: "—", title: "Order Record", quantity: 1, unit_price: o.total || 0 }];
+          const dateStr = o.created_at
+            ? new Date(o.created_at).toLocaleDateString("en-GB")
+            : "—";
+          const st = statuses[o.status] || o.status || "—";
+
+          for (const item of items) {
+            csvRows.push([
+              o.reference || "—",
+              o.name || "Student",
+              dateStr,
+              item.code || "—",
+              item.title || "—",
+              item.quantity || 1,
+              item.unit_price ? `Rs. ${item.unit_price}` : "—",
+              item.unit_price && item.quantity ? `Rs. ${item.unit_price * item.quantity}` : (o.total ? `Rs. ${o.total}` : "—"),
+              st,
+              o.phone || "—",
+              o.city || "—",
+            ]);
+          }
+        }
+
+        download(filename.replace(/\.xlsx$/, ".csv"), csv(csvRows));
+        toast.success(`Exported ${rows.length} order(s).`);
+      }
     } catch (err) {
       toast.error(errorText(err));
     } finally {
