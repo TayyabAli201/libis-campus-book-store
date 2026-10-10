@@ -2209,6 +2209,11 @@ details summary {
   .portal-page-head,
   .skip-link,
   .tracking-form,
+  .order-track-card,
+  .tracking-header,
+  .tracking-intro,
+  .search-bar,
+  .theme-toggle,
   [data-slot="sidebar"],
   [data-sonner-toaster] {
     display: none !important;
@@ -2247,16 +2252,6 @@ details summary {
 
   .order-receipt {
     width: 100%;
-  }
-
-  .order-receipt .eyebrow {
-    display: block;
-    color: #14261f;
-  }
-
-  .order-receipt * {
-    color: #14261f !important;
-    background: white !important;
   }
 
   .summary-item {

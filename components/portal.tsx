@@ -109,6 +109,27 @@ export function Login({ portal }: { portal: "admin" | "campus" }) {
     [password, setPassword] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [forgotMode, setForgotMode] = useState<"none" | "request" | "verify">("none");
+  const [forgotEmail, setForgotEmail] = useState("admin@campusbookstore.com");
+  const [resetCode, setResetCode] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [successNotice, setSuccessNotice] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const tokenParam = sp.get("reset_token");
+      const emailParam = sp.get("email");
+      if (tokenParam) {
+        setResetToken(tokenParam);
+        if (emailParam) setForgotEmail(emailParam);
+        setForgotMode("verify");
+      }
+    }
+  }, []);
+
   return (
     <main className="login-page">
       <section className="login-story">
@@ -139,59 +160,276 @@ export function Login({ portal }: { portal: "admin" | "campus" }) {
       <section className="login-form">
         <div>
           <ThemeSwitch />
-          <span className="eyebrow">WELCOME BACK</span>
-          <h2>{portal === "admin" ? "Admin sign in" : "Campus sign in"}</h2>
-          <p>Use the account provided by your administrator.</p>
-          <form
-            className="stack"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (signingIn.current) return;
-              signingIn.current = true;
-              setBusy(true);
-              setError("");
-              try {
-                const r = await api("login", { email, password, portal });
-                location.href = `/${portal}/${r.must_change ? "profile" : "dashboard"}`;
-              } catch (e) {
-                setError(errorText(e));
-              } finally {
-                signingIn.current = false;
-                setBusy(false);
-              }
-            }}
-          >
-            <Field label="Email address">
-              <input
-                type="email"
-                required
-                autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </Field>
-            <Field label="Password">
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Field>
-            {error && (
-              <p role="alert" className="error-text">
-                {error}
+          <span className="eyebrow">
+            {forgotMode === "none"
+              ? "WELCOME BACK"
+              : "ACCOUNT RECOVERY"}
+          </span>
+          <h2>
+            {forgotMode === "none"
+              ? portal === "admin"
+                ? "Admin sign in"
+                : "Campus sign in"
+              : forgotMode === "request"
+                ? "Reset Admin Password"
+                : "Enter Verification Code"}
+          </h2>
+          <p>
+            {forgotMode === "none"
+              ? "Use the account provided by your administrator."
+              : forgotMode === "request"
+                ? "We will send a 6-digit verification code to tayyabali201@gmail.com."
+                : "Check tayyabali201@gmail.com for your code, then set your new password."}
+          </p>
+
+          {successNotice && (
+            <div
+              className="notice"
+              style={{
+                marginBottom: 16,
+                background: "var(--accent)",
+                borderColor: "var(--primary)",
+              }}
+            >
+              {successNotice}
+            </div>
+          )}
+
+          {forgotMode === "none" ? (
+            <form
+              className="stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (signingIn.current) return;
+                signingIn.current = true;
+                setBusy(true);
+                setError("");
+                try {
+                  const r = await api("login", { email, password, portal });
+                  location.href = `/${portal}/${r.must_change ? "profile" : "dashboard"}`;
+                } catch (e) {
+                  setError(errorText(e));
+                } finally {
+                  signingIn.current = false;
+                  setBusy(false);
+                }
+              }}
+            >
+              <Field label="Email address">
+                <input
+                  type="email"
+                  required
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field label="Password">
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+
+              {portal === "admin" && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginTop: -4,
+                  }}
+                >
+                  <button
+                    type="button"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      color: "var(--primary)",
+                      fontSize: "0.82rem",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                    onClick={() => {
+                      setForgotMode("request");
+                      setError("");
+                      setSuccessNotice("");
+                      if (email) setForgotEmail(email);
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
+              {error && (
+                <p role="alert" className="error-text">
+                  {error}
+                </p>
+              )}
+              <button className="btn primary full" disabled={busy}>
+                {busy ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+          ) : forgotMode === "request" ? (
+            <form
+              className="stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                setError("");
+                setSuccessNotice("");
+                try {
+                  const r = await api("forgot-password", { email: forgotEmail });
+                  setSuccessNotice(
+                    r.message ||
+                      "A 6-digit reset code has been sent to tayyabali201@gmail.com.",
+                  );
+                  setForgotMode("verify");
+                } catch (err) {
+                  setError(errorText(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Field label="Admin email address">
+                <input
+                  type="email"
+                  required
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="admin@campusbookstore.com"
+                />
+              </Field>
+              <p className="small-text">
+                The verification code will be sent to{" "}
+                <strong>tayyabali201@gmail.com</strong>.
               </p>
-            )}
-            <button className="btn primary full" disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
+              {error && (
+                <p role="alert" className="error-text">
+                  {error}
+                </p>
+              )}
+              <button className="btn primary full" disabled={busy}>
+                {busy ? "Sending code…" : "Send Reset Code"}
+              </button>
+              <button
+                type="button"
+                className="btn full"
+                disabled={busy}
+                onClick={() => {
+                  setForgotMode("none");
+                  setError("");
+                }}
+              >
+                Cancel / Back to Sign in
+              </button>
+            </form>
+          ) : (
+            <form
+              className="stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError("");
+                if (newPassword !== confirmPassword) {
+                  setError("Passwords do not match.");
+                  return;
+                }
+                setBusy(true);
+                try {
+                  const r = await api("reset-password", {
+                    code: resetCode ? resetCode.trim() : undefined,
+                    token: resetToken || undefined,
+                    new_password: newPassword,
+                  });
+                  toast.success("Password reset successfully!");
+                  setSuccessNotice(
+                    r.message ||
+                      "Password reset successfully! Please sign in with your new password.",
+                  );
+                  setEmail(forgotEmail);
+                  setPassword("");
+                  setResetCode("");
+                  setResetToken("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setForgotMode("none");
+                } catch (err) {
+                  setError(errorText(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {!resetToken && (
+                <Field label="6-Digit Verification Code">
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={resetCode}
+                    onChange={(e) =>
+                      setResetCode(e.target.value.replace(/\D/g, ""))
+                    }
+                    placeholder="123456"
+                    style={{
+                      letterSpacing: "4px",
+                      fontSize: "1.15rem",
+                      fontWeight: "bold",
+                    }}
+                  />
+                </Field>
+              )}
+              <Field label="New Password">
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min 12 characters, A-Z, a-z, 0-9"
+                />
+              </Field>
+              <Field label="Confirm New Password">
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter your new password"
+                />
+              </Field>
+              {error && (
+                <p role="alert" className="error-text">
+                  {error}
+                </p>
+              )}
+              <button className="btn primary full" disabled={busy}>
+                {busy ? "Updating password…" : "Confirm New Password"}
+              </button>
+              <button
+                type="button"
+                className="btn full"
+                disabled={busy}
+                onClick={() => {
+                  setForgotMode("none");
+                  setError("");
+                }}
+              >
+                Back to Sign in
+              </button>
+            </form>
+          )}
+
           <p className="small-text">
             {portal === "campus"
               ? "Campus accounts are created by Super Admin. Contact your administrator for access or a password reset."
-              : "Use your secure administrator account. Temporary passwords must be changed on first sign-in."}
+              : "Use your secure administrator account. Passwords can be reset via email verification."}
           </p>
           <a href="/" className="text-link">
             Return to the bookstore

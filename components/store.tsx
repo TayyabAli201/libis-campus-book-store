@@ -703,7 +703,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
     : 0;
 
   return (
-    <div className="order-track-card">
+    <div className="order-track-card no-print">
       <div className="track-card-header">
         <div className="track-card-info">
           <span className="track-info-label">Order Reference:</span>

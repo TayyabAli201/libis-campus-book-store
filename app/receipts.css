@@ -270,31 +270,196 @@
   }
 }
 @media print {
-  .tracking-intro {
-    display: none;
+  @page {
+    size: A4;
+    margin: 15mm;
   }
-  .receipt-footer {
-    display: block !important;
+  .tracking-intro,
+  .order-track-card,
+  .tracking-form,
+  .receipt-buttons,
+  .no-print,
+  .actions {
+    display: none !important;
+  }
+  .receipt-panel {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
   .order-receipt {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: 1px solid #d4e0f0 !important;
+    border-radius: 4px !important;
+    background: #ffffff !important;
+    color: #1a3350 !important;
+    box-shadow: none !important;
+    font-size: 9.5pt !important;
+    line-height: 1.5 !important;
   }
-  .order-receipt .receipt-header,
+  .order-receipt .receipt-header {
+    border-top: 4px solid #2563a6 !important;
+    background: #edf5ff !important;
+    padding: 16px 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  .order-receipt .receipt-brand strong {
+    color: #1a3350 !important;
+    font-size: 13pt !important;
+  }
+  .order-receipt .receipt-brand div > span {
+    color: #5e7087 !important;
+    font-size: 7pt !important;
+    letter-spacing: 0.12em !important;
+  }
+  .order-receipt .receipt-brand-icon {
+    color: #2563a6 !important;
+  }
+  .order-receipt .receipt-document-label {
+    color: #2563a6 !important;
+    font-size: 8.5pt !important;
+    font-weight: 750 !important;
+    letter-spacing: 0.12em !important;
+  }
+  .order-receipt .receipt-meta {
+    padding: 16px 20px !important;
+    border-bottom: 1px solid #d4e0f0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    background: #ffffff !important;
+  }
+  .order-receipt .receipt-label {
+    color: #5e7087 !important;
+    font-size: 7pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+  }
+  .order-receipt .receipt-meta h2 {
+    color: #1a3350 !important;
+    font-size: 13pt !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+  }
+  .order-receipt .receipt-meta p {
+    color: #1a3350 !important;
+    font-size: 9.5pt !important;
+    margin: 0 !important;
+  }
+  .order-receipt .receipt-customer {
+    padding: 16px 20px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #d4e0f0 !important;
+  }
+  .order-receipt .receipt-customer h3 {
+    color: #1a3350 !important;
+    font-size: 10.5pt !important;
+    font-weight: 700 !important;
+    margin: 0 0 4px 0 !important;
+  }
+  .order-receipt .receipt-customer p {
+    color: #1a3350 !important;
+    font-size: 9pt !important;
+    margin: 0 !important;
+  }
+  .order-receipt .receipt-items {
+    width: calc(100% - 40px) !important;
+    margin: 16px 20px !important;
+    border-collapse: collapse !important;
+  }
   .order-receipt .receipt-items th {
     background: #edf5ff !important;
+    color: #1a3350 !important;
+    font-size: 8pt !important;
+    font-weight: 700 !important;
+    padding: 9px 8px !important;
+    border: none !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
   }
-  .order-receipt .receipt-header * {
-    background: transparent !important;
+  .order-receipt .receipt-items td {
+    padding: 11px 8px !important;
+    border-bottom: 1px solid #d4e0f0 !important;
+    color: #1a3350 !important;
+    font-size: 9pt !important;
   }
-  .order-receipt
-    :is(
-      .receipt-document-label,
-      .receipt-brand-icon,
-      .receipt-grand-total,
-      .receipt-grand-total *
-    ) {
+  .order-receipt .receipt-items td strong {
+    color: #1a3350 !important;
+    font-weight: 650 !important;
+    font-size: 9.5pt !important;
+  }
+  .order-receipt .receipt-items td small {
+    color: #5e7087 !important;
+    font-size: 7.5pt !important;
+  }
+  .order-receipt .receipt-bottom {
+    padding: 16px 20px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+    background: #ffffff !important;
+  }
+  .order-receipt .receipt-statuses .status {
+    border: 1px solid #d4e0f0 !important;
+    background: #f8fafc !important;
+    color: #1a3350 !important;
+    font-size: 7.5pt !important;
+  }
+  .order-receipt .receipt-totals {
+    font-size: 9.5pt !important;
+  }
+  .order-receipt .receipt-totals > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 4px 0 !important;
+    color: #1a3350 !important;
+  }
+  .order-receipt .receipt-totals .receipt-grand-total {
+    margin-top: 8px !important;
+    border-top: 2px solid #2563a6 !important;
     color: #2563a6 !important;
+    padding-top: 10px !important;
+    font-size: 11.5pt !important;
+    font-weight: 750 !important;
+  }
+  .order-receipt .receipt-totals .receipt-grand-total dd {
+    color: #2563a6 !important;
+    font-weight: 750 !important;
+  }
+  .order-receipt .receipt-instructions {
+    padding: 0 20px 16px !important;
+    background: #ffffff !important;
+  }
+  .order-receipt .receipt-instructions p {
+    color: #1a3350 !important;
+    font-size: 9pt !important;
+  }
+  .order-receipt .receipt-footer {
+    display: block !important;
+    margin: 0 20px 20px !important;
+    padding-top: 14px !important;
+    border-top: 1px solid #d4e0f0 !important;
+    background: #ffffff !important;
+  }
+  .order-receipt .receipt-footer strong {
+    color: #1a3350 !important;
+    font-size: 9.5pt !important;
+  }
+  .order-receipt .receipt-footer p,
+  .order-receipt .receipt-footer > span {
+    color: #5e7087 !important;
+    font-size: 8pt !important;
+    margin: 4px 0 0 !important;
   }
   .receipt-header,
   .receipt-meta,
@@ -302,12 +467,9 @@
   .receipt-bottom,
   .receipt-footer,
   .receipt-items tr {
-    break-inside: avoid;
+    break-inside: avoid !important;
   }
   .receipt-items thead {
-    display: table-header-group;
-  }
-  .order-receipt .receipt-bottom {
-    grid-template-columns: 1fr 1fr;
+    display: table-header-group !important;
   }
 }

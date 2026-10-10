@@ -7,6 +7,7 @@ export const migrations = [
   "0002_bizarre_thena.sql",
   "0003_clear_book_catalog.sql",
   "0004_campus_pricing_category.sql",
+  "0005_password_resets.sql",
 ];
 export async function migrateTurso(client, log = console.log) {
   await client.execute(
