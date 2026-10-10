@@ -2165,6 +2165,7 @@ function Orders({
         // Fallback to structured CSV with book items
         const csvRows: unknown[][] = [
           [
+            "Sr No",
             "Order Number",
             "Student Name",
             "Date",
@@ -2174,7 +2175,7 @@ function Orders({
           ],
         ];
 
-        for (const o of rows) {
+        rows.forEach((o: any, orderIdx: number) => {
           const items =
             o.items && o.items.length > 0
               ? o.items
@@ -2183,17 +2184,18 @@ function Orders({
             ? new Date(o.created_at).toLocaleDateString("en-GB")
             : "—";
 
-          for (const item of items) {
+          items.forEach((item: any, idx: number) => {
             csvRows.push([
-              o.reference || "—",
-              o.name || "Student",
-              dateStr,
+              idx === 0 ? orderIdx + 1 : "",
+              idx === 0 ? o.reference || "—" : "",
+              idx === 0 ? o.name || "Student" : "",
+              idx === 0 ? dateStr : "",
               item.code || "—",
               item.title || "—",
               item.quantity || 1,
             ]);
-          }
-        }
+          });
+        });
 
         download(filename.replace(/\.xlsx$/, ".csv"), csv(csvRows));
         toast.success(`Exported ${rows.length} order(s).`);

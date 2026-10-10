@@ -1,4 +1,5 @@
 export const ORDER_EXPORT_COLUMNS = [
+  "Sr No",
   "Order Number",
   "Student Name",
   "Date",
@@ -8,28 +9,30 @@ export const ORDER_EXPORT_COLUMNS = [
 ] as const;
 
 export function orderSheet(orders: any[]) {
-  // Theme Header Style: Royal Blue (#2563A6) matching the Bookstore Brand Theme
+  // Theme Header Style: Royal Blue matching Bookstore Brand Theme
   const headerRow = [
-    { value: "Order Number", width: 22 },
+    { value: "Sr No", width: 10 },
+    { value: "Order Number", width: 24 },
     { value: "Student Name", width: 26 },
     { value: "Date", width: 18 },
     { value: "Book Code", width: 16 },
-    { value: "Book Name", width: 44 },
+    { value: "Book Name", width: 46 },
     { value: "Quantity", width: 12 },
   ].map((col) => ({
     value: col.value,
     fontWeight: "bold" as const,
-    backgroundColor: "#2563A6",
+    backgroundColor: "#1F65A8",
     textColor: "#FFFFFF",
     align: "center" as const,
-    borderColor: "#1D4ED8",
+    alignVertical: "center" as const,
+    borderColor: "#1E3A8A",
     borderStyle: "thin" as const,
   }));
 
   const dataRows: any[] = [];
-  let rowIndex = 0;
+  const border = "#475569";
 
-  for (const o of orders) {
+  orders.forEach((o, orderIdx) => {
     const items =
       o.items && o.items.length > 0
         ? o.items
@@ -49,67 +52,106 @@ export function orderSheet(orders: any[]) {
         })
       : "—";
 
-    for (const item of items) {
-      rowIndex++;
-      const isAlt = rowIndex % 2 === 0;
-      const bg = isAlt ? "#F8FAFC" : "#FFFFFF";
-      const border = "#E2E8F0";
+    const N = items.length;
+    const srNo = orderIdx + 1;
 
-      dataRows.push([
-        {
-          value: o.reference || "—",
-          fontWeight: "bold" as const,
-          textColor: "#1E40AF",
-          backgroundColor: bg,
-          align: "center" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: o.name || "Student",
-          textColor: "#0F172A",
-          backgroundColor: bg,
-          align: "left" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: orderDate,
-          textColor: "#475569",
-          backgroundColor: bg,
-          align: "center" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: item.code || "—",
-          fontWeight: "bold" as const,
-          textColor: "#0F172A",
-          backgroundColor: bg,
-          align: "center" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: item.title || "—",
-          textColor: "#0F172A",
-          backgroundColor: bg,
-          align: "left" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: Number(item.quantity) || 1,
-          type: Number,
-          textColor: "#0F172A",
-          backgroundColor: bg,
-          align: "right" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-      ]);
-    }
-  }
+    items.forEach((item: any, idx: number) => {
+      if (idx === 0) {
+        // First row of the order: contains merged cells spanning N rows
+        dataRows.push([
+          {
+            value: srNo,
+            type: Number,
+            rowSpan: N,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: o.reference || "—",
+            rowSpan: N,
+            fontWeight: "bold" as const,
+            textColor: "#1E40AF",
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: o.name || "Student",
+            rowSpan: N,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: orderDate,
+            rowSpan: N,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: item.code || "—",
+            fontWeight: "bold" as const,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: item.title || "—",
+            align: "left" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: Number(item.quantity) || 1,
+            type: Number,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+        ]);
+      } else {
+        // Subsequent rows of the order: first 4 cells are null (covered by rowSpan)
+        dataRows.push([
+          null,
+          null,
+          null,
+          null,
+          {
+            value: item.code || "—",
+            fontWeight: "bold" as const,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: item.title || "—",
+            align: "left" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+          {
+            value: Number(item.quantity) || 1,
+            type: Number,
+            align: "center" as const,
+            alignVertical: "center" as const,
+            borderColor: border,
+            borderStyle: "thin" as const,
+          },
+        ]);
+      }
+    });
+  });
 
   return [headerRow, ...dataRows];
 }
