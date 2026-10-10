@@ -1903,11 +1903,6 @@ export function OrderReceipt({ o }: { o: any }) {
         </tbody>
       </table>
       <div className="receipt-bottom">
-        <div className="receipt-statuses">
-          <span className="receipt-label">Order & payment</span>
-          <Status value={o.status} />
-          <Status value={o.payment_status} />
-        </div>
         <dl className="receipt-totals">
           <div>
             <dt>Subtotal</dt>
@@ -2044,25 +2039,16 @@ function OrderTracking({ data }: { data: Catalog }) {
                   </div>
                 ))}
               </div>
-              {!o.tracking_only && (
-                <>
-                  <h3>Payment proof</h3>
-                  <Status value={o.ocr_status} />
-                  <p>{o.ocr_message}</p>
-                  {o.detected_amount !== null && (
-                    <p>Detected: {money(o.detected_amount)}</p>
-                  )}
-                  {o.payment_status === "NEW_SLIP_REQUESTED" && (
-                    <>
-                      <p className="notice">{o.payment_note}</p>
-                      <ProofUploader
-                        path={"proofs?order=" + o.id}
-                        max={data.settings.max_upload_mb}
-                        onUploaded={() => load(o.id)}
-                      />
-                    </>
-                  )}
-                </>
+              {!o.tracking_only && o.payment_status === "NEW_SLIP_REQUESTED" && (
+                <div style={{ marginTop: 20 }}>
+                  <h3>Upload new payment proof</h3>
+                  {o.payment_note && <p className="notice">{o.payment_note}</p>}
+                  <ProofUploader
+                    path={"proofs?order=" + o.id}
+                    max={data.settings.max_upload_mb}
+                    onUploaded={() => load(o.id)}
+                  />
+                </div>
               )}
               {o.tracking_only && o.payment_status === "NEW_SLIP_REQUESTED" && (
                 <p className="notice">

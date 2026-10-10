@@ -218,20 +218,8 @@ export async function receipt(o: any) {
     separator(y);
   }
   y -= 24;
-  const paymentLines = wrap(
-    statuses[o.payment_status] || o.payment_status,
-    225,
-    9,
-  );
-  const statusLines = wrap(statuses[o.status] || o.status, 225, 9, bold);
-  const summaryHeight = Math.max(
-    100,
-    30 + statusLines.length * 13 + paymentLines.length * 13,
-  );
+  const summaryHeight = 90;
   ensure(summaryHeight);
-  text("ORDER & PAYMENT", margin, y, 7, true, muted);
-  const orderHeight = lines(statusLines, margin, y - 17, 9, true);
-  lines(paymentLines, margin, y - 23 - orderHeight, 9, false, muted);
   text("Subtotal", 335, y, 10, false, muted);
   right(money(o.subtotal, o.currency), width - margin - 10, y, 10);
   text("Delivery", 335, y - 23, 10, false, muted);

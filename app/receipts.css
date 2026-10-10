@@ -165,26 +165,13 @@
   font-size: 0.65rem;
 }
 .receipt-bottom {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  display: flex;
+  justify-content: flex-end;
   padding: 25px 26px;
 }
-.receipt-statuses {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 8px;
-}
-.receipt-statuses .receipt-label {
-  margin-bottom: 2px;
-}
-.receipt-statuses .status {
-  white-space: normal;
-  font-size: 0.61rem;
-  padding: 5px 8px;
-}
 .receipt-totals {
+  width: 280px;
+  max-width: 100%;
   margin: 0;
   font-size: 0.77rem;
 }
@@ -425,18 +412,12 @@
   }
   .order-receipt .receipt-bottom {
     padding: 16px 20px !important;
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
     background: #ffffff !important;
   }
-  .order-receipt .receipt-statuses .status {
-    border: 1px solid #d4e0f0 !important;
-    background: #f8fafc !important;
-    color: #1a3350 !important;
-    font-size: 7.5pt !important;
-  }
   .order-receipt .receipt-totals {
+    width: 250px !important;
     font-size: 9.5pt !important;
   }
   .order-receipt .receipt-totals > div {
