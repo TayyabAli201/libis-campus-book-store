@@ -2150,24 +2150,22 @@ function Orders({
         toast.info("No orders found to export.");
         return;
       }
-      const statusSuffix =
-        status === "all"
-          ? "all"
-          : (statuses[status] || status)
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-");
-      const deliverySuffix =
-        deliveryType === "all"
-          ? ""
-          : `-${deliveryType === "other" ? "other-cities" : deliveryType}`;
-      const filename = `orders-${statusSuffix}${deliverySuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const currentDate = new Date().toISOString().slice(0, 10);
+      let deliveryPrefix = "Orders";
+      if (deliveryType === "campus") deliveryPrefix = "Campus Pickup";
+      else if (deliveryType === "lahore") deliveryPrefix = "Lahore";
+      else if (deliveryType === "other") deliveryPrefix = "Other City";
+
+      const statusPart =
+        status && status !== "all" ? ` - ${statuses[status] || status}` : "";
+      const filename = `${deliveryPrefix}${statusPart} - ${currentDate}.xlsx`;
       const includeAddress = deliveryType === "other";
 
       try {
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
         await exportOrdersExcel(rows, filename, { includeAddress });
         toast.success(
-          `Exported ${rows.length} order(s)${includeAddress ? " with address" : ""} in theme format.`,
+          `Exported ${rows.length} order(s)${includeAddress ? " with address" : ""} to ${filename}.`,
         );
       } catch (excelErr) {
         // Fallback to structured CSV with book items
@@ -2289,8 +2287,8 @@ function Orders({
           options={[
             { value: "all", label: "All delivery types" },
             { value: "campus", label: "Campus Pickup" },
-            { value: "lahore", label: "Lahore Delivery" },
-            { value: "other", label: "Other Cities (Courier)" },
+            { value: "lahore", label: "Lahore" },
+            { value: "other", label: "Other City" },
           ]}
         />
         <input
@@ -2315,7 +2313,7 @@ function Orders({
           className="btn compact"
           onClick={exportOrders}
           disabled={exporting || loading}
-          title={`Export ${status === "all" ? "all" : statuses[status] || status} ${deliveryType === "all" ? "" : `(${deliveryType}) `}orders to Excel`}
+          title={`Export ${deliveryType === "all" ? (status === "all" ? "all" : statuses[status] || status) : (deliveryType === "other" ? "Other City" : deliveryType === "campus" ? "Campus Pickup" : "Lahore")} orders to Excel`}
         >
           <Download size={15} />
           {exporting
@@ -2325,10 +2323,10 @@ function Orders({
                   ? "Orders"
                   : deliveryType !== "all"
                     ? deliveryType === "other"
-                      ? "Other Cities"
+                      ? "Other City"
                       : deliveryType === "campus"
                         ? "Campus Pickup"
-                        : "Lahore Delivery"
+                        : "Lahore"
                     : statuses[status] || status
               }`}
         </button>
