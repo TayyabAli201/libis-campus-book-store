@@ -63,13 +63,11 @@ export function orderSheet(
             },
           ];
 
-    const orderDate = o.created_at
-      ? new Date(o.created_at).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "—";
+    const d = o.created_at ? new Date(o.created_at) : null;
+    const orderDate =
+      d && !isNaN(d.getTime())
+        ? `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`
+        : "—";
 
     const N = items.length;
     const srNo = orderIdx + 1;

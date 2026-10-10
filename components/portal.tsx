@@ -2150,7 +2150,12 @@ function Orders({
         toast.info("No orders found to export.");
         return;
       }
-      const currentDate = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yyyy = now.getFullYear();
+      const currentDate = `${dd}-${mm}-${yyyy}`;
+
       let deliveryPrefix = "Orders";
       if (deliveryType === "campus") deliveryPrefix = "Campus Pickup";
       else if (deliveryType === "lahore") deliveryPrefix = "Lahore";
@@ -2187,9 +2192,11 @@ function Orders({
             o.items && o.items.length > 0
               ? o.items
               : [{ code: "—", title: "Order Record", quantity: 1 }];
-          const dateStr = o.created_at
-            ? new Date(o.created_at).toLocaleDateString("en-GB")
-            : "—";
+          const d = o.created_at ? new Date(o.created_at) : null;
+          const dateStr =
+            d && !isNaN(d.getTime())
+              ? `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`
+              : "—";
           const fullAddress = o.address
             ? o.city && !o.address.toLowerCase().includes(o.city.toLowerCase())
               ? `${o.address}, ${o.city}`

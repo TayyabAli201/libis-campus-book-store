@@ -29,6 +29,7 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
   assert.deepEqual(standardSheet[0].map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS));
   assert.equal(standardSheet[1][0].rowSpan, 2);
   assert.equal(standardSheet[1][1].value, 'ORD-101');
+  assert.equal(standardSheet[1][3].value, '10-10-2026');
   assert.equal(standardSheet[1][4].value, 'CS101');
   assert.equal(standardSheet[2][0], null);
   assert.equal(standardSheet[2][4].value, 'MATH201');
