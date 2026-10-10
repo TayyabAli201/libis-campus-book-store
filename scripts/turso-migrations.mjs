@@ -6,23 +6,33 @@ export const migrations = [
   "0001_swift_scream.sql",
   "0002_bizarre_thena.sql",
   "0003_clear_book_catalog.sql",
+  "0004_campus_pricing_category.sql",
 ];
 export async function migrateTurso(client, log = console.log) {
   await client.execute(
     "CREATE TABLE IF NOT EXISTS __bookstore_migrations (name TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)",
   );
   for (const name of migrations) {
-    const source = readFileSync(
+    const rawSource = readFileSync(
       new URL("../drizzle/" + name, import.meta.url),
       "utf8",
     );
-    const checksum = createHash("sha256").update(source).digest("hex");
+    const source = rawSource.replace(/\r\n/g, "\n");
+    const rawChecksum = createHash("sha256").update(rawSource).digest("hex");
+    const lfChecksum = createHash("sha256")
+      .update(rawSource.replace(/\r\n/g, "\n"))
+      .digest("hex");
+    const crlfChecksum = createHash("sha256")
+      .update(rawSource.replace(/\r?\n/g, "\r\n"))
+      .digest("hex");
+    const checksum = lfChecksum;
     const applied = await client.execute({
       sql: "SELECT checksum FROM __bookstore_migrations WHERE name=?",
       args: [name],
     });
     if (applied.rows.length) {
-      if (applied.rows[0].checksum !== checksum)
+      const stored = applied.rows[0].checksum;
+      if (stored !== lfChecksum && stored !== crlfChecksum && stored !== rawChecksum)
         throw new Error(`Previously applied migration was modified: ${name}`);
       continue;
     }
