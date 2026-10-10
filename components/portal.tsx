@@ -595,7 +595,7 @@ export function Portal({
           ) : section === "audit" ? (
             <Audit />
           ) : section === "students" ? (
-            <Students />
+            <Students user={user} />
           ) : section === "orders" || section === "payments" ? (
             record ? (
               <OrderDetail id={record} user={user} />
@@ -887,41 +887,22 @@ function Dashboard({
   );
   return (
     <>
-      {!reportsOnly && (
+      {!reportsOnly && !!quickLinks.length && (
         <section className="dashboard-welcome">
-          <div className="dashboard-welcome-copy">
-            <span className="eyebrow">
-              {isAdmin
-                ? "A LITTLE CLARITY FOR YOUR DAY"
-                : `CAMPUS PORTAL · ASSIGNED PRICING RATE: ${categoryLabel(user.campus_category || "A").toUpperCase()}`}
-            </span>
-            <h2>
-              Your bookstore
-              <br />
-              at a glance.
-            </h2>
-            <p>
-              {isAdmin
-                ? "Follow your orders, review payments and keep your collection ready for the next chapter."
-                : `Order books for your campus students at your assigned ${categoryLabel(user.campus_category || "A")} pricing rate.`}
-            </p>
-          </div>
-          {!!quickLinks.length && (
-            <nav className="dashboard-shortcuts" aria-label="Quick actions">
-              {quickLinks.map(({ label, description, href, icon: Icon }) => (
-                <a key={href} href={base + href}>
-                  <span className="shortcut-icon">
-                    <Icon size={20} />
-                  </span>
-                  <span>
-                    <strong>{label}</strong>
-                    <small>{description}</small>
-                  </span>
-                  <ArrowUpRight size={18} className="shortcut-arrow" />
-                </a>
-              ))}
-            </nav>
-          )}
+          <nav className="dashboard-shortcuts" aria-label="Quick actions">
+            {quickLinks.map(({ label, description, href, icon: Icon }) => (
+              <a key={href} href={base + href}>
+                <span className="shortcut-icon">
+                  <Icon size={20} />
+                </span>
+                <span>
+                  <strong>{label}</strong>
+                  <small>{description}</small>
+                </span>
+                <ArrowUpRight size={18} className="shortcut-arrow" />
+              </a>
+            ))}
+          </nav>
         </section>
       )}
       <div className="dashboard-controls">
@@ -2153,9 +2134,68 @@ function Orders({
     [page, setPage] = useState(1),
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
-    [deletingOrder, setDeletingOrder] = useState<any | null>(null);
+    [deletingOrder, setDeletingOrder] = useState<any | null>(null),
+    [exporting, setExporting] = useState(false);
 
   const isAdmin = user?.role === "SUPER_ADMIN";
+
+  const exportOrders = async () => {
+    setExporting(true);
+    try {
+      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
+      const res = await api(exportPath);
+      const rows = res.rows || [];
+      if (!rows.length) {
+        toast.info("No orders found to export.");
+        return;
+      }
+      const statusSuffix =
+        status === "all"
+          ? "all"
+          : (statuses[status] || status)
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-");
+      const filename = `orders-${statusSuffix}-${new Date().toISOString().slice(0, 10)}.csv`;
+      const csvContent = csv([
+        [
+          "Order ID",
+          "Date",
+          "Student Name",
+          "Phone",
+          "City",
+          "Address",
+          "Delivery Type",
+          "Order Status",
+          "Payment Status",
+          "Subtotal",
+          "Delivery Fee",
+          "Total",
+          "Instructions",
+        ],
+        ...rows.map((o: any) => [
+          o.reference,
+          new Date(o.created_at).toLocaleString(),
+          o.name,
+          o.phone,
+          o.city,
+          o.address,
+          o.delivery_type,
+          statuses[o.status] || o.status,
+          statuses[o.payment_status] || o.payment_status,
+          money(o.subtotal, o.currency),
+          money(o.delivery, o.currency),
+          money(o.total, o.currency),
+          o.instructions || "",
+        ]),
+      ]);
+      download(filename, csvContent);
+      toast.success(`Exported ${rows.length} order(s).`);
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const path = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&page=${page}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
   const { data, error, loading, reload } = useData(path);
@@ -2232,6 +2272,17 @@ function Orders({
             setPage(1);
           }}
         />
+        <button
+          className="btn compact"
+          onClick={exportOrders}
+          disabled={exporting || loading}
+          title={`Export ${status === "all" ? "all" : statuses[status] || status} orders to CSV`}
+        >
+          <Download size={15} />
+          {exporting
+            ? "Exporting…"
+            : `Export ${status === "all" ? "Orders" : statuses[status] || status}`}
+        </button>
       </div>
       <Result loading={loading} error={error}>
         <DataTable
@@ -3206,21 +3257,137 @@ function SettingsPage() {
     </Result>
   );
 }
-function Students() {
-  const { data, error, loading } = useData<any[]>("manage/students");
+function Students({ user }: { user?: User }) {
+  const [q, setQ] = useState("");
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [studentToClear, setStudentToClear] = useState<any | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const { data, error, loading, reload } = useData<any[]>("manage/students");
+
+  const isAdmin =
+    user?.role === "SUPER_ADMIN" || user?.permissions.includes("orders.update");
+
+  const filtered = (data || []).filter((s) => {
+    if (!q.trim()) return true;
+    const term = q.toLowerCase();
+    return (
+      (s.name && s.name.toLowerCase().includes(term)) ||
+      (s.phone && s.phone.includes(term)) ||
+      (s.city && s.city.toLowerCase().includes(term))
+    );
+  });
+
+  const clearAllHistory = async () => {
+    setClearing(true);
+    try {
+      await api("manage/students", { action: "clear_all" });
+      toast.success("Student history cleared successfully.");
+      reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const clearSingleStudent = async () => {
+    if (!studentToClear) return;
+    setClearing(true);
+    try {
+      await api("manage/students", {
+        action: "clear_student",
+        phone: studentToClear.phone,
+      });
+      toast.success(
+        `Cleared history for ${studentToClear.name || studentToClear.phone}.`,
+      );
+      setStudentToClear(null);
+      reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
-    <Result loading={loading} error={error}>
-      <DataTable
-        headers={["Student", "WhatsApp", "City", "Orders", "Latest order"]}
-        rows={(data || []).map((s) => [
-          s.name,
-          s.phone,
-          s.city,
-          s.orders,
-          new Date(s.last_order).toLocaleDateString(),
-        ])}
+    <>
+      <div className="toolbar">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="Search students"
+          placeholder="Filter by student name, WhatsApp or city…"
+        />
+        <button className="btn compact" onClick={reload} disabled={loading}>
+          <RefreshCw
+            size={15}
+            className={loading ? "refresh-spinning" : undefined}
+          />
+          Refresh
+        </button>
+        {isAdmin && (
+          <button
+            className="btn compact btn-destructive"
+            onClick={() => setConfirmClearAll(true)}
+            disabled={clearing || loading || !data?.length}
+            title="Clear all student order history"
+          >
+            <Trash2 size={15} />
+            {clearing ? "Clearing…" : "Clear Student History"}
+          </button>
+        )}
+      </div>
+
+      <Result loading={loading} error={error}>
+        <DataTable
+          headers={[
+            "Student",
+            "WhatsApp",
+            "City",
+            "Orders",
+            "Latest order",
+            ...(isAdmin ? ["Actions"] : []),
+          ]}
+          rows={filtered.map((s) => [
+            s.name || "Student",
+            s.phone || "—",
+            s.city || "—",
+            s.orders,
+            s.last_order ? new Date(s.last_order).toLocaleDateString() : "—",
+            ...(isAdmin
+              ? [
+                  <button
+                    key={s.phone}
+                    className="btn compact btn-destructive"
+                    onClick={() => setStudentToClear(s)}
+                    disabled={clearing}
+                    title={`Clear history for ${s.name}`}
+                  >
+                    <Trash2 size={14} /> Clear
+                  </button>,
+                ]
+              : []),
+          ])}
+        />
+      </Result>
+
+      <Confirm
+        open={confirmClearAll}
+        onClose={() => setConfirmClearAll(false)}
+        onConfirm={clearAllHistory}
+        title="Clear All Student History"
+        description="Are you sure you want to clear all student history? This will permanently delete student orders and records from the directory."
       />
-    </Result>
+
+      <Confirm
+        open={!!studentToClear}
+        onClose={() => setStudentToClear(null)}
+        onConfirm={clearSingleStudent}
+        title={`Clear History for ${studentToClear?.name || "Student"}`}
+        description={`Are you sure you want to delete order history for ${studentToClear?.name || "this student"} (${studentToClear?.phone})?`}
+      />
+    </>
   );
 }
 function Audit() {

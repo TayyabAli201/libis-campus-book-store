@@ -333,6 +333,7 @@ export async function listOrders(
   to = "",
   page = 1,
   campusId = "",
+  limit?: number | "all",
 ) {
   const s = scope(u);
   const filters = [s.sql];
@@ -362,10 +363,12 @@ export async function listOrders(
     "SELECT COUNT(*) AS n FROM orders o WHERE " + where,
     ...args,
   );
+  const isAll = limit === "all";
+  const limitClause = isAll ? "LIMIT 10000" : "LIMIT 50 OFFSET ?";
+  const queryArgs = isAll ? [...args] : [...args, (page - 1) * 50];
   const rows = await all(
-    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC LIMIT 50 OFFSET ?`,
-    ...args,
-    (page - 1) * 50,
+    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
+    ...queryArgs,
   );
   rows.forEach((o) => {
     delete o.owner;

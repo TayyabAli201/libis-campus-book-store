@@ -176,19 +176,16 @@ textarea:focus-visible,
 }
 .dashboard-welcome {
   position: relative;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  align-items: center;
-  gap: 35px;
-  padding: 24px 30px;
+  display: block;
+  padding: 22px 24px;
   margin-bottom: 24px;
   overflow: hidden;
   isolation: isolate;
   color: var(--feature-foreground);
   background: var(--feature-surface);
   border: 1px solid var(--feature-border);
-  border-radius: 22px;
-  box-shadow: 0 12px 35px #173d6514;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px #173d650e;
 }
 .dashboard-welcome::before,
 .dashboard-welcome::after {
@@ -232,22 +229,26 @@ textarea:focus-visible,
 }
 .dashboard-shortcuts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
 }
 .dashboard-shortcuts a {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 13px;
-  padding: 15px 12px;
+  gap: 12px;
+  padding: 18px 16px;
+  min-height: 108px;
   border: 1px solid var(--feature-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--feature-glass);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
   transition:
-    background-color 250ms ease,
-    border-color 250ms ease,
-    transform 300ms var(--ui-ease);
+    background-color 220ms ease,
+    border-color 220ms ease,
+    transform 220ms var(--ui-ease),
+    box-shadow 220ms ease;
 }
 .shortcut-icon {
   width: 36px;
@@ -566,25 +567,21 @@ textarea:focus-visible,
   .portal-main .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .dashboard-shortcuts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 860px) {
+  .dashboard-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 540px) {
   .dashboard-welcome {
-    padding: 26px;
-    gap: 24px;
+    padding: 16px;
   }
   .dashboard-shortcuts {
     grid-template-columns: 1fr;
-  }
-  .dashboard-shortcuts a {
-    display: flex;
-    padding: 10px 12px;
-  }
-}
-@media (max-width: 700px) {
-  .dashboard-welcome {
-    grid-template-columns: 1fr;
-    padding: 24px;
-  }
-  .dashboard-welcome h2 {
-    font-size: 2rem;
   }
   .portal-main {
     padding: 22px 18px;

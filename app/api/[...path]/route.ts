@@ -509,6 +509,7 @@ async function handle(req: Request) {
           1,
           Math.min(10000, Number(url.searchParams.get("page")) || 1),
         );
+        const limitParam = url.searchParams.get("limit");
         return ok(
           await listOrders(
             u,
@@ -518,6 +519,7 @@ async function handle(req: Request) {
             url.searchParams.get("to") || "",
             page,
             url.searchParams.get("campus") || "",
+            limitParam === "all" ? "all" : undefined,
           ),
         );
       }
@@ -598,15 +600,62 @@ async function handle(req: Request) {
         });
       return ok(await reports(u, dates.from, dates.to));
     }
-    if (section === "students" && method === "GET") {
-      const u = await user(req, "students.read");
-      const s = scope(u);
-      return ok(
-        await all(
-          `SELECT o.name,o.phone,o.city,COUNT(*) orders,MAX(o.created_at) last_order FROM orders o WHERE ${s.sql} GROUP BY o.phone,o.name,o.city ORDER BY last_order DESC LIMIT 500`,
-          ...s.args,
-        ),
-      );
+    if (section === "students") {
+      if (method === "GET") {
+        const u = await user(req, "students.read");
+        const s = scope(u);
+        return ok(
+          await all(
+            `SELECT o.name,o.phone,o.city,COUNT(*) orders,MAX(o.created_at) last_order FROM orders o WHERE ${s.sql} GROUP BY o.phone,o.name,o.city ORDER BY last_order DESC LIMIT 500`,
+            ...s.args,
+          ),
+        );
+      }
+      if (method === "POST" || method === "DELETE") {
+        const adminUser = await user(req, "orders.update");
+        const s = scope(adminUser);
+        const body = method === "POST" ? await json(req).catch(() => ({})) : {};
+        const phone = (body as any)?.phone || url.searchParams.get("phone");
+
+        let orderIds: { id: string }[] = [];
+        if (phone) {
+          orderIds = await all<{ id: string }>(
+            `SELECT id FROM orders o WHERE ${s.sql} AND o.phone=?`,
+            ...s.args,
+            phone,
+          );
+        } else {
+          orderIds = await all<{ id: string }>(
+            `SELECT id FROM orders o WHERE ${s.sql}`,
+            ...s.args,
+          );
+        }
+
+        if (orderIds.length > 0) {
+          for (let i = 0; i < orderIds.length; i += 50) {
+            const ids = orderIds.slice(i, i + 50).map((o) => o.id);
+            const placeholders = ids.map(() => "?").join(",");
+            await batch([
+              stmt(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, ...ids),
+              stmt(`DELETE FROM order_history WHERE order_id IN (${placeholders})`, ...ids),
+              stmt(`DELETE FROM payments WHERE order_id IN (${placeholders})`, ...ids),
+              stmt(`UPDATE payment_slips SET order_id=NULL WHERE order_id IN (${placeholders})`, ...ids),
+              stmt(`DELETE FROM orders WHERE id IN (${placeholders})`, ...ids),
+            ]);
+          }
+        }
+        await batch([
+          auditStmt(
+            adminUser.email,
+            phone ? "CLEAR_STUDENT_HISTORY" : "CLEAR_ALL_STUDENT_HISTORY",
+            phone || "ALL",
+            { clearedCount: orderIds.length },
+            undefined,
+            req,
+          ),
+        ]);
+        return ok({ ok: true, cleared: orderIds.length });
+      }
     }
     if (section === "campuses") {
       const u = await admin(req);
