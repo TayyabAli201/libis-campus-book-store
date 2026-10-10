@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790968915140,
+      "tag": "0000_modern_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790980593191,
+      "tag": "0001_swift_scream",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790982285014,
+      "tag": "0002_bizarre_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790984975199,
+      "tag": "0003_clear_book_catalog",
+      "breakpoints": true
+    }
+  ]
+}

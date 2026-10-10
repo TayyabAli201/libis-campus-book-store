@@ -1,0 +1,763 @@
+import { z } from "zod";
+import {
+  all,
+  one,
+  stmt,
+  batch,
+  guard,
+  now,
+  uid,
+  AppError,
+  auditStmt,
+  bucket,
+} from "@/lib/server/db";
+import {
+  authenticate,
+  csrf,
+  rate,
+  user,
+  admin,
+  guest,
+  token,
+  hash,
+  cookie,
+  cookieValue,
+  passwordHash,
+  verifyPassword,
+  scope,
+} from "@/lib/server/security";
+import {
+  catalog,
+  getSettings,
+  saveBook,
+  importBooks,
+  clearBooks,
+  clearBooksPreview,
+} from "@/lib/server/catalog";
+import {
+  quote,
+  submitOrder,
+  getOrder,
+  listOrders,
+  pendingOrderCount,
+  decidePayment,
+  changeStatus,
+} from "@/lib/server/orders";
+import { upload } from "@/lib/server/uploads";
+import { bootstrap } from "@/lib/server/seed";
+import { reports } from "@/lib/server/reports";
+import { password, permissions, settingsInput } from "@/lib/contracts";
+export const dynamic = "force-dynamic";
+async function json(req: Request) {
+  if (Number(req.headers.get("content-length")) > 500000)
+    throw new AppError(413, "Request is too large.");
+  const reader = req.body?.getReader();
+  if (!reader) throw new AppError(400, "A request body is required.");
+  let text = "",
+    size = 0;
+  const decoder = new TextDecoder();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > 500000) {
+      await reader.cancel();
+      throw new AppError(413, "Request is too large.");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  text += decoder.decode();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new AppError(400, "Invalid request body.");
+  }
+}
+const ok = (
+  data: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+) =>
+  Response.json(data, {
+    status,
+    headers: { "Cache-Control": "no-store", ...headers },
+  });
+async function handle(req: Request) {
+  const url = new URL(req.url),
+    p = url.pathname.replace(/^\/api\//, "").split("/"),
+    action = p.join("/"),
+    method = req.method;
+  try {
+    if (action === "setup" && method === "POST")
+      return ok(await bootstrap(req));
+    if (method !== "GET") csrf(req);
+    if (action === "session" && method === "GET") {
+      let u = null;
+      try {
+        u = await user(req, "profile");
+      } catch {}
+      let t = cookieValue(req, "cbs_guest");
+      if (!/^[a-f0-9]{64}$/.test(t)) t = token();
+      return ok({ user: u }, 200, {
+        "Set-Cookie": cookie(req, "cbs_guest", t, 60 * 60 * 24 * 90),
+      });
+    }
+    if (action === "login" && method === "POST") {
+      const b = z
+        .object({
+          email: z.string().trim().email().max(200),
+          password: z.string().min(1).max(128),
+          portal: z.enum(["admin", "campus"]),
+        })
+        .parse(await json(req));
+      const r = await authenticate(req, b.email, b.password, b.portal);
+      return ok({ must_change: r.must_change }, 200, {
+        "Set-Cookie": cookie(req, "cbs_session", r.token, 8 * 3600),
+      });
+    }
+    if (action === "logout" && method === "POST") {
+      await stmt(
+        "DELETE FROM sessions WHERE id=?",
+        hash(cookieValue(req, "cbs_session")),
+      ).run();
+      return ok({ ok: true }, 200, {
+        "Set-Cookie": cookie(req, "cbs_session", "", 0),
+      });
+    }
+    if (action === "profile" && method === "POST") {
+      const u = await user(req, "profile");
+      const b = z
+        .object({
+          name: z.string().trim().min(1).max(100),
+          current_password: z.string().max(128),
+          new_password: password.optional(),
+        })
+        .parse(await json(req));
+      const old = await one<any>(
+        "SELECT password_hash FROM users WHERE id=?",
+        u.id,
+      );
+      if (!verifyPassword(b.current_password, old.password_hash))
+        throw new AppError(400, "Current password is incorrect.");
+      if (u.must_change && !b.new_password)
+        throw new AppError(400, "Set a new password to continue.");
+      if (b.new_password && verifyPassword(b.new_password, old.password_hash))
+        throw new AppError(
+          400,
+          "Choose a password different from your current password.",
+        );
+      await batch([
+        stmt(
+          "UPDATE users SET name=?,password_hash=?,must_change=0 WHERE id=?",
+          b.name,
+          b.new_password ? passwordHash(b.new_password) : old.password_hash,
+          u.id,
+        ),
+        stmt("DELETE FROM sessions WHERE user_id=?", u.id),
+        auditStmt(
+          u.email,
+          "UPDATE_PROFILE",
+          u.id,
+          undefined,
+          { name: b.name, password_changed: !!b.new_password },
+          req,
+        ),
+      ]);
+      return ok({ ok: true }, 200, {
+        "Set-Cookie": cookie(req, "cbs_session", "", 0),
+      });
+    }
+    if (action === "catalog" && method === "GET") {
+      let u;
+      try {
+        u = await user(req);
+      } catch {}
+      const [{ settings }, books, campuses, prices] = await Promise.all([
+        getSettings(),
+        catalog(url.searchParams.get("q") || "", u, {
+          page: Number(url.searchParams.get("page")) || 1,
+          ids: (url.searchParams.get("ids") || "")
+            .split(",")
+            .filter(Boolean)
+            .slice(0, 30),
+          category: url.searchParams.get("category") || undefined,
+        }),
+        all("SELECT id,code,name,city FROM campuses WHERE active=1"),
+        all("SELECT id,rate,version FROM pricing_categories ORDER BY id"),
+      ]);
+      return ok({ settings, books, campuses, prices });
+    }
+    if (action === "quote" && method === "POST") {
+      await rate(req, "quote", 20, 300);
+      return ok(await quote(req, await json(req)));
+    }
+    if (action === "proofs" && method === "POST") return ok(await upload(req));
+    if (action === "orders" && method === "POST") {
+      await rate(req, "submit-order", 10, 3600);
+      const b = z
+        .object({ quote_id: z.string().uuid(), slip_id: z.string().uuid() })
+        .parse(await json(req));
+      return ok(await submitOrder(req, b.quote_id, b.slip_id), 201);
+    }
+    if (action === "my-orders" && method === "GET")
+      return ok(
+        await all(
+          "SELECT id,reference,status,total,currency,created_at FROM orders WHERE owner=? ORDER BY created_at DESC LIMIT 100",
+          guest(req),
+        ),
+      );
+    if (p[0] === "orders" && p[1] && method === "GET") {
+      if (p.length > 3 || (p[2] && p[2] !== "receipt"))
+        throw new AppError(404, "Endpoint not found.");
+      await rate(req, "read-order", 90, 60);
+      let u;
+      try {
+        u = await user(req, "orders.read");
+      } catch {}
+      const o = await getOrder(
+        req,
+        p[1],
+        u,
+        p[2] === "receipt" ? "private" : "tracking",
+      );
+      if (p[2] === "receipt") {
+        const { receipt } = await import("@/lib/server/receipt");
+        return new Response((await receipt(o)) as BodyInit, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${o.reference}.pdf"`,
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+      return ok(o);
+    }
+    if (p[0] === "proofs" && p[1] && method === "GET") {
+      const u = await admin(req);
+      const s = await one<any>("SELECT * FROM payment_slips WHERE id=?", p[1]);
+      if (!s) throw new AppError(404, "Proof not found.");
+      const object = await bucket().get(s.object_key);
+      if (!object) throw new AppError(404, "File not found.");
+      await auditStmt(
+        u.email,
+        "VIEW_PAYMENT_PROOF",
+        s.id,
+        undefined,
+        undefined,
+        req,
+      ).run();
+      const disposition = url.searchParams.get("download") === "1" ? "attachment" : "inline";
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": s.mime,
+          "Content-Disposition": `${disposition}; filename="payment-${s.id}.${s.mime === "application/pdf" ? "pdf" : s.mime === "image/png" ? "png" : "jpg"}"`,
+          "Cache-Control": "no-store",
+          "Content-Security-Policy": "sandbox; default-src 'none'",
+        },
+      });
+    }
+    if (action === "covers" && method === "POST")
+      return ok(await upload(req, true));
+    if (p[0] === "covers" && p[1] && method === "GET") {
+      if (!/^[a-f0-9-]{36}$/.test(p[1]))
+        throw new AppError(404, "Image not found.");
+      const object = await bucket().get("covers/" + p[1]);
+      if (!object) throw new AppError(404, "Image not found.");
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType || "image/jpeg",
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    }
+    if (p[0] !== "manage") throw new AppError(404, "Endpoint not found.");
+    const section = p[1],
+      id = p[2];
+    if (section === "books") {
+      const u =
+        method === "GET" ? await user(req, "books.read") : await admin(req);
+      if (id === "clear") {
+        if (method === "GET") return ok(await clearBooksPreview(u));
+        if (method === "DELETE")
+          return ok(await clearBooks(await json(req), u, req));
+        throw new AppError(405, "Method not allowed.");
+      }
+      if (method === "GET") {
+        if (id && p[3] === "history") {
+          if (u.role !== "SUPER_ADMIN")
+            throw new AppError(403, "Super Admin access required.");
+          return ok(
+            await all(
+              "SELECT * FROM inventory_transactions WHERE book_id=? ORDER BY created_at DESC LIMIT 200",
+              id,
+            ),
+          );
+        }
+        return ok(
+          await catalog(url.searchParams.get("q") || "", u, {
+            page: Number(url.searchParams.get("page")) || 1,
+            category: url.searchParams.get("category") || undefined,
+          }),
+        );
+      }
+      if (method === "POST" && id === "import") {
+        const rows = z
+          .array(z.object({ row: z.number().int().min(2), book: z.unknown() }))
+          .min(1)
+          .max(200)
+          .parse(await json(req));
+        return ok(await importBooks(rows, u, req));
+      }
+      if (method === "POST")
+        return ok(await saveBook(await json(req), u, req, id));
+      if (method === "DELETE" && id) {
+        const b = await one("SELECT * FROM books WHERE id=?", id);
+        if (!b) throw new AppError(404, "Book not found.");
+        await batch([
+          stmt("UPDATE books SET active=0,version=version+1 WHERE id=?", id),
+          auditStmt(u.email, "ARCHIVE_BOOK", id, b, { active: 0 }, req),
+        ]);
+        return ok({ ok: true });
+      }
+    }
+    if (section === "pricing") {
+      const u = await admin(req);
+      if (method === "GET")
+        return ok({
+          prices: await all("SELECT * FROM pricing_categories ORDER BY id"),
+          history: await all(
+            "SELECT * FROM price_history ORDER BY created_at DESC LIMIT 100",
+          ),
+        });
+      if (method === "POST") {
+        const b = z
+          .object({
+            category: z.enum(["A", "B", "C", "D"]),
+            rate: z.number().int().min(1).max(100000),
+            version: z.number().int(),
+            confirmed: z.literal(true),
+          })
+          .parse(await json(req));
+        const old = await one<any>(
+          "SELECT * FROM pricing_categories WHERE id=?",
+          b.category,
+        );
+        await batch([
+          guard(
+            "EXISTS(SELECT 1 FROM pricing_categories WHERE id=? AND version=?)",
+            b.category,
+            b.version,
+          ),
+          stmt(
+            "UPDATE pricing_categories SET rate=?,version=version+1 WHERE id=?",
+            b.rate,
+            b.category,
+          ),
+          stmt(
+            "INSERT INTO price_history(id,category,old_rate,new_rate,actor,created_at) VALUES(?,?,?,?,?,?)",
+            uid(),
+            b.category,
+            old.rate,
+            b.rate,
+            u.email,
+            now(),
+          ),
+          auditStmt(
+            u.email,
+            "PRICE_CHANGED",
+            b.category,
+            old,
+            { rate: b.rate },
+            req,
+          ),
+        ]);
+        return ok({ ok: true });
+      }
+    }
+    if (section === "orders") {
+      if (method === "GET" && id === "pending-count") {
+        await admin(req);
+        return ok({ count: await pendingOrderCount() });
+      }
+      const u = await user(
+        req,
+        method === "GET" ? "orders.read" : "orders.update",
+      );
+      if (method === "GET") {
+        if (id) return ok(await getOrder(req, id, u));
+        const page = Math.max(
+          1,
+          Math.min(10000, Number(url.searchParams.get("page")) || 1),
+        );
+        return ok(
+          await listOrders(
+            u,
+            url.searchParams.get("q") || "",
+            url.searchParams.get("status") || "",
+            url.searchParams.get("from") || "",
+            url.searchParams.get("to") || "",
+            page,
+            url.searchParams.get("campus") || "",
+          ),
+        );
+      }
+      if (method === "DELETE" && id) {
+        const adminUser = await admin(req);
+        const o = await one<any>("SELECT * FROM orders WHERE id=?", id);
+        if (!o) throw new AppError(404, "Order not found.");
+        await batch([
+          stmt("DELETE FROM order_items WHERE order_id=?", id),
+          stmt("DELETE FROM order_history WHERE order_id=?", id),
+          stmt("DELETE FROM payments WHERE order_id=?", id),
+          stmt("UPDATE payment_slips SET order_id=NULL WHERE order_id=?", id),
+          stmt("DELETE FROM orders WHERE id=?", id),
+          auditStmt(adminUser.email, "DELETE_ORDER", id, o, undefined, req),
+        ]);
+        return ok({ ok: true });
+      }
+      if (method === "POST" && id) {
+        const b = z
+          .object({
+            action: z.enum([
+              "status",
+              "note",
+              "approve",
+              "reject",
+              "request",
+              "manual",
+            ]),
+            status: z.string().optional(),
+            note: z.string().trim().max(2000).default(""),
+            version: z.number().int(),
+          })
+          .parse(await json(req));
+        if (b.action === "note") {
+          if (u.role !== "SUPER_ADMIN")
+            throw new AppError(403, "Super Admin access required.");
+          const o = await getOrder(req, id, u);
+          await batch([
+            stmt(
+              "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,1,?)",
+              uid(),
+              o.id,
+              o.status,
+              b.note,
+              u.email,
+              now(),
+            ),
+            auditStmt(
+              u.email,
+              "ORDER_NOTE",
+              id,
+              undefined,
+              { note: b.note },
+              req,
+            ),
+          ]);
+          return ok({ ok: true });
+        }
+        if (b.action === "status")
+          return ok(
+            await changeStatus(req, u, id, b.status || "", b.note, b.version),
+          );
+        if (u.role !== "SUPER_ADMIN")
+          throw new AppError(403, "Only Super Admin may verify payments.");
+        return ok(await decidePayment(req, u, id, b.action, b.note, b.version));
+      }
+    }
+    if (section === "reports" && method === "GET") {
+      const u = await user(req, "reports.read");
+      const dates = z
+        .object({
+          from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        })
+        .parse({
+          from: url.searchParams.get("from") || "2000-01-01",
+          to: url.searchParams.get("to") || now().slice(0, 10),
+        });
+      return ok(await reports(u, dates.from, dates.to));
+    }
+    if (section === "students" && method === "GET") {
+      const u = await user(req, "students.read");
+      const s = scope(u);
+      return ok(
+        await all(
+          `SELECT o.name,o.phone,o.city,COUNT(*) orders,MAX(o.created_at) last_order FROM orders o WHERE ${s.sql} GROUP BY o.phone,o.name,o.city ORDER BY last_order DESC LIMIT 500`,
+          ...s.args,
+        ),
+      );
+    }
+    if (section === "campuses") {
+      const u = await admin(req);
+      if (method === "GET" && id && p[3] === "activity")
+        return ok(
+          await all(
+            "SELECT a.* FROM audit_logs a WHERE a.entity=? OR a.actor IN (SELECT email FROM users WHERE campus_id=?) ORDER BY a.created_at DESC LIMIT 100",
+            id,
+            id,
+          ),
+        );
+      if (method === "GET")
+        return ok(
+          await all(
+            "SELECT c.*,(SELECT COUNT(*) FROM orders o WHERE o.campus_id=c.id) AS orders FROM campuses c ORDER BY c.name",
+          ),
+        );
+      if (method === "POST") {
+        const b = z
+          .object({
+            code: z
+              .string()
+              .trim()
+              .min(1)
+              .max(30)
+              .regex(/^[A-Z0-9-]+$/),
+            name: z.string().trim().min(1).max(120),
+            city: z.string().trim().min(1).max(80),
+            category: z.enum(["A", "B", "C", "D"]).default("A"),
+            active: z.boolean(),
+            permissions: z.array(z.enum(permissions)),
+            version: z.number().int().optional(),
+          })
+          .parse(await json(req));
+        const cid = id || uid();
+        const old = id
+          ? await one("SELECT * FROM campuses WHERE id=?", id)
+          : null;
+        const a = [
+          b.code,
+          b.name,
+          b.city,
+          b.category || "A",
+          +b.active,
+          JSON.stringify(b.permissions),
+        ];
+        await batch([
+          ...(id
+            ? [
+                guard(
+                  "EXISTS(SELECT 1 FROM campuses WHERE id=? AND version=?)",
+                  id,
+                  b.version,
+                ),
+                stmt(
+                  "UPDATE campuses SET code=?,name=?,city=?,category=?,active=?,permissions=?,version=version+1 WHERE id=?",
+                  ...a,
+                  id,
+                ),
+              ]
+            : [
+                stmt(
+                  "INSERT INTO campuses(code,name,city,category,active,permissions,id,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                  ...a,
+                  cid,
+                  now(),
+                ),
+              ]),
+          ...(!b.active
+            ? [
+                stmt(
+                  "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE campus_id=?)",
+                  cid,
+                ),
+              ]
+            : []),
+          auditStmt(
+            u.email,
+            id ? "UPDATE_CAMPUS" : "CREATE_CAMPUS",
+            cid,
+            old,
+            b,
+            req,
+          ),
+        ]);
+        return ok({ id: cid });
+      }
+      if (method === "DELETE" && id) {
+        if (
+          (await one("SELECT id FROM orders WHERE campus_id=? LIMIT 1", id)) ||
+          (await one("SELECT id FROM books WHERE campus_id=? LIMIT 1", id))
+        )
+          throw new AppError(
+            409,
+            "This campus has linked orders or books. Disable it to preserve history.",
+          );
+        await batch([
+          stmt("DELETE FROM users WHERE campus_id=?", id),
+          stmt("DELETE FROM campuses WHERE id=?", id),
+          auditStmt(u.email, "DELETE_CAMPUS", id, undefined, undefined, req),
+        ]);
+        return ok({ ok: true });
+      }
+    }
+    if (section === "users") {
+      const u = await admin(req);
+      if (method === "GET")
+        return ok(
+          await all(
+            "SELECT u.id,u.email,u.name,u.role,u.campus_id,u.active,u.must_change,c.name campus_name FROM users u LEFT JOIN campuses c ON c.id=u.campus_id ORDER BY u.created_at DESC",
+          ),
+        );
+      if (method === "POST") {
+        const b = z
+          .object({
+            name: z.string().trim().min(1).max(100),
+            email: z.string().email().max(200),
+            role: z.enum(["SUPER_ADMIN", "CAMPUS_ADMIN"]),
+            campus_id: z.string().nullable(),
+            active: z.boolean(),
+            password: password.optional(),
+          })
+          .parse(await json(req));
+        if (
+          b.role === "CAMPUS_ADMIN" &&
+          (!b.campus_id ||
+            !(await one("SELECT id FROM campuses WHERE id=?", b.campus_id)))
+        )
+          throw new AppError(400, "Choose a campus.");
+        if (id === u.id && (!b.active || b.role !== "SUPER_ADMIN"))
+          throw new AppError(
+            400,
+            "You cannot disable or demote your current account.",
+          );
+        if (!id && !b.password)
+          throw new AppError(400, "A temporary password is required.");
+        const old = id
+          ? await one<any>("SELECT * FROM users WHERE id=?", id)
+          : null;
+        if (id && !old) throw new AppError(404, "User not found.");
+        const userId = id || uid(),
+          ph = b.password ? passwordHash(b.password) : old.password_hash;
+        const values = [
+          b.name,
+          b.email.toLowerCase(),
+          b.role,
+          b.role === "CAMPUS_ADMIN" ? b.campus_id : null,
+          +b.active,
+          ph,
+          b.password ? 1 : old.must_change,
+        ];
+        await batch([
+          ...(old?.role === "SUPER_ADMIN" &&
+          (!b.active || b.role !== "SUPER_ADMIN")
+            ? [
+                guard(
+                  "(SELECT COUNT(*) FROM users WHERE role=? AND active=1)>1",
+                  "SUPER_ADMIN",
+                ),
+              ]
+            : []),
+          id
+            ? stmt(
+                "UPDATE users SET name=?,email=?,role=?,campus_id=?,active=?,password_hash=?,must_change=? WHERE id=?",
+                ...values,
+                userId,
+              )
+            : stmt(
+                "INSERT INTO users(name,email,role,campus_id,active,password_hash,must_change,id,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                ...values,
+                userId,
+                now(),
+              ),
+          ...(id ? [stmt("DELETE FROM sessions WHERE user_id=?", id)] : []),
+          auditStmt(
+            u.email,
+            id ? "UPDATE_USER" : "CREATE_USER",
+            userId,
+            old
+              ? { email: old.email, role: old.role, active: old.active }
+              : undefined,
+            {
+              email: b.email,
+              role: b.role,
+              active: b.active,
+              password_reset: !!b.password,
+            },
+            req,
+          ),
+        ]);
+        return ok({ id: userId });
+      }
+    }
+    if (section === "settings") {
+      const u = await admin(req);
+      if (method === "GET") return ok(await getSettings());
+      if (method === "POST") {
+        const b = z
+          .object({ settings: settingsInput, version: z.number().int() })
+          .parse(await json(req));
+        const old = await getSettings();
+        await batch([
+          guard(
+            "EXISTS(SELECT 1 FROM settings WHERE id=1 AND version=?)",
+            b.version,
+          ),
+          stmt(
+            "UPDATE settings SET value=?,version=version+1 WHERE id=1",
+            JSON.stringify(b.settings),
+          ),
+          auditStmt(
+            u.email,
+            "UPDATE_SETTINGS",
+            "store",
+            old.settings,
+            b.settings,
+            req,
+          ),
+        ]);
+        return ok({ ok: true });
+      }
+    }
+    if (section === "audit" && method === "GET") {
+      await admin(req);
+      const offset = Math.max(
+        0,
+        Math.min(100000, Number(url.searchParams.get("offset")) || 0),
+      );
+      return ok(
+        await all(
+          "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100 OFFSET ?",
+          offset,
+        ),
+      );
+    }
+    throw new AppError(404, "Endpoint not found.");
+  } catch (e) {
+    if (e instanceof z.ZodError)
+      return ok(
+        {
+          error: e.issues
+            .map((i) => `${i.path.join(".")}: ${i.message}`)
+            .join("; "),
+        },
+        400,
+      );
+    if (e instanceof AppError)
+      return ok(
+        { error: e.message },
+        e.status,
+        e.retryAfterSeconds
+          ? { "Retry-After": String(e.retryAfterSeconds) }
+          : {},
+      );
+    console.error(
+      "Request failed",
+      action,
+      e instanceof Error ? e.message : "unknown",
+    );
+    return ok(
+      { error: "We could not complete this request. Please try again." },
+      503,
+    );
+  }
+}
+export async function GET(req: Request) {
+  return handle(req);
+}
+export async function POST(req: Request) {
+  return handle(req);
+}
+export async function DELETE(req: Request) {
+  return handle(req);
+}
