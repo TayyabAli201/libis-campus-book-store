@@ -2171,11 +2171,6 @@ function Orders({
             "Book Code",
             "Book Name",
             "Quantity",
-            "Unit Price",
-            "Item Total",
-            "Order Status",
-            "WhatsApp",
-            "City",
           ],
         ];
 
@@ -2183,11 +2178,10 @@ function Orders({
           const items =
             o.items && o.items.length > 0
               ? o.items
-              : [{ code: "—", title: "Order Record", quantity: 1, unit_price: o.total || 0 }];
+              : [{ code: "—", title: "Order Record", quantity: 1 }];
           const dateStr = o.created_at
             ? new Date(o.created_at).toLocaleDateString("en-GB")
             : "—";
-          const st = statuses[o.status] || o.status || "—";
 
           for (const item of items) {
             csvRows.push([
@@ -2197,11 +2191,6 @@ function Orders({
               item.code || "—",
               item.title || "—",
               item.quantity || 1,
-              item.unit_price ? `Rs. ${item.unit_price}` : "—",
-              item.unit_price && item.quantity ? `Rs. ${item.unit_price * item.quantity}` : (o.total ? `Rs. ${o.total}` : "—"),
-              st,
-              o.phone || "—",
-              o.city || "—",
             ]);
           }
         }

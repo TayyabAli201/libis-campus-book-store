@@ -1,5 +1,3 @@
-import { statuses } from "./contracts";
-
 export const ORDER_EXPORT_COLUMNS = [
   "Order Number",
   "Student Name",
@@ -7,27 +5,17 @@ export const ORDER_EXPORT_COLUMNS = [
   "Book Code",
   "Book Name",
   "Quantity",
-  "Unit Price",
-  "Item Total",
-  "Order Status",
-  "WhatsApp",
-  "City",
 ] as const;
 
 export function orderSheet(orders: any[]) {
   // Theme Header Style: Royal Blue (#2563A6) matching the Bookstore Brand Theme
   const headerRow = [
     { value: "Order Number", width: 22 },
-    { value: "Student Name", width: 24 },
-    { value: "Date", width: 20 },
+    { value: "Student Name", width: 26 },
+    { value: "Date", width: 18 },
     { value: "Book Code", width: 16 },
     { value: "Book Name", width: 44 },
     { value: "Quantity", width: 12 },
-    { value: "Unit Price (Rs)", width: 16 },
-    { value: "Item Total (Rs)", width: 16 },
-    { value: "Order Status", width: 20 },
-    { value: "WhatsApp", width: 18 },
-    { value: "City", width: 18 },
   ].map((col) => ({
     value: col.value,
     fontWeight: "bold" as const,
@@ -50,7 +38,6 @@ export function orderSheet(orders: any[]) {
               code: "—",
               title: "Order Record",
               quantity: 1,
-              unit_price: o.total || 0,
             },
           ];
 
@@ -61,8 +48,6 @@ export function orderSheet(orders: any[]) {
           year: "numeric",
         })
       : "—";
-
-    const orderStatus = statuses[o.status] || o.status || "—";
 
     for (const item of items) {
       rowIndex++;
@@ -119,53 +104,6 @@ export function orderSheet(orders: any[]) {
           textColor: "#0F172A",
           backgroundColor: bg,
           align: "right" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: item.unit_price ? `Rs. ${item.unit_price}` : "—",
-          textColor: "#475569",
-          backgroundColor: bg,
-          align: "right" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value:
-            item.unit_price && item.quantity
-              ? `Rs. ${item.unit_price * item.quantity}`
-              : o.total
-                ? `Rs. ${o.total}`
-                : "—",
-          fontWeight: "bold" as const,
-          textColor: "#166534",
-          backgroundColor: bg,
-          align: "right" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: orderStatus,
-          fontWeight: "bold" as const,
-          textColor: "#1E3A8A",
-          backgroundColor: bg,
-          align: "center" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: o.phone || "—",
-          textColor: "#475569",
-          backgroundColor: bg,
-          align: "center" as const,
-          borderColor: border,
-          borderStyle: "thin" as const,
-        },
-        {
-          value: o.city || "—",
-          textColor: "#475569",
-          backgroundColor: bg,
-          align: "left" as const,
           borderColor: border,
           borderStyle: "thin" as const,
         },

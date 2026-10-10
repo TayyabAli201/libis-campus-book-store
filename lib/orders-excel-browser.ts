@@ -8,17 +8,12 @@ export async function exportOrdersExcel(
   await writeExcelFile(orderSheet(orders), {
     sheet: "Orders",
     columns: [
-      { width: 22 },
-      { width: 24 },
-      { width: 18 },
-      { width: 16 },
-      { width: 44 },
-      { width: 12 },
-      { width: 16 },
-      { width: 16 },
-      { width: 20 },
-      { width: 18 },
-      { width: 18 },
+      { width: 22 }, // Order Number
+      { width: 26 }, // Student Name
+      { width: 18 }, // Date
+      { width: 16 }, // Book Code
+      { width: 44 }, // Book Name
+      { width: 12 }, // Quantity
     ],
     stickyRowsCount: 1,
   }).toFile(filename);
