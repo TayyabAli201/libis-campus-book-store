@@ -1978,7 +1978,7 @@ function OrderTracking({ data }: { data: Catalog }) {
   }, [ready]);
   return (
     <section className="section track-page-container">
-      <div className="home-track-section" style={{ margin: "20px 0 35px" }}>
+      <div className="home-track-section no-print" style={{ margin: "20px 0 35px" }}>
         <div className="home-track-badge">REAL-TIME ORDER TRACKING</div>
         <h1 className="home-track-title">Track Your Course Materials Order</h1>
         <p className="home-track-subtitle">

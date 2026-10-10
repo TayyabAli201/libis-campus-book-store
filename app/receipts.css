@@ -274,13 +274,32 @@
     size: A4;
     margin: 15mm;
   }
-  .tracking-intro,
+  .home-track-section,
+  .home-track-badge,
+  .home-track-title,
+  .home-track-subtitle,
+  .home-track-form,
+  .home-track-input-wrap,
+  .home-track-input,
+  .home-track-btn,
+  .home-track-results,
+  .track-card-header,
+  .track-stepper-wrapper,
+  .track-card-footer,
   .order-track-card,
+  .tracking-intro,
   .tracking-form,
+  .tracking-header,
   .receipt-buttons,
   .no-print,
   .actions {
     display: none !important;
+  }
+  .checkout-grid {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
   }
   .receipt-panel {
     border: none !important;
@@ -288,6 +307,8 @@
     background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   .order-receipt {
     print-color-adjust: exact !important;
