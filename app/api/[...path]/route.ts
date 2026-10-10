@@ -520,6 +520,7 @@ async function handle(req: Request) {
             page,
             url.searchParams.get("campus") || "",
             limitParam === "all" ? "all" : undefined,
+            url.searchParams.get("delivery_type") || "",
           ),
         );
       }

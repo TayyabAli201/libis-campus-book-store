@@ -334,6 +334,7 @@ export async function listOrders(
   page = 1,
   campusId = "",
   limit?: number | "all",
+  deliveryType = "",
 ) {
   const s = scope(u);
   const filters = [s.sql];
@@ -349,6 +350,10 @@ export async function listOrders(
   if (status) {
     filters.push("o.status=?");
     args.push(status);
+  }
+  if (deliveryType && deliveryType !== "all") {
+    filters.push("o.delivery_type=?");
+    args.push(deliveryType.trim());
   }
   if (from) {
     filters.push("o.created_at>=?");

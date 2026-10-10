@@ -8,17 +8,36 @@ export const ORDER_EXPORT_COLUMNS = [
   "Quantity",
 ] as const;
 
-export function orderSheet(orders: any[]) {
-  // Theme Header Style: Royal Blue matching Bookstore Brand Theme
-  const headerRow = [
+export const ORDER_EXPORT_COLUMNS_WITH_ADDRESS = [
+  "Sr No",
+  "Order Number",
+  "Student Name",
+  "Date",
+  "Address",
+  "Book Code",
+  "Book Name",
+  "Quantity",
+] as const;
+
+export function orderSheet(
+  orders: any[],
+  options?: { includeAddress?: boolean },
+) {
+  const includeAddress = Boolean(options?.includeAddress);
+
+  const headerCols = [
     { value: "Sr No", width: 10 },
     { value: "Order Number", width: 24 },
     { value: "Student Name", width: 26 },
     { value: "Date", width: 18 },
+    ...(includeAddress ? [{ value: "Address", width: 36 }] : []),
     { value: "Book Code", width: 16 },
     { value: "Book Name", width: 46 },
     { value: "Quantity", width: 12 },
-  ].map((col) => ({
+  ];
+
+  // Theme Header Style: Royal Blue matching Bookstore Brand Theme
+  const headerRow = headerCols.map((col) => ({
     value: col.value,
     fontWeight: "bold" as const,
     backgroundColor: "#1F65A8",
@@ -54,6 +73,22 @@ export function orderSheet(orders: any[]) {
 
     const N = items.length;
     const srNo = orderIdx + 1;
+
+    const fullAddress = o.address
+      ? o.city && !o.address.toLowerCase().includes(o.city.toLowerCase())
+        ? `${o.address}, ${o.city}`
+        : o.address
+      : (o.city || "—");
+
+    const addressCell = {
+      value: fullAddress,
+      rowSpan: N,
+      align: "left" as const,
+      alignVertical: "center" as const,
+      borderColor: border,
+      borderStyle: "thin" as const,
+      wrap: true,
+    };
 
     items.forEach((item: any, idx: number) => {
       if (idx === 0) {
@@ -94,6 +129,7 @@ export function orderSheet(orders: any[]) {
             borderColor: border,
             borderStyle: "thin" as const,
           },
+          ...(includeAddress ? [addressCell] : []),
           {
             value: item.code || "—",
             fontWeight: "bold" as const,
@@ -119,12 +155,13 @@ export function orderSheet(orders: any[]) {
           },
         ]);
       } else {
-        // Subsequent rows of the order: first 4 cells are null (covered by rowSpan)
+        // Subsequent rows of the order: merged cells are null (covered by rowSpan)
         dataRows.push([
           null,
           null,
           null,
           null,
+          ...(includeAddress ? [null] : []),
           {
             value: item.code || "—",
             fontWeight: "bold" as const,

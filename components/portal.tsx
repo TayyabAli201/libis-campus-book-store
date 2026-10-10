@@ -2131,6 +2131,7 @@ function Orders({
   );
   const [q, setQ] = useState(""),
     [status, setStatus] = useState(payments ? "PAYMENT_PENDING" : "all"),
+    [deliveryType, setDeliveryType] = useState("all"),
     [page, setPage] = useState(1),
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
@@ -2142,7 +2143,7 @@ function Orders({
   const exportOrders = async () => {
     setExporting(true);
     try {
-      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
+      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&delivery_type=${deliveryType === "all" ? "" : deliveryType}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
       const res = await api(exportPath);
       const rows = res.rows || [];
       if (!rows.length) {
@@ -2155,12 +2156,19 @@ function Orders({
           : (statuses[status] || status)
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, "-");
-      const filename = `orders-${statusSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const deliverySuffix =
+        deliveryType === "all"
+          ? ""
+          : `-${deliveryType === "other" ? "other-cities" : deliveryType}`;
+      const filename = `orders-${statusSuffix}${deliverySuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const includeAddress = deliveryType === "other";
 
       try {
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
-        await exportOrdersExcel(rows, filename);
-        toast.success(`Exported ${rows.length} order(s) in theme format.`);
+        await exportOrdersExcel(rows, filename, { includeAddress });
+        toast.success(
+          `Exported ${rows.length} order(s)${includeAddress ? " with address" : ""} in theme format.`,
+        );
       } catch (excelErr) {
         // Fallback to structured CSV with book items
         const csvRows: unknown[][] = [
@@ -2169,6 +2177,7 @@ function Orders({
             "Order Number",
             "Student Name",
             "Date",
+            ...(includeAddress ? ["Address"] : []),
             "Book Code",
             "Book Name",
             "Quantity",
@@ -2183,6 +2192,11 @@ function Orders({
           const dateStr = o.created_at
             ? new Date(o.created_at).toLocaleDateString("en-GB")
             : "—";
+          const fullAddress = o.address
+            ? o.city && !o.address.toLowerCase().includes(o.city.toLowerCase())
+              ? `${o.address}, ${o.city}`
+              : o.address
+            : (o.city || "—");
 
           items.forEach((item: any, idx: number) => {
             csvRows.push([
@@ -2190,6 +2204,7 @@ function Orders({
               idx === 0 ? o.reference || "—" : "",
               idx === 0 ? o.name || "Student" : "",
               idx === 0 ? dateStr : "",
+              ...(includeAddress ? [idx === 0 ? fullAddress : ""] : []),
               item.code || "—",
               item.title || "—",
               item.quantity || 1,
@@ -2207,7 +2222,7 @@ function Orders({
     }
   };
 
-  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&page=${page}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
+  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&delivery_type=${deliveryType === "all" ? "" : deliveryType}&page=${page}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
   const { data, error, loading, reload } = useData(path);
 
   useEffect(() => {
@@ -2264,6 +2279,20 @@ function Orders({
             })),
           ]}
         />
+        <Choose
+          value={deliveryType}
+          onChange={(v) => {
+            setDeliveryType(v);
+            setPage(1);
+          }}
+          label="Delivery type"
+          options={[
+            { value: "all", label: "All delivery types" },
+            { value: "campus", label: "Campus Pickup" },
+            { value: "lahore", label: "Lahore Delivery" },
+            { value: "other", label: "Other Cities (Courier)" },
+          ]}
+        />
         <input
           type="date"
           aria-label="From date"
@@ -2286,12 +2315,22 @@ function Orders({
           className="btn compact"
           onClick={exportOrders}
           disabled={exporting || loading}
-          title={`Export ${status === "all" ? "all" : statuses[status] || status} orders to CSV`}
+          title={`Export ${status === "all" ? "all" : statuses[status] || status} ${deliveryType === "all" ? "" : `(${deliveryType}) `}orders to Excel`}
         >
           <Download size={15} />
           {exporting
             ? "Exporting…"
-            : `Export ${status === "all" ? "Orders" : statuses[status] || status}`}
+            : `Export ${
+                status === "all" && deliveryType === "all"
+                  ? "Orders"
+                  : deliveryType !== "all"
+                    ? deliveryType === "other"
+                      ? "Other Cities"
+                      : deliveryType === "campus"
+                        ? "Campus Pickup"
+                        : "Lahore Delivery"
+                    : statuses[status] || status
+              }`}
         </button>
       </div>
       <Result loading={loading} error={error}>
@@ -2324,6 +2363,15 @@ function Orders({
                   <div>
                     {o.name}
                     <p>{o.phone}</p>
+                    {o.delivery_type && (
+                      <span className="small-text muted">
+                        {o.delivery_type === "campus"
+                          ? "🏫 Campus Pickup"
+                          : o.delivery_type === "lahore"
+                            ? "🛵 Lahore Delivery"
+                            : "📦 Other Cities"}
+                      </span>
+                    )}
                   </div>,
                   money(o.total),
                   <div>
@@ -2365,6 +2413,15 @@ function Orders({
                   <div>
                     {o.name}
                     <p>{o.phone}</p>
+                    {o.delivery_type && (
+                      <span className="small-text muted">
+                        {o.delivery_type === "campus"
+                          ? "🏫 Campus Pickup"
+                          : o.delivery_type === "lahore"
+                            ? "🛵 Lahore Delivery"
+                            : "📦 Other Cities"}
+                      </span>
+                    )}
                   </div>,
                   new Date(o.created_at).toLocaleDateString(),
                   money(o.total),
