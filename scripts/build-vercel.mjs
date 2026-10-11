@@ -2,6 +2,26 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+if (process.env.TURSO_DATABASE_URL) {
+  try {
+    const { createClient } = await import("@libsql/client");
+    const { migrateTurso } = await import("./turso-migrations.mjs");
+    const client = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+    try {
+      await migrateTurso(client, console.log);
+      console.log("Turso database schema verified and up to date.");
+    } finally {
+      client.close();
+    }
+  } catch (err) {
+    console.error("Warning: Turso migration step failed:", err.message);
+  }
+}
+
 const result = spawnSync(
   process.execPath,
   [
