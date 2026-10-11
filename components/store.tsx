@@ -1420,7 +1420,7 @@ function Checkout({ data }: { data: Catalog }) {
       <span className="eyebrow">A FEW DETAILS, THEN YOU’RE ALL SET</span>
       <h1 className="page-title">Checkout.</h1>
       <div className="checkout-steps">
-        {["Delivery", "Review", "Payment"].map((s, i) => (
+        {["Delivery", "Payment"].map((s, i) => (
           <span key={s} className={i + 1 === step ? "active" : ""}>
             {i + 1}. {s}
           </span>
@@ -1658,63 +1658,16 @@ function Checkout({ data }: { data: Catalog }) {
                 />
               </Field>
               <button className="btn primary" disabled={busy || !ready}>
-                {busy ? "Checking prices…" : "Review Order"}
+                {busy ? "Checking prices…" : "Proceed to Payment"}
               </button>
             </form>
-          ) : step === 2 ? (
+          ) : (
             <div className="stack">
-              <h3>Review your order</h3>
-              <p>
-                <strong>{quote!.customer.name}</strong>
-                <br />
-                {quote!.customer.phone}
-                <br />
-                {quote!.customer.address}
-                <br />
-                {quote!.customer.city} ·{" "}
-                {quote!.customer.delivery_type === "campus"
-                  ? "Campus Pickup"
-                  : quote!.customer.delivery_type === "lahore"
-                    ? "Lahore (At Home)"
-                    : "Other City"}
-                {quote!.customer.delivery_type === "campus" && (
-                  <span style={{ display: "block", marginTop: 4 }}>
-                    <a
-                      href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        color: "var(--primary)",
-                        fontWeight: 600,
-                        textDecoration: "underline",
-                        fontSize: "0.85rem",
-                      }}
-                    >
-                      <MapPin size={13} /> Campus Pickup Location on Google Maps <ExternalLink size={11} />
-                    </a>
-                  </span>
-                )}
-              </p>
-              {quote!.customer.instructions && (
-                <p>{quote!.customer.instructions}</p>
-              )}
+              <h3>Transfer {money(quote!.total)}</h3>
               <p className="small-text">
                 Your quote is valid for 30 minutes. Stock is reserved after you
                 submit proof.
               </p>
-              <button className="btn primary" onClick={() => setStep(3)}>
-                Confirm & Continue to Payment
-              </button>
-              <button className="btn" onClick={() => setStep(1)}>
-                Edit delivery details
-              </button>
-            </div>
-          ) : (
-            <div className="stack">
-              <h3>Transfer {money(quote!.total)}</h3>
               <div className="bank-card">
                 <span className="eyebrow">{quote!.settings.bank_name}</span>
                 <small>ACCOUNT NUMBER</small>
