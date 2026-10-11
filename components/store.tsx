@@ -2209,6 +2209,41 @@ export function printOrderReceiptSlip(order: any) {
       background: #ffffff;
     }
     .receipt-instructions p { margin: 4px 0 0; color: #1a3350; line-height: 1.5; }
+    .receipt-delivery-notice {
+      margin: 4px 24px 18px;
+      padding: 12px 16px;
+      border: 1.5px solid #ef4444;
+      border-left: 4px solid #ef4444;
+      background: #fff5f5;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #1e293b;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .receipt-delivery-notice-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 5px;
+      color: #dc2626;
+      font-weight: 750;
+      font-size: 0.81rem;
+    }
+    .receipt-delivery-notice-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.77rem;
+      line-height: 1.45;
+      color: #334155;
+    }
+    .receipt-delivery-notice-list li {
+      margin-bottom: 3px;
+    }
+    .receipt-delivery-notice-list li:last-child {
+      margin-bottom: 0;
+    }
     .receipt-footer {
       display: block;
       margin: 0 24px 20px;
@@ -2271,7 +2306,7 @@ export function printOrderReceiptSlip(order: any) {
         ${itemsHtml}
       </tbody>
     </table>
-    <div class="receipt-bottom" style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; padding: 18px 24px; background: #ffffff;">
+    <div class="receipt-bottom" style="display: flex; justify-content: flex-end; padding: 18px 24px 8px; background: #ffffff;">
       <dl class="receipt-totals">
         <div>
           <dt>Subtotal</dt>
@@ -2286,13 +2321,19 @@ export function printOrderReceiptSlip(order: any) {
           <dd>${escapeHtml(money(order.total, order.currency))}</dd>
         </div>
       </dl>
-      ${order.delivery_type === "lahore" || order.delivery_type === "other" ? `
-        <div class="receipt-delivery-box" style="padding: 10px 14px; border: 1.5px solid #ef4444; background: #fff5f5; border-radius: 6px; font-size: 0.8rem; line-height: 1.45; color: #1e293b; max-width: 360px; text-align: left;">
-          <strong style="color: #dc2626; display: block; margin-bottom: 3px; font-size: 0.82rem;">⚠️ Delivery Note (Minimum Base):</strong>
-          <span>Base minimum delivery fee. Excess rider or courier fare (if higher) must be paid directly by the student upon delivery.</span>
-        </div>
-      ` : ""}
     </div>
+    ${order.delivery_type === "lahore" || order.delivery_type === "other" ? `
+      <div class="receipt-delivery-notice">
+        <div class="receipt-delivery-notice-header">
+          <span>⚠️</span>
+          <strong>IMPORTANT DELIVERY POLICY NOTICE (BASE MINIMUM FEE)</strong>
+        </div>
+        <ul class="receipt-delivery-notice-list">
+          <li><strong>Base Advance Fee:</strong> The delivery charge included above is a minimum base advance fee.</li>
+          <li><strong>Excess Rider / Courier Fare:</strong> If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the student must pay the remaining difference directly upon delivery.</li>
+        </ul>
+      </div>
+    ` : ""}
     ${instructionsHtml}
     <footer class="receipt-footer">
       <strong>Thank you for choosing ${escapeHtml(storeName)}.</strong>
@@ -2487,7 +2528,7 @@ export function OrderReceipt({ o }: { o: any }) {
           ))}
         </tbody>
       </table>
-      <div className="receipt-bottom" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+      <div className="receipt-bottom">
         <dl className="receipt-totals">
           <div>
             <dt>Subtotal</dt>
@@ -2502,30 +2543,23 @@ export function OrderReceipt({ o }: { o: any }) {
             <dd>{money(o.total, o.currency)}</dd>
           </div>
         </dl>
-        {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
-          <div
-            className="receipt-delivery-box"
-            style={{
-              padding: "10px 14px",
-              border: "1.5px solid #ef4444",
-              background: "rgba(239, 68, 68, 0.06)",
-              borderRadius: "6px",
-              fontSize: "0.8rem",
-              lineHeight: 1.45,
-              color: "var(--foreground)",
-              maxWidth: "360px",
-              textAlign: "left",
-            }}
-          >
-            <strong style={{ color: "#dc2626", display: "block", marginBottom: 3, fontSize: "0.82rem" }}>
-              ⚠️ Delivery Note (Minimum Base):
-            </strong>
-            <span>
-              Base minimum delivery fee. Excess rider or courier fare (if higher) must be paid directly by the student upon delivery.
-            </span>
-          </div>
-        )}
       </div>
+      {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
+        <div className="receipt-delivery-notice">
+          <div className="receipt-delivery-notice-header">
+            <span aria-hidden="true">⚠️</span>
+            <strong>IMPORTANT DELIVERY POLICY NOTICE (BASE MINIMUM FEE)</strong>
+          </div>
+          <ul className="receipt-delivery-notice-list">
+            <li>
+              <strong>Base Advance Fee:</strong> The delivery charge included above is a minimum base advance fee.
+            </li>
+            <li>
+              <strong>Excess Rider / Courier Fare:</strong> If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the student must pay the remaining difference directly upon delivery.
+            </li>
+          </ul>
+        </div>
+      )}
       {!o.tracking_only && o.instructions && (
         <div className="receipt-instructions">
           <span className="receipt-label">Delivery instructions</span>

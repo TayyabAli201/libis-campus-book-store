@@ -258,13 +258,21 @@ export async function receipt(o: any) {
     y -= 16;
   }
   if (isBaseDelivery) {
-    const noticeLines = wrap(
-      "The delivery charge included in this order is a minimum base advance fee. If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.",
-      content - 24,
-      8,
-      regular,
-    );
-    const boxHeight = 22 + noticeLines.length * 12;
+    const noticeLines = [
+      ...wrap(
+        "• Base Advance Fee: The delivery charge included in this order is a minimum base advance fee.",
+        content - 24,
+        8,
+        regular,
+      ),
+      ...wrap(
+        "• Excess Rider / Courier Fare: If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the student must pay the remaining difference directly upon delivery.",
+        content - 24,
+        8,
+        regular,
+      ),
+    ];
+    const boxHeight = 24 + noticeLines.length * 12;
     ensure(boxHeight + 14);
     const redBorder = rgb(0.86, 0.15, 0.15);
     const redBg = rgb(0.99, 0.95, 0.95);
@@ -277,7 +285,7 @@ export async function receipt(o: any) {
       borderColor: redBorder,
       borderWidth: 1,
     });
-    text("IMPORTANT DELIVERY POLICY NOTICE", margin + 12, y - 6, 7.5, true, redBorder);
+    text("IMPORTANT DELIVERY POLICY NOTICE (BASE MINIMUM FEE)", margin + 12, y - 6, 7.5, true, redBorder);
     lines(noticeLines, margin + 12, y - 20, 8, false, ink);
     y -= boxHeight + 16;
   }
