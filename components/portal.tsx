@@ -1782,7 +1782,16 @@ function getMapDirectionsUrl(o: any) {
     }
   }
 
-  // 4. Fallback for Lahore home delivery address: route directly to address in Lahore
+  // 4. Campus pickup orders: route to university campus pickup location
+  if (
+    o.delivery_type === "campus" ||
+    (o.city && o.city.toLowerCase().includes("campus")) ||
+    (o.address && o.address.toLowerCase().includes("campus"))
+  ) {
+    return "https://maps.app.goo.gl/xgXSaNeVCBvSFtb57";
+  }
+
+  // 5. Fallback for Lahore home delivery address: route directly to address in Lahore
   if (
     o.delivery_type === "lahore" ||
     o.delivery_type === "lahore_home" ||
@@ -1920,27 +1929,43 @@ function OrderModalPopup({
         <Result loading={loading} error={error}>
           {o && (
             <div className="order-modal-body stack">
-              {mapUrl && (
-                <div className="rider-map-pin-banner">
-                  <div className="banner-left">
-                    <Navigation size={26} className="map-icon-pulse" />
-                    <div>
-                      <strong>📍 Lahore Rider Live Route Navigation (InDrive Style)</strong>
-                      <p className="small-text">
-                        Direct route from rider’s current location to student pin: {o.address}
-                      </p>
+              {mapUrl && (() => {
+                const isCampus =
+                  o.delivery_type === "campus" ||
+                  (o.city && o.city.toLowerCase().includes("campus")) ||
+                  (o.address && o.address.toLowerCase().includes("campus"));
+                return (
+                  <div className="rider-map-pin-banner">
+                    <div className="banner-left">
+                      <Navigation size={26} className="map-icon-pulse" />
+                      <div>
+                        <strong>
+                          {isCampus
+                            ? "📍 Campus Pickup Point Location"
+                            : "📍 Lahore Rider Live Route Navigation (InDrive Style)"}
+                        </strong>
+                        <p className="small-text">
+                          {isCampus
+                            ? "University campus counter pickup point for student collection"
+                            : `Direct route from rider’s current location to student pin: ${o.address}`}
+                        </p>
+                      </div>
                     </div>
+                    <a
+                      href={mapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn primary compact map-btn"
+                    >
+                      <Navigation size={16} />{" "}
+                      {isCampus
+                        ? "Open Campus Location on Google Maps"
+                        : "Start InDrive Live Route Navigation"}{" "}
+                      <ExternalLink size={14} />
+                    </a>
                   </div>
-                  <a
-                    href={mapUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn primary compact map-btn"
-                  >
-                    <Navigation size={16} /> Start InDrive Live Route Navigation <ExternalLink size={14} />
-                  </a>
-                </div>
-              )}
+                );
+              })()}
 
               <div className="checkout-grid order-modal-grid">
                 <div className="stack">
@@ -2370,6 +2395,10 @@ function Orders({
           headers={headers}
           rows={(data?.rows || []).map((o: any) => {
             const mapUrl = getMapLocation(o);
+            const isCampus =
+              o.delivery_type === "campus" ||
+              (o.city && o.city.toLowerCase().includes("campus")) ||
+              (o.address && o.address.toLowerCase().includes("campus"));
             const refCell = (
               <div>
                 <strong>{o.reference}</strong>
@@ -2381,9 +2410,13 @@ function Orders({
                       rel="noreferrer"
                       className="map-pin-pill"
                       onClick={(e) => e.stopPropagation()}
-                      title="Open InDrive style live route navigation from your location to student location"
+                      title={
+                        isCampus
+                          ? "Open campus pickup location on Google Maps"
+                          : "Open InDrive style live route navigation from your location to student location"
+                      }
                     >
-                      <Navigation size={12} /> Lahore Route
+                      <Navigation size={12} /> {isCampus ? "Campus Location" : "Lahore Route"}
                     </a>
                   </div>
                 )}

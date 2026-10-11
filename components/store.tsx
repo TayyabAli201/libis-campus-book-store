@@ -27,6 +27,7 @@ import {
   Mail,
   Clock,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 
 function FacebookIcon({ size = 18 }: { size?: number }) {
@@ -215,7 +216,17 @@ function MaintenanceScreen({ settings }: { settings: StoreSettings }) {
           {settings.distribution_center_address && (
             <div className="maintenance-info-item">
               <Building2 size={18} />
-              <span>Center: <strong>{settings.distribution_center_address}</strong></span>
+              <span>
+                Center:{" "}
+                <a
+                  href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: "underline", color: "inherit" }}
+                >
+                  <strong>{settings.distribution_center_address}</strong>
+                </a>
+              </span>
             </div>
           )}
           {settings.support_hours && (
@@ -732,6 +743,32 @@ export function OrderTrackerCard({ o }: { o: any }) {
             {o.payment_status || o.status || "PAYMENT_PENDING"}
           </span>
         </div>
+
+        {(o.delivery_type === "campus" ||
+          (o.city && o.city.toLowerCase().includes("campus")) ||
+          (o.address && o.address.toLowerCase().includes("campus"))) && (
+          <div className="track-card-info">
+            <span className="track-info-label">Campus Location:</span>
+            <a
+              href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                color: "var(--primary)",
+                fontWeight: 600,
+                textDecoration: "underline",
+                fontSize: "0.85rem",
+              }}
+            >
+              <MapPin size={14} />
+              <span>Open on Google Maps</span>
+              <ExternalLink size={12} />
+            </a>
+          </div>
+        )}
       </div>
 
       <div className="track-stepper-wrapper">
@@ -1522,6 +1559,27 @@ function Checkout({ data }: { data: Catalog }) {
                   <div>
                     <strong>📍 Campus Pickup Selected ({money(data.settings.delivery_campus ?? 10000)})</strong>
                     <p>No home address required! Show your order reference ID at the campus bookstore counter when collecting your books.</p>
+                    <div style={{ marginTop: 10 }}>
+                      <a
+                        href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn compact"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: "0.85rem",
+                          background: "var(--primary)",
+                          color: "var(--primary-foreground)",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <MapPin size={15} />
+                        <span>View Campus Location on Google Maps</span>
+                        <ExternalLink size={13} />
+                      </a>
+                    </div>
                   </div>
                 </div>
               ) : form.delivery_type === "lahore" ? (
@@ -1619,6 +1677,26 @@ function Checkout({ data }: { data: Catalog }) {
                   : quote!.customer.delivery_type === "lahore"
                     ? "Lahore (At Home)"
                     : "Other City"}
+                {quote!.customer.delivery_type === "campus" && (
+                  <span style={{ display: "block", marginTop: 4 }}>
+                    <a
+                      href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        color: "var(--primary)",
+                        fontWeight: 600,
+                        textDecoration: "underline",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      <MapPin size={13} /> Campus Pickup Location on Google Maps <ExternalLink size={11} />
+                    </a>
+                  </span>
+                )}
               </p>
               {quote!.customer.instructions && (
                 <p>{quote!.customer.instructions}</p>
@@ -1868,12 +1946,40 @@ export function OrderReceipt({ o }: { o: any }) {
             <p>{o.phone}</p>
           </div>
           <div>
-            <span className="receipt-label">Deliver to</span>
+            <span className="receipt-label">
+              {o.delivery_type === "campus" || (o.city && o.city.toLowerCase().includes("campus"))
+                ? "Pickup Location"
+                : "Deliver to"}
+            </span>
             <p>
               {o.address}
               <br />
               {o.city}
             </p>
+            {(o.delivery_type === "campus" ||
+              (o.city && o.city.toLowerCase().includes("campus")) ||
+              (o.address && o.address.toLowerCase().includes("campus"))) && (
+              <p style={{ marginTop: 6 }} className="no-print">
+                <a
+                  href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    color: "var(--primary)",
+                    fontWeight: 600,
+                    textDecoration: "underline",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  <MapPin size={14} />
+                  <span>View Campus Location on Google Maps</span>
+                  <ExternalLink size={12} />
+                </a>
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -2429,17 +2535,52 @@ function SupportCallout({ data }: { data: Catalog }) {
               </p>
               <div className="contact-address-box">
                 <MapPin size={16} className="address-pin-icon" />
-                <span>Address: <strong>{address}</strong></span>
+                <span>
+                  Address:{" "}
+                  <a
+                    href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: "underline", color: "inherit", fontWeight: 700 }}
+                  >
+                    {address}
+                  </a>
+                </span>
+                <a
+                  href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn compact"
+                  style={{
+                    marginLeft: "auto",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: "0.8rem",
+                    padding: "4px 10px",
+                  }}
+                >
+                  <MapPin size={13} />
+                  <span>View Map</span>
+                  <ExternalLink size={12} />
+                </a>
               </div>
               <p className="small-muted" style={{ margin: "4px 0 12px 0" }}>
                 Official university course materials fulfillment center. Counter pickup & order dispatches available daily.
               </p>
             </div>
             <div className="contact-delivery-rates">
-              <div className="rate-badge">
+              <a
+                href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rate-badge"
+                style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                title="View Campus Pickup Location on Google Maps"
+              >
                 <span>🏛️ Campus Pickup</span>
                 <strong>{money(s.delivery_campus ?? 10000)}</strong>
-              </div>
+              </a>
               <div className="rate-badge">
                 <span>🚀 Lahore Rider</span>
                 <strong>{money(s.delivery_lahore)}</strong>
@@ -2655,7 +2796,16 @@ function Footer({ data }: { data: Catalog }) {
           {s.distribution_center_address && (
             <div className="footer-support-item">
               <span className="footer-support-label">Location:</span>{" "}
-              <span>{s.distribution_center_address}</span>
+              <a
+                href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                target="_blank"
+                rel="noreferrer"
+                className="footer-whatsapp-link"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <span>{s.distribution_center_address}</span>
+                <ExternalLink size={12} />
+              </a>
             </div>
           )}
         </div>
