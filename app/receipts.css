@@ -251,6 +251,12 @@
     padding-left: 16px;
     padding-right: 16px;
   }
+  .receipt-panel > .actions {
+    padding: 0 16px 20px;
+    flex-wrap: wrap;
+  }
+}
+
 .print-only {
   display: none !important;
 }
