@@ -166,8 +166,26 @@
 }
 .receipt-bottom {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
   padding: 25px 26px;
+}
+.receipt-delivery-box {
+  padding: 10px 14px;
+  border: 1.5px solid #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--foreground);
+  max-width: 360px;
+  text-align: left;
+}
+.dark .receipt-delivery-box {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--foreground);
 }
 .receipt-totals {
   width: 280px;
@@ -507,8 +525,24 @@
   .order-receipt .receipt-bottom {
     padding: 16px 20px !important;
     display: flex !important;
-    justify-content: flex-end !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 20px !important;
+    flex-wrap: wrap !important;
     background: #ffffff !important;
+  }
+  .order-receipt .receipt-delivery-box {
+    padding: 8px 12px !important;
+    border: 1.5px solid #ef4444 !important;
+    background: #fff5f5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    border-radius: 6px !important;
+    font-size: 8pt !important;
+    line-height: 1.4 !important;
+    color: #1e293b !important;
+    max-width: 320px !important;
+    text-align: left !important;
   }
   .order-receipt .receipt-totals {
     width: 250px !important;
