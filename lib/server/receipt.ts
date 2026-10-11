@@ -226,7 +226,16 @@ export async function receipt(o: any) {
   ensure(summaryHeight);
   text("Subtotal", 335, y, 10, false, muted);
   right(money(o.subtotal, o.currency), width - margin - 10, y, 10);
-  text("Delivery", 335, y - 23, 10, false, muted);
+  const isBaseDelivery =
+    o.delivery_type === "lahore" || o.delivery_type === "other";
+  text(
+    isBaseDelivery ? "Delivery (Base / Min)" : "Delivery",
+    335,
+    y - 23,
+    10,
+    false,
+    muted,
+  );
   right(money(o.delivery, o.currency), width - margin - 10, y - 23, 10);
   page.drawRectangle({
     x: 323,
@@ -247,6 +256,30 @@ export async function receipt(o: any) {
     y -= 18;
     y -= lines(instructionLines, margin, y, 9);
     y -= 16;
+  }
+  if (isBaseDelivery) {
+    const noticeLines = wrap(
+      "The delivery charge included in this order is a minimum base advance fee. If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.",
+      content - 24,
+      8,
+      regular,
+    );
+    const boxHeight = 22 + noticeLines.length * 12;
+    ensure(boxHeight + 14);
+    const redBorder = rgb(0.86, 0.15, 0.15);
+    const redBg = rgb(0.99, 0.95, 0.95);
+    page.drawRectangle({
+      x: margin,
+      y: y - boxHeight,
+      width: content,
+      height: boxHeight,
+      color: redBg,
+      borderColor: redBorder,
+      borderWidth: 1,
+    });
+    text("IMPORTANT DELIVERY POLICY NOTICE", margin + 12, y - 6, 7.5, true, redBorder);
+    lines(noticeLines, margin + 12, y - 20, 8, false, ink);
+    y -= boxHeight + 16;
   }
   const thanks = wrap(
     `Thank you for choosing ${storeName}.`,

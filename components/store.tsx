@@ -2291,6 +2291,12 @@ export function printOrderReceiptSlip(order: any) {
         : ""}
     </div>
     ${instructionsHtml}
+    ${(order.delivery_type === "lahore" || order.delivery_type === "other") ? `
+      <div style="margin: 14px 0; padding: 10px 14px; border: 1.5px solid #ef4444; background: #fff5f5; border-radius: 6px; font-size: 0.8rem; line-height: 1.45; color: #1e293b;">
+        <strong style="color: #dc2626; display: block; margin-bottom: 3px; font-size: 0.82rem;">⚠️ IMPORTANT DELIVERY POLICY NOTICE:</strong>
+        <span>The delivery charge included in this order is a <strong>base minimum advance fee</strong>. If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.</span>
+      </div>
+    ` : ""}
     <footer class="receipt-footer">
       <strong>Thank you for choosing ${escapeHtml(storeName)}.</strong>
       <p>${escapeHtml(receiptPaymentNote(order.payment_status))}</p>
@@ -2509,6 +2515,28 @@ export function OrderReceipt({ o }: { o: any }) {
         <div className="receipt-instructions">
           <span className="receipt-label">Delivery instructions</span>
           <p>{o.instructions}</p>
+        </div>
+      )}
+      {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
+        <div
+          className="receipt-delivery-notice"
+          style={{
+            margin: "14px 0",
+            padding: "10px 14px",
+            border: "1.5px solid #ef4444",
+            background: "rgba(239, 68, 68, 0.06)",
+            borderRadius: "6px",
+            fontSize: "0.82rem",
+            lineHeight: 1.45,
+            color: "var(--foreground)",
+          }}
+        >
+          <strong style={{ color: "#dc2626", display: "block", marginBottom: 3, fontSize: "0.84rem" }}>
+            ⚠️ IMPORTANT DELIVERY POLICY NOTICE:
+          </strong>
+          <span>
+            The delivery charge included in this order is a <strong>base minimum advance fee</strong>. If actual rider fare (e.g. Bykea, InDrive) or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.
+          </span>
         </div>
       )}
       <footer className="receipt-footer">
