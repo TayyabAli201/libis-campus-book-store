@@ -842,15 +842,15 @@ export function OrderTrackerCard({ o }: { o: any }) {
             style={{
               width: "100%",
               marginTop: 10,
-              padding: "8px 12px",
-              borderRadius: "6px",
-              background: "var(--muted)",
-              fontSize: "0.8rem",
-              color: "var(--muted-foreground)",
-              lineHeight: 1.4,
+              padding: "10px 14px",
+              borderRadius: "8px",
+              background: "rgba(239, 68, 68, 0.06)",
+              border: "1.5px solid #ef4444",
+              fontSize: "0.82rem",
+              lineHeight: 1.45,
             }}
           >
-            ℹ️ <strong>Delivery Policy Note:</strong> Order total includes {money(o.delivery, o.currency)} base minimum delivery charges. Agar actual rider/courier fare is se zyada ho to baqi farq student delivery ke waqt direct pay kare ga.
+            <strong style={{ color: "#dc2626" }}>⚠️ Delivery Notice:</strong> Order total includes {money(o.delivery, o.currency)} minimum base delivery fee. If actual rider fare or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.
           </div>
         )}
       </div>
@@ -1095,8 +1095,20 @@ function Totals({
             <strong>{money(subtotal + delivery)}</strong>
           </div>
           {isBase && (
-            <p style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--muted-foreground)", lineHeight: 1.35 }}>
-              * Base minimum delivery charges. If actual rider or courier fare exceeds this, the remaining difference is payable upon delivery.
+            <p
+              style={{
+                margin: "8px 0 0",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                background: "rgba(239, 68, 68, 0.05)",
+                border: "1px solid #ef4444",
+                fontSize: "0.78rem",
+                color: "#dc2626",
+                lineHeight: 1.35,
+                fontWeight: 500,
+              }}
+            >
+              * Base minimum delivery charge. Any extra rider or courier fare difference is payable upon delivery.
             </p>
           )}
         </>
@@ -1641,27 +1653,24 @@ function Checkout({ data }: { data: Catalog }) {
                   <div
                     className="delivery-policy-alert"
                     style={{
-                      padding: "12px 16px",
+                      padding: "14px 16px",
                       borderRadius: "10px",
-                      background: "rgba(245, 158, 11, 0.09)",
-                      border: "1px solid rgba(245, 158, 11, 0.35)",
+                      background: "rgba(239, 68, 68, 0.06)",
+                      border: "2px solid #ef4444",
                       marginBottom: 16,
-                      fontSize: "0.85rem",
-                      lineHeight: 1.45,
+                      fontSize: "0.86rem",
+                      lineHeight: 1.5,
                     }}
                   >
-                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <Info size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <AlertTriangle size={20} style={{ color: "#dc2626", flexShrink: 0, marginTop: 2 }} />
                       <div>
-                        <strong style={{ color: "#b45309", display: "block", marginBottom: 3 }}>
-                          🛵 Lahore Rider Delivery Policy ({money(data.settings.delivery_lahore)} Base Fare):
+                        <strong style={{ color: "#dc2626", display: "block", marginBottom: 4, fontSize: "0.92rem" }}>
+                          ⚠️ Important Delivery Notice: Minimum Base Rider Fare ({money(data.settings.delivery_lahore)})
                         </strong>
-                        <span>
-                          Checkout mein add kiye gaye <strong>{money(data.settings.delivery_lahore)}</strong> sirf <strong>minimum / base rider charges</strong> hain. Agar rider (Bykea / InDrive / Yango) ka actual rent/fare is se zyada banta hai (maslan rent Rs. 400 aye to upar walay Rs. 50), to <strong>extra farq student rider ko khud pay kare ga</strong>.
-                        </span>
-                        <div style={{ marginTop: 4, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                          (The {money(data.settings.delivery_lahore)} fee is a base minimum charge. Any excess rider fare due to distance is payable directly by the student to the rider upon delivery.)
-                        </div>
+                        <p style={{ margin: 0, color: "var(--foreground)" }}>
+                          The <strong>{money(data.settings.delivery_lahore)}</strong> charged at checkout is a <strong>minimum base rider fare</strong>. If the actual rider fare (e.g. Bykea, InDrive, Yango) exceeds this base amount depending on distance (e.g. if ride fare is Rs. 400, the remaining Rs. 50 difference), the <strong>remaining excess fare must be paid directly to the rider by the student upon delivery</strong>.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1711,27 +1720,24 @@ function Checkout({ data }: { data: Catalog }) {
                   <div
                     className="delivery-policy-alert"
                     style={{
-                      padding: "12px 16px",
+                      padding: "14px 16px",
                       borderRadius: "10px",
-                      background: "rgba(245, 158, 11, 0.09)",
-                      border: "1px solid rgba(245, 158, 11, 0.35)",
+                      background: "rgba(239, 68, 68, 0.06)",
+                      border: "2px solid #ef4444",
                       marginBottom: 16,
-                      fontSize: "0.85rem",
-                      lineHeight: 1.45,
+                      fontSize: "0.86rem",
+                      lineHeight: 1.5,
                     }}
                   >
-                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <Info size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <AlertTriangle size={20} style={{ color: "#dc2626", flexShrink: 0, marginTop: 2 }} />
                       <div>
-                        <strong style={{ color: "#b45309", display: "block", marginBottom: 3 }}>
-                          📦 Nationwide Courier Delivery Policy ({money(data.settings.delivery_other)} Base Minimum):
+                        <strong style={{ color: "#dc2626", display: "block", marginBottom: 4, fontSize: "0.92rem" }}>
+                          ⚠️ Important Delivery Notice: Minimum Base Courier Charge ({money(data.settings.delivery_other)})
                         </strong>
-                        <span>
-                          Checkout mein add kiye gaye <strong>{money(data.settings.delivery_other)}</strong> nationwide courier ke <strong>minimum base charges</strong> hain. Agar parcel ke weight (zyada kitabon) ya door daraz city ki wajah se courier charges is se zyada bante hain (maslan Rs. 800 charge ho to upar walay Rs. 300), to <strong>extra farq customer/student ko khud pay karna hoga</strong>.
-                        </span>
-                        <div style={{ marginTop: 4, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                          (The {money(data.settings.delivery_other)} fee is a base minimum courier charge. Any excess courier fee charged due to parcel weight or distance is payable by the customer upon delivery.)
-                        </div>
+                        <p style={{ margin: 0, color: "var(--foreground)" }}>
+                          The <strong>{money(data.settings.delivery_other)}</strong> charged at checkout is a <strong>minimum base advance courier fee</strong>. If actual courier charges exceed this amount due to parcel weight (multiple heavy books) or distant delivery location (e.g. if courier charges Rs. 800 instead of Rs. 500), the <strong>remaining difference (e.g. Rs. 300) must be paid by the customer upon delivery</strong>.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1783,14 +1789,14 @@ function Checkout({ data }: { data: Catalog }) {
                   style={{
                     padding: "10px 14px",
                     borderRadius: "8px",
-                    background: "rgba(245, 158, 11, 0.08)",
-                    border: "1px solid rgba(245, 158, 11, 0.3)",
+                    background: "rgba(239, 68, 68, 0.06)",
+                    border: "2px solid #ef4444",
                     fontSize: "0.83rem",
                     lineHeight: 1.45,
                   }}
                 >
-                  ℹ️ <strong>Delivery Note:</strong> Total includes{" "}
-                  <strong>{money(quote!.delivery)}</strong> base minimum delivery fee. Agar rider / courier ka actual fare is se zyada aya to extra difference parcel delivery ke waqt student pay kare ga.
+                  <strong style={{ color: "#dc2626" }}>⚠️ Delivery Notice:</strong> Total includes{" "}
+                  <strong>{money(quote!.delivery)}</strong> minimum base delivery fee. If actual rider or courier charges exceed this amount, the remaining difference must be paid by the student upon delivery.
                 </div>
               )}
               <div className="bank-card">
