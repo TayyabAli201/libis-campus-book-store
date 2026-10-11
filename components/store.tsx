@@ -686,13 +686,19 @@ function CatalogView({
   );
 }
 export function OrderTrackerCard({ o }: { o: any }) {
+  const isCampusPickup =
+    o.delivery_type === "campus" ||
+    (o.city && String(o.city).toLowerCase().includes("campus")) ||
+    (o.address && String(o.address).toLowerCase().includes("campus")) ||
+    (o.delivery_title && String(o.delivery_title).toLowerCase().includes("campus"));
+
   const steps = [
     { id: "placed", label: "Order Placed", icon: Clock },
     { id: "verified", label: "Payment Verified", icon: ShieldCheck },
     { id: "confirmed", label: "Order Confirmed", icon: CheckCircle2 },
     { id: "processing", label: "Processing", icon: Layers },
     { id: "ready", label: "Ready for Dispatch", icon: Package },
-    { id: "shipped", label: "Shipped", icon: Truck },
+    { id: "shipped", label: isCampusPickup ? "Shipped in Campus" : "Shipped", icon: Truck },
     { id: "delivered", label: "Delivered", icon: CheckCircle2 },
   ];
 
@@ -762,7 +768,9 @@ export function OrderTrackerCard({ o }: { o: any }) {
                     : "status-pending"
                 }`}
             >
-              {o.payment_status || o.status || "PAYMENT_PENDING"}
+              {currentStep === 5 && isCampusPickup
+                ? "Shipped in Campus"
+                : (steps[currentStep]?.label || o.payment_status || o.status || "Order Placed")}
             </span>
           )}
         </div>
@@ -2795,13 +2803,23 @@ function OrderTracking({ data }: { data: Catalog }) {
             <div className="panel">
               <h3 style={{ margin: "0 0 16px 0" }}>Order journey</h3>
               <div className="timeline">
-                {o.history.map((h: any, i: number) => (
-                  <div key={i}>
-                    <Status value={h.status} />
-                    {h.note && <p>{h.note}</p>}
-                    <small>{new Date(h.created_at).toLocaleString()}</small>
-                  </div>
-                ))}
+                {o.history.map((h: any, i: number) => {
+                  const isCampus =
+                    o.delivery_type === "campus" ||
+                    (o.city && String(o.city).toLowerCase().includes("campus")) ||
+                    (o.address && String(o.address).toLowerCase().includes("campus")) ||
+                    (o.delivery_title && String(o.delivery_title).toLowerCase().includes("campus"));
+                  return (
+                    <div key={i}>
+                      <Status
+                        value={h.status}
+                        label={h.status === "SHIPPED" && isCampus ? "Shipped in Campus" : undefined}
+                      />
+                      {h.note && <p>{h.note}</p>}
+                      <small>{new Date(h.created_at).toLocaleString()}</small>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

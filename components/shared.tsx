@@ -125,7 +125,7 @@ export function Loading() {
     </div>
   );
 }
-export function Status({ value }: { value: string }) {
+export function Status({ value, label }: { value: string; label?: string }) {
   return (
     <span
       className={
@@ -139,7 +139,7 @@ export function Status({ value }: { value: string }) {
             : "")
       }
     >
-      {statuses[value] || value.replaceAll("_", " ")}
+      {label || statuses[value] || value.replaceAll("_", " ")}
     </span>
   );
 }
