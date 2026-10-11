@@ -698,7 +698,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
     { id: "confirmed", label: "Order Confirmed", icon: CheckCircle2 },
     { id: "processing", label: "Processing", icon: Layers },
     { id: "ready", label: "Ready for Dispatch", icon: Package },
-    { id: "shipped", label: isCampusPickup ? "Shipped in Campus" : "Shipped", icon: Truck },
+    { id: "shipped", label: isCampusPickup ? "Arrived at Campus - Ready for Pickup" : "Shipped", icon: isCampusPickup ? MapPin : Truck },
     { id: "delivered", label: "Delivered", icon: CheckCircle2 },
   ];
 
@@ -769,7 +769,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
                 }`}
             >
               {currentStep === 5 && isCampusPickup
-                ? "Shipped in Campus"
+                ? "Arrived at Campus - Ready for Pickup"
                 : (steps[currentStep]?.label || o.payment_status || o.status || "Order Placed")}
             </span>
           )}
@@ -2813,7 +2813,7 @@ function OrderTracking({ data }: { data: Catalog }) {
                     <div key={i}>
                       <Status
                         value={h.status}
-                        label={h.status === "SHIPPED" && isCampus ? "Shipped in Campus" : undefined}
+                        label={h.status === "SHIPPED" && isCampus ? "Arrived at Campus - Ready for Pickup" : undefined}
                       />
                       {h.note && <p>{h.note}</p>}
                       <small>{new Date(h.created_at).toLocaleString()}</small>
