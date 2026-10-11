@@ -55,7 +55,7 @@ export async function getSettings() {
     delivery_lahore: typeof raw.delivery_lahore === "number" ? raw.delivery_lahore : 50000,
     delivery_other: typeof raw.delivery_other === "number" ? raw.delivery_other : 80000,
     currency: raw.currency || "PKR",
-    order_prefix: raw.order_prefix || "CBS",
+    order_prefix: raw.order_prefix === "CBS" ? "VU" : raw.order_prefix || "VU",
     max_upload_mb: typeof raw.max_upload_mb === "number" ? raw.max_upload_mb : 5,
   };
   if (runtime().MAX_UPLOAD_MB)

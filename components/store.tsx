@@ -2625,7 +2625,9 @@ function OrderTracking({ data }: { data: Catalog }) {
     const q = new URLSearchParams(location.search);
     const initialId =
       q.get("id") ||
-      (location.hash.startsWith("#CBS-") ? location.hash.slice(1) : "");
+      (location.hash && location.hash.length > 1
+        ? decodeURIComponent(location.hash.slice(1))
+        : "");
     if (initialId) {
       setReference(initialId);
       void load(initialId);
@@ -2637,7 +2639,7 @@ function OrderTracking({ data }: { data: Catalog }) {
         <div className="home-track-badge">REAL-TIME ORDER TRACKING</div>
         <h1 className="home-track-title">Track Your Course Materials Order</h1>
         <p className="home-track-subtitle">
-          Enter your unique Order ID (e.g. CBS-04102026-1024) to view status details.
+          Enter your unique Order ID (e.g. VU-1210-0001) to view status details.
         </p>
 
         <form
@@ -2652,7 +2654,7 @@ function OrderTracking({ data }: { data: Catalog }) {
             <input
               type="text"
               className="home-track-input"
-              placeholder="e.g. CBS-04102026-1024"
+              placeholder="e.g. VU-1210-0001"
               value={reference}
               autoCapitalize="characters"
               spellCheck={false}

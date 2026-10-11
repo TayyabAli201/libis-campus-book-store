@@ -37,7 +37,7 @@ export async function bootstrap(req: Request) {
     delivery_lahore: 50000,
     delivery_other: 80000,
     currency: "PKR",
-    order_prefix: "CBS",
+    order_prefix: "VU",
     max_upload_mb: 5,
   };
   const statements = [

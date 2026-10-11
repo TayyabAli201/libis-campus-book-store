@@ -145,9 +145,54 @@ export async function submitOrder(
     );
   const id = uid(),
     at = now();
-  const [yyyy, mm, dd] = at.slice(0, 10).split("-");
-  const random4 = Math.floor(1000 + Math.random() * 9000);
-  const reference = `${data.settings.order_prefix}-${dd}${mm}${yyyy}-${random4}`;
+  let dd = "01",
+    mm = "01";
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Karachi",
+      day: "2-digit",
+      month: "2-digit",
+    }).formatToParts(new Date());
+    dd = parts.find((p) => p.type === "day")?.value || "01";
+    mm = parts.find((p) => p.type === "month")?.value || "01";
+  } catch {
+    const [, m, d] = at.slice(0, 10).split("-");
+    dd = d || "01";
+    mm = m || "01";
+  }
+  const dateKey = `${dd}${mm}`;
+  const prefix =
+    data.settings?.order_prefix && data.settings.order_prefix !== "CBS"
+      ? data.settings.order_prefix
+      : "VU";
+  const basePrefix = `${prefix}-${dateKey}-`;
+
+  const latestOrder = await one<{ reference: string }>(
+    "SELECT reference FROM orders WHERE reference LIKE ? ORDER BY LENGTH(reference) DESC, reference DESC LIMIT 1",
+    `${basePrefix}%`,
+  );
+
+  let nextSeq = 1;
+  if (latestOrder?.reference) {
+    const lastPart = latestOrder.reference.slice(basePrefix.length);
+    const parsed = parseInt(lastPart, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      nextSeq = parsed + 1;
+    }
+  }
+
+  let reference = `${basePrefix}${String(nextSeq).padStart(4, "0")}`;
+  let attempts = 0;
+  while (attempts < 20) {
+    const existing = await one<{ id: string }>(
+      "SELECT id FROM orders WHERE reference=?",
+      reference,
+    );
+    if (!existing) break;
+    nextSeq++;
+    reference = `${basePrefix}${String(nextSeq).padStart(4, "0")}`;
+    attempts++;
+  }
   const c = data.customer;
   const result = compareAmount(slip.detected_amount, data.total);
   const statements = [
