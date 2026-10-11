@@ -2471,6 +2471,116 @@ function OrderTracking({ data }: { data: Catalog }) {
           <div className="print-only">
             <OrderReceipt o={o} />
           </div>
+          {/* Top Priority Action: When Admin requests a new payment proof */}
+          {o.payment_status === "NEW_SLIP_REQUESTED" && (
+            <div
+              className="track-details-wrapper no-print"
+              style={{ maxWidth: 720, margin: "24px auto 0" }}
+            >
+              <div
+                className="panel"
+                style={{
+                  border: "2px solid #ef4444",
+                  background:
+                    "linear-gradient(180deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.01) 100%)",
+                  boxShadow: "0 6px 20px rgba(239, 68, 68, 0.12)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 12,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#fee2e2",
+                      color: "#dc2626",
+                      padding: "10px",
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div>
+                    <h3
+                      style={{
+                        margin: 0,
+                        color: "#991b1b",
+                        fontSize: "1.15rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Action Required: Upload New Payment Proof
+                    </h3>
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        color: "#4b5563",
+                        fontSize: "0.88rem",
+                      }}
+                    >
+                      Admin has requested a new payment slip. Please upload your valid payment screenshot / receipt below.
+                    </p>
+                  </div>
+                </div>
+
+                {o.payment_note && (
+                  <div
+                    style={{
+                      marginBottom: 18,
+                      background: "#ffffff",
+                      border: "1px solid #fecaca",
+                      borderLeft: "4px solid #ef4444",
+                      padding: "12px 16px",
+                      borderRadius: "0 8px 8px 0",
+                    }}
+                  >
+                    <strong
+                      style={{
+                        display: "block",
+                        color: "#991b1b",
+                        fontSize: "0.82rem",
+                        letterSpacing: "0.03em",
+                        textTransform: "uppercase",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Reason from Admin:
+                    </strong>
+                    <span
+                      style={{
+                        fontSize: "0.95rem",
+                        color: "#1f2937",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {o.payment_note}
+                    </span>
+                  </div>
+                )}
+
+                {!o.tracking_only ? (
+                  <ProofUploader
+                    path={"proofs?order=" + o.id}
+                    max={data.settings.max_upload_mb}
+                    onUploaded={() => load(o.id)}
+                  />
+                ) : (
+                  <p className="notice" style={{ margin: 0 }}>
+                    Use the device you placed this order on to upload a replacement payment proof, or contact support.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="track-details-wrapper no-print" style={{ maxWidth: 720, margin: "24px auto 0" }}>
             <div className="panel">
               <h3 style={{ margin: "0 0 16px 0" }}>Order journey</h3>
@@ -2483,23 +2593,6 @@ function OrderTracking({ data }: { data: Catalog }) {
                   </div>
                 ))}
               </div>
-              {!o.tracking_only && o.payment_status === "NEW_SLIP_REQUESTED" && (
-                <div style={{ marginTop: 20 }}>
-                  <h3>Upload new payment proof</h3>
-                  {o.payment_note && <p className="notice">{o.payment_note}</p>}
-                  <ProofUploader
-                    path={"proofs?order=" + o.id}
-                    max={data.settings.max_upload_mb}
-                    onUploaded={() => load(o.id)}
-                  />
-                </div>
-              )}
-              {o.tracking_only && o.payment_status === "NEW_SLIP_REQUESTED" && (
-                <p className="notice">
-                  Use the device you placed this order on to upload a
-                  replacement payment proof, or contact support.
-                </p>
-              )}
             </div>
           </div>
         </>
