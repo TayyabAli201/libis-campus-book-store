@@ -172,7 +172,11 @@ export async function receipt(o: any) {
     Math.max(customerLines.length * 15, addressLines.length * 14) + 40;
   ensure(customerHeight);
   text("BILLED TO", margin, y, 7, true, muted);
-  text("DELIVER TO", 310, y, 7, true, muted);
+  const isPickup =
+    o.delivery_type === "campus" ||
+    (o.city && String(o.city).toLowerCase().includes("campus")) ||
+    (o.address && String(o.address).toLowerCase().includes("campus"));
+  text(isPickup ? "PICKUP LOCATION (VU QANCHI CAMPUS)" : "DELIVER TO", 310, y, 7, true, muted);
   const nameHeight = lines(
     wrap(o.name, 220, 11, bold),
     margin,

@@ -1941,12 +1941,12 @@ function OrderModalPopup({
                       <div>
                         <strong>
                           {isCampus
-                            ? "📍 Campus Pickup Point Location"
+                            ? "📍 VU Qanchi Campus Pickup Point Location"
                             : "📍 Lahore Rider Live Route Navigation (InDrive Style)"}
                         </strong>
                         <p className="small-text">
                           {isCampus
-                            ? "University campus counter pickup point for student collection"
+                            ? "VU Qanchi campus bookstore counter pickup point for student collection"
                             : `Direct route from rider’s current location to student pin: ${o.address}`}
                         </p>
                       </div>
@@ -1959,7 +1959,7 @@ function OrderModalPopup({
                     >
                       <Navigation size={16} />{" "}
                       {isCampus
-                        ? "Open Campus Location on Google Maps"
+                        ? "Open VU Qanchi Campus on Google Maps"
                         : "Start InDrive Live Route Navigation"}{" "}
                       <ExternalLink size={14} />
                     </a>
@@ -2215,7 +2215,7 @@ function Orders({
       const currentDate = `${dd}-${mm}-${yyyy}`;
 
       let deliveryPrefix = "Orders";
-      if (deliveryType === "campus") deliveryPrefix = "Campus Pickup";
+      if (deliveryType === "campus") deliveryPrefix = "VU Qanchi Campus Pickup";
       else if (deliveryType === "lahore") deliveryPrefix = "Lahore";
       else if (deliveryType === "other") deliveryPrefix = "Other City";
 
@@ -2351,7 +2351,7 @@ function Orders({
           label="Delivery type"
           options={[
             { value: "all", label: "All delivery types" },
-            { value: "campus", label: "Campus Pickup" },
+            { value: "campus", label: "VU Qanchi Campus Pickup" },
             { value: "lahore", label: "Lahore" },
             { value: "other", label: "Other City" },
           ]}
@@ -2378,7 +2378,7 @@ function Orders({
           className="btn compact"
           onClick={exportOrders}
           disabled={exporting || loading}
-          title={`Export ${deliveryType === "all" ? (status === "all" ? "all" : statuses[status] || status) : (deliveryType === "other" ? "Other City" : deliveryType === "campus" ? "Campus Pickup" : "Lahore")} orders to Excel`}
+          title={`Export ${deliveryType === "all" ? (status === "all" ? "all" : statuses[status] || status) : (deliveryType === "other" ? "Other City" : deliveryType === "campus" ? "VU Qanchi Campus Pickup" : "Lahore")} orders to Excel`}
         >
           <Download size={15} />
           {exporting
@@ -2390,7 +2390,7 @@ function Orders({
                     ? deliveryType === "other"
                       ? "Other City"
                       : deliveryType === "campus"
-                        ? "Campus Pickup"
+                        ? "VU Qanchi Campus Pickup"
                         : "Lahore"
                     : statuses[status] || status
               }`}
@@ -2418,11 +2418,11 @@ function Orders({
                       onClick={(e) => e.stopPropagation()}
                       title={
                         isCampus
-                          ? "Open campus pickup location on Google Maps"
+                          ? "Open VU Qanchi campus pickup location on Google Maps"
                           : "Open InDrive style live route navigation from your location to student location"
                       }
                     >
-                      <Navigation size={12} /> {isCampus ? "Campus Location" : "Lahore Route"}
+                      <Navigation size={12} /> {isCampus ? "VU Qanchi Campus" : "Lahore Route"}
                     </a>
                   </div>
                 )}
@@ -2437,7 +2437,7 @@ function Orders({
                     {o.delivery_type && (
                       <span className="small-text muted">
                         {o.delivery_type === "campus"
-                          ? "🏫 Campus Pickup"
+                          ? "🏫 VU Qanchi Campus Pickup"
                           : o.delivery_type === "lahore"
                             ? "🛵 Lahore Delivery"
                             : "📦 Other Cities"}
@@ -2487,7 +2487,7 @@ function Orders({
                     {o.delivery_type && (
                       <span className="small-text muted">
                         {o.delivery_type === "campus"
-                          ? "🏫 Campus Pickup"
+                          ? "🏫 VU Qanchi Campus Pickup"
                           : o.delivery_type === "lahore"
                             ? "🛵 Lahore Delivery"
                             : "📦 Other Cities"}
@@ -3346,7 +3346,7 @@ function SettingsPage() {
             </div>
 
             <div className="form-grid three-col" style={{ marginTop: 16 }}>
-              <Field label="Campus Pickup Fee (Rs.)">
+              <Field label="VU Qanchi Campus Pickup Fee (Rs.)">
                 <input
                   required
                   type="number"

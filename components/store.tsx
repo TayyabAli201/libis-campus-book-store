@@ -748,7 +748,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
           (o.city && o.city.toLowerCase().includes("campus")) ||
           (o.address && o.address.toLowerCase().includes("campus"))) && (
           <div className="track-card-info">
-            <span className="track-info-label">Campus Location:</span>
+            <span className="track-info-label">Pickup Location:</span>
             <a
               href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
               target="_blank"
@@ -764,7 +764,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
               }}
             >
               <MapPin size={14} />
-              <span>Open on Google Maps</span>
+              <span>VU Qanchi Campus (Google Maps)</span>
               <ExternalLink size={12} />
             </a>
           </div>
@@ -1493,8 +1493,8 @@ function Checkout({ data }: { data: Catalog }) {
                       setForm({
                         ...form,
                         delivery_type: "campus",
-                        city: "Campus Pickup",
-                        address: "Pickup from Campus Bookstore Counter",
+                        city: "VU Qanchi Campus",
+                        address: "Pickup from VU Qanchi Campus Bookstore Counter",
                       });
                     }}
                   >
@@ -1503,8 +1503,8 @@ function Checkout({ data }: { data: Catalog }) {
                       <Building2 size={24} />
                     </div>
                     <div className="delivery-option-info">
-                      <strong>Pickup from Campus</strong>
-                      <span>Collect from campus counter</span>
+                      <strong>VU Qanchi Campus Pickup</strong>
+                      <span>Only from VU Qanchi Campus Counter</span>
                     </div>
                   </button>
 
@@ -1537,7 +1537,7 @@ function Checkout({ data }: { data: Catalog }) {
                       setForm({
                         ...form,
                         delivery_type: "other",
-                        city: form.city === "Lahore" || form.city === "Campus Pickup" ? "" : form.city,
+                        city: form.city === "Lahore" || form.city.includes("Campus") ? "" : form.city,
                         address: form.address.startsWith("Pickup from") ? "" : form.address,
                       })
                     }
@@ -1560,8 +1560,10 @@ function Checkout({ data }: { data: Catalog }) {
                     <Building2 size={24} style={{ color: "var(--primary)" }} />
                   </div>
                   <div>
-                    <strong>📍 Campus Pickup Selected ({money(data.settings.delivery_campus ?? 10000)})</strong>
-                    <p>No home address required! Show your order reference ID at the campus bookstore counter when collecting your books.</p>
+                    <strong>📍 Campus Pickup Only From VU Qanchi Campus ({money(data.settings.delivery_campus ?? 10000)})</strong>
+                    <p style={{ marginTop: 4 }}>
+                      ⚠️ <strong>Please Note:</strong> Campus pickup is available <u>only from the VU Qanchi Campus bookstore counter (Lahore)</u>. No home address required — just show your Order ID at the counter to collect your books.
+                    </p>
                     <div style={{ marginTop: 10 }}>
                       <a
                         href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
@@ -1579,7 +1581,7 @@ function Checkout({ data }: { data: Catalog }) {
                         }}
                       >
                         <MapPin size={15} />
-                        <span>View Campus Location on Google Maps</span>
+                        <span>View VU Qanchi Campus on Google Maps</span>
                         <ExternalLink size={13} />
                       </a>
                     </div>
@@ -1841,8 +1843,9 @@ export function printOrderReceiptSlip(order: any) {
     .join(" · ");
   const isPickup =
     order.delivery_type === "campus" ||
-    (order.city && String(order.city).toLowerCase().includes("campus"));
-  const locationLabel = isPickup ? "Pickup Location" : "Deliver to";
+    (order.city && String(order.city).toLowerCase().includes("campus")) ||
+    (order.address && String(order.address).toLowerCase().includes("campus"));
+  const locationLabel = isPickup ? "Pickup Location (VU Qanchi Campus)" : "Deliver to";
 
   const itemsHtml = (order.items || [])
     .map(
@@ -2206,10 +2209,10 @@ export function ReceiptButtons({ order }: { order: any }) {
         type="button"
         className="track-receipt-btn-print"
         onClick={() => printOrderReceiptSlip(order)}
-        title="Print official order slip"
+        title="Print official order receipt"
       >
         <Printer size={15} />
-        <span>Print Slip</span>
+        <span>Print Receipt</span>
       </button>
       <button
         type="button"
@@ -2284,7 +2287,7 @@ export function OrderReceipt({ o }: { o: any }) {
           <div>
             <span className="receipt-label">
               {o.delivery_type === "campus" || (o.city && o.city.toLowerCase().includes("campus"))
-                ? "Pickup Location"
+                ? "Pickup Location (VU Qanchi Campus)"
                 : "Deliver to"}
             </span>
             <p>
@@ -2311,7 +2314,7 @@ export function OrderReceipt({ o }: { o: any }) {
                   }}
                 >
                   <MapPin size={14} />
-                  <span>View Campus Location on Google Maps</span>
+                  <span>View VU Qanchi Campus on Google Maps</span>
                   <ExternalLink size={12} />
                 </a>
               </p>
@@ -2911,9 +2914,9 @@ function SupportCallout({ data }: { data: Catalog }) {
                 rel="noopener noreferrer"
                 className="rate-badge"
                 style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
-                title="View Campus Pickup Location on Google Maps"
+                title="View VU Qanchi Campus Location on Google Maps"
               >
-                <span>🏛️ Campus Pickup</span>
+                <span>🏛️ VU Qanchi Campus Pickup</span>
                 <strong>{money(s.delivery_campus ?? 10000)}</strong>
               </a>
               <div className="rate-badge">
