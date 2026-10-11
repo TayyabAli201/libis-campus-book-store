@@ -1341,6 +1341,8 @@ function LocationPinPicker({
           style={{ border: 0, borderRadius: "8px" }}
           loading="lazy"
           allowFullScreen
+          allow="geolocation"
+          referrerPolicy="no-referrer-when-downgrade"
           onError={() => setMapError(true)}
           src={mapError ? osmEmbedSrc : googleEmbedSrc}
         />

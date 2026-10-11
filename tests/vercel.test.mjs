@@ -96,3 +96,31 @@ test("Vercel files remain private and preserve existing object keys and content 
   await bucket.delete("proofs/test-id");
   assert.deepEqual(calls.at(-1), ["del", "proofs/test-id"]);
 });
+
+test("Production CSP headers permit Google Maps and OpenStreetMap embeds and live geolocation", async () => {
+  const origEnv = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    const { default: nextConfig } = await import("../next.config.ts");
+    const headersList = await nextConfig.headers();
+    const globalRule = headersList.find((h) => h.source === "/:path*");
+    assert.ok(globalRule, "Global headers rule must exist");
+
+    const headerMap = Object.fromEntries(
+      globalRule.headers.map((h) => [h.key, h.value]),
+    );
+
+    assert.equal(headerMap["Referrer-Policy"], "strict-origin-when-cross-origin");
+    assert.match(headerMap["Permissions-Policy"], /geolocation=\(self\)/);
+    assert.ok(headerMap["Content-Security-Policy"], "CSP must be present in production");
+
+    const csp = headerMap["Content-Security-Policy"];
+    assert.match(csp, /frame-src[^;]*maps\.google\.com/);
+    assert.match(csp, /frame-src[^;]*openstreetmap\.org/);
+    assert.match(csp, /img-src[^;]*openstreetmap\.org/);
+    assert.match(csp, /img-src[^;]*google\.com/);
+  } finally {
+    process.env.NODE_ENV = origEnv;
+  }
+});
+

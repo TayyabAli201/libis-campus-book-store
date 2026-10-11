@@ -36,10 +36,10 @@ export default {
     );
     const headers = new Headers(response.headers);
     headers.set("X-Content-Type-Options", "nosniff");
-    headers.set("Referrer-Policy", "no-referrer");
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     headers.set(
       "Permissions-Policy",
-      "camera=(), microphone=(), geolocation=()",
+      "camera=(), microphone=(), geolocation=(self)",
     );
     if (!import.meta.env.DEV) {
       headers.set(
@@ -49,7 +49,7 @@ export default {
       if (!headers.has("Content-Security-Policy"))
         headers.set(
           "Content-Security-Policy",
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://chatgpt.com https://*.chatgpt.com",
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.openstreetmap.org; font-src 'self' data:; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.gstatic.com; frame-src 'self' https://maps.google.com https://www.google.com https://*.google.com https://*.openstreetmap.org blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://chatgpt.com https://*.chatgpt.com",
         );
     }
     if (

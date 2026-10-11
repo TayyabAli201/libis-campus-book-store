@@ -16,10 +16,10 @@ const nextConfig: NextConfig = {
   async headers() {
     const security = [
       { key: "X-Content-Type-Options", value: "nosniff" },
-      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
         key: "Permissions-Policy",
-        value: "camera=(), microphone=(), geolocation=()",
+        value: "camera=(), microphone=(), geolocation=(self)",
       },
       ...(process.env.NODE_ENV === "production"
         ? [
@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
             {
               key: "Content-Security-Policy",
               value:
-                "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://chatgpt.com https://*.chatgpt.com",
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.openstreetmap.org; font-src 'self' data:; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.gstatic.com; frame-src 'self' https://maps.google.com https://www.google.com https://*.google.com https://*.openstreetmap.org blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://chatgpt.com https://*.chatgpt.com",
             },
           ]
         : []),
