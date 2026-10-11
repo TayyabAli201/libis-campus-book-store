@@ -2011,8 +2011,14 @@ function OrderModalPopup({
                     </div>
                   )}
 
-                  <div className="panel receipt-panel">
+                  <div className="print-only">
                     <OrderReceipt o={o} />
+                  </div>
+                  <div className="panel no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
+                      <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or download PDF</p>
+                    </div>
                     <ReceiptButtons order={o} />
                   </div>
                 </div>
@@ -2594,9 +2600,17 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
       {o && (
         <>
           <div className="checkout-grid">
-            <div className="panel receipt-panel">
+            <div className="print-only">
               <OrderReceipt o={o} />
-              <ReceiptButtons order={o} />
+            </div>
+            <div className="stack no-print">
+              <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
+                <div>
+                  <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
+                  <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or download PDF</p>
+                </div>
+                <ReceiptButtons order={o} />
+              </div>
             </div>
             <div className="stack no-print">
               <div className="panel stack">
