@@ -1827,16 +1827,75 @@ function Checkout({ data }: { data: Catalog }) {
 }
 export function ReceiptButtons({ order }: { order: any }) {
   const [busy, setBusy] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const printReceipt = async () => {
+    setPrinting(true);
+    try {
+      const r = await fetch("/api/orders/" + order.id + "/receipt");
+      if (!r.ok) throw new Error("Unable to generate receipt.");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+
+      // Create an off-screen iframe with real layout dimensions so PDF engine can render
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.left = "-9999px";
+      iframe.style.top = "0";
+      iframe.style.width = "1000px";
+      iframe.style.height = "1000px";
+      iframe.style.border = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+
+      let triggered = false;
+      const triggerPrint = () => {
+        if (triggered) return;
+        triggered = true;
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch {
+          window.open(url, "_blank");
+        }
+      };
+
+      iframe.onload = () => {
+        setTimeout(triggerPrint, 500);
+      };
+
+      // Fallback timer if browser doesn't fire onload on PDF MIME iframe
+      setTimeout(() => {
+        if (!triggered) {
+          triggerPrint();
+        }
+      }, 1500);
+
+      // Clean up iframe and object URL after print dialog
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {}
+        URL.revokeObjectURL(url);
+      }, 60000);
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   return (
     <div className="track-receipt-actions no-print" style={{ display: "inline-flex", gap: 10, alignItems: "center", margin: 0, padding: 0 }}>
       <button
         type="button"
         className="track-receipt-btn-print"
-        onClick={() => window.print()}
+        disabled={printing}
+        onClick={printReceipt}
         title="Print official order slip"
       >
         <Printer size={15} />
-        <span>Print Slip</span>
+        <span>{printing ? "Preparing…" : "Print Slip"}</span>
       </button>
       <button
         type="button"
