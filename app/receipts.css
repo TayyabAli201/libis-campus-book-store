@@ -357,9 +357,24 @@
   .tracking-form,
   .tracking-header,
   .receipt-buttons,
+  .order-modal-header,
+  .rider-map-pin-banner,
+  .slip-online-panel,
+  [data-slot="dialog-overlay"],
   .no-print,
   .actions {
     display: none !important;
+  }
+  .order-modal-popup-content {
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: transparent !important;
   }
   .checkout-grid {
     display: block !important;

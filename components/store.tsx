@@ -1825,77 +1825,391 @@ function Checkout({ data }: { data: Catalog }) {
     </section>
   );
 }
+function escapeHtml(str: unknown): string {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+export function printOrderReceiptSlip(order: any) {
+  const storeName = order.store?.store_name || "Campus Bookstore";
+  const contact = [order.store?.support_email, order.store?.whatsapp]
+    .filter(Boolean)
+    .join(" · ");
+  const isPickup =
+    order.delivery_type === "campus" ||
+    (order.city && String(order.city).toLowerCase().includes("campus"));
+  const locationLabel = isPickup ? "Pickup Location" : "Deliver to";
+
+  const itemsHtml = (order.items || [])
+    .map(
+      (b: any) => `
+        <tr>
+          <td>
+            <strong>${escapeHtml(b.title)}</strong>
+            <small>${escapeHtml(b.code)} · ${b.pages} pages</small>
+          </td>
+          <td>${b.quantity}</td>
+          <td>${escapeHtml(money(b.unit_price, order.currency))}</td>
+          <td>${escapeHtml(money(b.unit_price * b.quantity, order.currency))}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  const customerHtml = !order.tracking_only
+    ? `
+      <div class="receipt-customer">
+        <div>
+          <span class="receipt-label">Billed to</span>
+          <h3>${escapeHtml(order.name || "")}</h3>
+          <p>${escapeHtml(order.phone || "")}</p>
+        </div>
+        <div>
+          <span class="receipt-label">${locationLabel}</span>
+          <p>${escapeHtml(order.address || "")}<br />${escapeHtml(order.city || "")}</p>
+        </div>
+      </div>
+    `
+    : "";
+
+  const instructionsHtml =
+    !order.tracking_only && order.instructions
+      ? `
+      <div class="receipt-instructions">
+        <span class="receipt-label">Delivery instructions</span>
+        <p>${escapeHtml(order.instructions)}</p>
+      </div>
+    `
+      : "";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Order Receipt - ${escapeHtml(order.reference || "")}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a3350;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+    .order-receipt {
+      width: 100%;
+      max-width: 100%;
+      border: 1px solid #d4e0f0;
+      border-radius: 6px;
+      background: #ffffff;
+      overflow: hidden;
+      color: #1a3350;
+    }
+    .receipt-header {
+      border-top: 5px solid #2563a6;
+      background: #edf5ff;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .receipt-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .receipt-brand-icon {
+      color: #2563a6;
+      display: flex;
+    }
+    .receipt-brand strong {
+      display: block;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1a3350;
+      line-height: 1.3;
+    }
+    .receipt-brand span {
+      display: block;
+      margin-top: 3px;
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      color: #5e7087;
+      font-weight: 600;
+    }
+    .receipt-document-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      color: #2563a6;
+    }
+    .receipt-meta {
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid #d4e0f0;
+      background: #ffffff;
+    }
+    .receipt-label {
+      display: block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #5e7087;
+      margin-bottom: 6px;
+    }
+    .receipt-meta h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 0;
+      color: #1a3350;
+      line-height: 1.4;
+    }
+    .receipt-meta p {
+      font-size: 0.85rem;
+      margin: 0;
+      color: #1a3350;
+      line-height: 1.6;
+    }
+    .receipt-customer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 18px 24px;
+      border-bottom: 1px solid #d4e0f0;
+      background: #ffffff;
+    }
+    .receipt-customer h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+      color: #1a3350;
+    }
+    .receipt-customer p {
+      font-size: 0.84rem;
+      line-height: 1.6;
+      margin: 0;
+      color: #1a3350;
+    }
+    .receipt-items {
+      width: calc(100% - 48px);
+      margin: 18px 24px;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    .receipt-items th {
+      background: #edf5ff;
+      color: #1a3350;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 10px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: none;
+    }
+    .receipt-items th:first-child { width: 48%; border-radius: 4px 0 0 4px; }
+    .receipt-items th:nth-child(2) { width: 10%; text-align: right; }
+    .receipt-items th:nth-child(3) { width: 20%; text-align: right; }
+    .receipt-items th:last-child { width: 22%; text-align: right; border-radius: 0 4px 4px 0; }
+    .receipt-items td {
+      padding: 14px 8px;
+      border-bottom: 1px solid #d4e0f0;
+      font-size: 0.82rem;
+      color: #1a3350;
+      vertical-align: top;
+    }
+    .receipt-items td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+    .receipt-items td strong { display: block; font-weight: 650; font-size: 0.88rem; line-height: 1.5; color: #1a3350; }
+    .receipt-items td small { display: block; color: #5e7087; font-size: 0.72rem; margin-top: 4px; }
+    .receipt-bottom {
+      display: flex;
+      justify-content: flex-end;
+      padding: 18px 24px;
+      background: #ffffff;
+    }
+    .receipt-totals {
+      width: 280px;
+      max-width: 100%;
+      margin: 0;
+      font-size: 0.85rem;
+    }
+    .receipt-totals > div {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      color: #1a3350;
+    }
+    .receipt-totals dd {
+      margin: 0;
+      text-align: right;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+    }
+    .receipt-totals .receipt-grand-total {
+      margin-top: 8px;
+      border-top: 2px solid #2563a6;
+      color: #2563a6;
+      padding-top: 10px;
+      font-size: 1.05rem;
+      font-weight: 800;
+    }
+    .receipt-instructions {
+      padding: 0 24px 18px;
+      font-size: 0.82rem;
+      background: #ffffff;
+    }
+    .receipt-instructions p { margin: 4px 0 0; color: #1a3350; line-height: 1.5; }
+    .receipt-footer {
+      display: block;
+      margin: 0 24px 20px;
+      padding-top: 16px;
+      border-top: 1px solid #d4e0f0;
+      background: #ffffff;
+    }
+    .receipt-footer strong { font-size: 0.88rem; color: #1a3350; }
+    .receipt-footer p, .receipt-footer span {
+      font-size: 0.76rem;
+      line-height: 1.6;
+      color: #5e7087;
+      margin: 5px 0 0;
+    }
+    .receipt-footer span { display: block; }
+    .receipt-header, .receipt-meta, .receipt-customer, .receipt-bottom, .receipt-footer, .receipt-items tr {
+      break-inside: avoid;
+    }
+    @media print {
+      body { padding: 0; background: none; }
+      .order-receipt { border: 1px solid #d4e0f0 !important; }
+    }
+  </style>
+</head>
+<body>
+  <article class="order-receipt">
+    <header class="receipt-header">
+      <div class="receipt-brand">
+        <span class="receipt-brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </span>
+        <div>
+          <strong>${escapeHtml(storeName)}</strong>
+          <span>BOOKS FOR YOUR NEXT CHAPTER</span>
+        </div>
+      </div>
+      <span class="receipt-document-label">${order.tracking_only ? "ORDER SUMMARY" : "ORDER RECEIPT"}</span>
+    </header>
+    <div class="receipt-meta">
+      <div>
+        <span class="receipt-label">Order ID</span>
+        <h2>${escapeHtml(order.reference || "")}</h2>
+      </div>
+      <div>
+        <span class="receipt-label">Issued on</span>
+        <p>${escapeHtml(receiptDate(order.created_at))}</p>
+      </div>
+    </div>
+    ${customerHtml}
+    <table class="receipt-items">
+      <thead>
+        <tr>
+          <th scope="col">Book / description</th>
+          <th scope="col">Qty</th>
+          <th scope="col">Unit price</th>
+          <th scope="col">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+    <div class="receipt-bottom">
+      <dl class="receipt-totals">
+        <div>
+          <dt>Subtotal</dt>
+          <dd>${escapeHtml(money(order.subtotal, order.currency))}</dd>
+        </div>
+        <div>
+          <dt>Delivery</dt>
+          <dd>${escapeHtml(money(order.delivery, order.currency))}</dd>
+        </div>
+        <div class="receipt-grand-total">
+          <dt>Grand total</dt>
+          <dd>${escapeHtml(money(order.total, order.currency))}</dd>
+        </div>
+      </dl>
+    </div>
+    ${instructionsHtml}
+    <footer class="receipt-footer">
+      <strong>Thank you for choosing ${escapeHtml(storeName)}.</strong>
+      <p>${escapeHtml(receiptPaymentNote(order.payment_status))}</p>
+      ${contact ? `<p>${escapeHtml(contact)}</p>` : ""}
+      <span>Keep your Order ID for tracking and support.</span>
+    </footer>
+  </article>
+</body>
+</html>`;
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) return;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch {
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        win.print();
+      }
+    }
+    setTimeout(() => {
+      try {
+        document.body.removeChild(iframe);
+      } catch {}
+    }, 10000);
+  }, 250);
+}
+
 export function ReceiptButtons({ order }: { order: any }) {
   const [busy, setBusy] = useState(false);
-  const [printing, setPrinting] = useState(false);
-
-  const printReceipt = async () => {
-    setPrinting(true);
-    try {
-      const r = await fetch("/api/orders/" + order.id + "/receipt");
-      if (!r.ok) throw new Error("Unable to generate receipt.");
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-
-      // Create an off-screen iframe with real layout dimensions so PDF engine can render
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.left = "-9999px";
-      iframe.style.top = "0";
-      iframe.style.width = "1000px";
-      iframe.style.height = "1000px";
-      iframe.style.border = "none";
-      iframe.src = url;
-      document.body.appendChild(iframe);
-
-      let triggered = false;
-      const triggerPrint = () => {
-        if (triggered) return;
-        triggered = true;
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch {
-          window.open(url, "_blank");
-        }
-      };
-
-      iframe.onload = () => {
-        setTimeout(triggerPrint, 500);
-      };
-
-      // Fallback timer if browser doesn't fire onload on PDF MIME iframe
-      setTimeout(() => {
-        if (!triggered) {
-          triggerPrint();
-        }
-      }, 1500);
-
-      // Clean up iframe and object URL after print dialog
-      setTimeout(() => {
-        try {
-          document.body.removeChild(iframe);
-        } catch {}
-        URL.revokeObjectURL(url);
-      }, 60000);
-    } catch (e) {
-      toast.error(errorText(e));
-    } finally {
-      setPrinting(false);
-    }
-  };
 
   return (
     <div className="track-receipt-actions no-print" style={{ display: "inline-flex", gap: 10, alignItems: "center", margin: 0, padding: 0 }}>
       <button
         type="button"
         className="track-receipt-btn-print"
-        disabled={printing}
-        onClick={printReceipt}
+        onClick={() => printOrderReceiptSlip(order)}
         title="Print official order slip"
       >
         <Printer size={15} />
-        <span>{printing ? "Preparing…" : "Print Slip"}</span>
+        <span>Print Slip</span>
       </button>
       <button
         type="button"
