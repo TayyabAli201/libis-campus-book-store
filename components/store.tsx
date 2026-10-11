@@ -28,6 +28,7 @@ import {
   Clock,
   AlertTriangle,
   ExternalLink,
+  Info,
 } from "lucide-react";
 
 function FacebookIcon({ size = 18 }: { size?: number }) {
@@ -836,6 +837,22 @@ export function OrderTrackerCard({ o }: { o: any }) {
           </div>
           {!o.tracking_only && <ReceiptButtons order={o} />}
         </div>
+        {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
+          <div
+            style={{
+              width: "100%",
+              marginTop: 10,
+              padding: "8px 12px",
+              borderRadius: "6px",
+              background: "var(--muted)",
+              fontSize: "0.8rem",
+              color: "var(--muted-foreground)",
+              lineHeight: 1.4,
+            }}
+          >
+            ℹ️ <strong>Delivery Policy Note:</strong> Order total includes {money(o.delivery, o.currency)} base minimum delivery charges. Agar actual rider/courier fare is se zyada ho to baqi farq student delivery ke waqt direct pay kare ga.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1054,10 +1071,13 @@ function Cart({ data }: { data: Catalog }) {
 function Totals({
   subtotal,
   delivery,
+  deliveryType,
 }: {
   subtotal: number;
   delivery?: number;
+  deliveryType?: string;
 }) {
+  const isBase = deliveryType === "lahore" || deliveryType === "other";
   return (
     <div className="totals">
       <div>
@@ -1067,13 +1087,18 @@ function Totals({
       {typeof delivery === "number" && (
         <>
           <div>
-            <span>Delivery</span>
+            <span>{isBase ? "Delivery (Minimum Base)" : "Delivery"}</span>
             <strong>{money(delivery)}</strong>
           </div>
           <div className="grand-total">
             <span>Grand total</span>
             <strong>{money(subtotal + delivery)}</strong>
           </div>
+          {isBase && (
+            <p style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--muted-foreground)", lineHeight: 1.35 }}>
+              * Base minimum delivery charges. If actual rider or courier fare exceeds this, the remaining difference is payable upon delivery.
+            </p>
+          )}
         </>
       )}
       {typeof delivery !== "number" && (
@@ -1544,13 +1569,13 @@ function Checkout({ data }: { data: Catalog }) {
                       })
                     }
                   >
-                    <div className="delivery-option-badge">{money(data.settings.delivery_lahore)}</div>
+                    <div className="delivery-option-badge">{money(data.settings.delivery_lahore)} (Base)</div>
                     <div className="delivery-option-icon">
                       <Navigation size={24} />
                     </div>
                     <div className="delivery-option-info">
                       <strong>Lahore - At Home</strong>
-                      <span>Rider delivery to home / map pin</span>
+                      <span>Rider delivery (Base charge)</span>
                     </div>
                   </button>
 
@@ -1566,13 +1591,13 @@ function Checkout({ data }: { data: Catalog }) {
                       })
                     }
                   >
-                    <div className="delivery-option-badge">{money(data.settings.delivery_other)}</div>
+                    <div className="delivery-option-badge">{money(data.settings.delivery_other)} (Base)</div>
                     <div className="delivery-option-icon">
                       <Truck size={24} />
                     </div>
                     <div className="delivery-option-info">
                       <strong>Other City</strong>
-                      <span>Courier delivery nationwide</span>
+                      <span>Courier delivery (Base charge)</span>
                     </div>
                   </button>
                 </div>
@@ -1613,6 +1638,34 @@ function Checkout({ data }: { data: Catalog }) {
                 </div>
               ) : form.delivery_type === "lahore" ? (
                 <>
+                  <div
+                    className="delivery-policy-alert"
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: "10px",
+                      background: "rgba(245, 158, 11, 0.09)",
+                      border: "1px solid rgba(245, 158, 11, 0.35)",
+                      marginBottom: 16,
+                      fontSize: "0.85rem",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <Info size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                      <div>
+                        <strong style={{ color: "#b45309", display: "block", marginBottom: 3 }}>
+                          🛵 Lahore Rider Delivery Policy ({money(data.settings.delivery_lahore)} Base Fare):
+                        </strong>
+                        <span>
+                          Checkout mein add kiye gaye <strong>{money(data.settings.delivery_lahore)}</strong> sirf <strong>minimum / base rider charges</strong> hain. Agar rider (Bykea / InDrive / Yango) ka actual rent/fare is se zyada banta hai (maslan rent Rs. 400 aye to upar walay Rs. 50), to <strong>extra farq student rider ko khud pay kare ga</strong>.
+                        </span>
+                        <div style={{ marginTop: 4, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+                          (The {money(data.settings.delivery_lahore)} fee is a base minimum charge. Any excess rider fare due to distance is payable directly by the student to the rider upon delivery.)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="form-grid">
                     <Field label="City">
                       <input
@@ -1655,6 +1708,34 @@ function Checkout({ data }: { data: Catalog }) {
                 </>
               ) : (
                 <>
+                  <div
+                    className="delivery-policy-alert"
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: "10px",
+                      background: "rgba(245, 158, 11, 0.09)",
+                      border: "1px solid rgba(245, 158, 11, 0.35)",
+                      marginBottom: 16,
+                      fontSize: "0.85rem",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <Info size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                      <div>
+                        <strong style={{ color: "#b45309", display: "block", marginBottom: 3 }}>
+                          📦 Nationwide Courier Delivery Policy ({money(data.settings.delivery_other)} Base Minimum):
+                        </strong>
+                        <span>
+                          Checkout mein add kiye gaye <strong>{money(data.settings.delivery_other)}</strong> nationwide courier ke <strong>minimum base charges</strong> hain. Agar parcel ke weight (zyada kitabon) ya door daraz city ki wajah se courier charges is se zyada bante hain (maslan Rs. 800 charge ho to upar walay Rs. 300), to <strong>extra farq customer/student ko khud pay karna hoga</strong>.
+                        </span>
+                        <div style={{ marginTop: 4, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+                          (The {money(data.settings.delivery_other)} fee is a base minimum courier charge. Any excess courier fee charged due to parcel weight or distance is payable by the customer upon delivery.)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="form-grid">
                     <Field label="City">
                       <input
@@ -1697,6 +1778,21 @@ function Checkout({ data }: { data: Catalog }) {
                 Your quote is valid for 30 minutes. Stock is reserved after you
                 submit proof.
               </p>
+              {(form.delivery_type === "lahore" || form.delivery_type === "other") && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    background: "rgba(245, 158, 11, 0.08)",
+                    border: "1px solid rgba(245, 158, 11, 0.3)",
+                    fontSize: "0.83rem",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  ℹ️ <strong>Delivery Note:</strong> Total includes{" "}
+                  <strong>{money(quote!.delivery)}</strong> base minimum delivery fee. Agar rider / courier ka actual fare is se zyada aya to extra difference parcel delivery ke waqt student pay kare ga.
+                </div>
+              )}
               <div className="bank-card">
                 <span className="eyebrow">{quote!.settings.bank_name}</span>
                 <small>ACCOUNT NUMBER</small>
@@ -1841,6 +1937,7 @@ function Checkout({ data }: { data: Catalog }) {
                   ? data.settings.delivery_lahore
                   : data.settings.delivery_other)
             }
+            deliveryType={form.delivery_type}
           />
           <div className="small-text">
             <ShieldCheck size={18} /> Secure proof upload. Manual payment
@@ -2168,7 +2265,7 @@ export function printOrderReceiptSlip(order: any) {
           <dd>${escapeHtml(money(order.subtotal, order.currency))}</dd>
         </div>
         <div>
-          <dt>Delivery</dt>
+          <dt>Delivery${order.delivery_type === "lahore" || order.delivery_type === "other" ? " (Base / Min)" : ""}</dt>
           <dd>${escapeHtml(money(order.delivery, order.currency))}</dd>
         </div>
         <div class="receipt-grand-total">
@@ -2176,6 +2273,9 @@ export function printOrderReceiptSlip(order: any) {
           <dd>${escapeHtml(money(order.total, order.currency))}</dd>
         </div>
       </dl>
+      ${order.delivery_type === "lahore" || order.delivery_type === "other"
+        ? `<p style="margin: 4px 0 0; font-size: 0.72rem; color: #666; text-align: right;">* Base minimum delivery fee. Excess rider/courier fare if any is payable upon delivery.</p>`
+        : ""}
     </div>
     ${instructionsHtml}
     <footer class="receipt-footer">
@@ -2378,7 +2478,7 @@ export function OrderReceipt({ o }: { o: any }) {
             <dd>{money(o.subtotal, o.currency)}</dd>
           </div>
           <div>
-            <dt>Delivery</dt>
+            <dt>Delivery{o.delivery_type === "lahore" || o.delivery_type === "other" ? " (Base / Min)" : ""}</dt>
             <dd>{money(o.delivery, o.currency)}</dd>
           </div>
           <div className="receipt-grand-total">
@@ -2386,6 +2486,11 @@ export function OrderReceipt({ o }: { o: any }) {
             <dd>{money(o.total, o.currency)}</dd>
           </div>
         </dl>
+        {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
+          <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "#666", textAlign: "right" }}>
+            * Base minimum delivery fee. Excess rider/courier fare if any is payable upon delivery.
+          </p>
+        )}
       </div>
       {!o.tracking_only && o.instructions && (
         <div className="receipt-instructions">
@@ -2794,10 +2899,10 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
       subtitle: "Delivery fees, dispatch schedules, and tracking guidelines.",
       sections: [
         {
-          title: "Delivery charges",
-          text: `Lahore delivery is ${money(s.delivery_lahore)}. Other cities are ${money(s.delivery_other)}. The server applies the current charge at checkout.`,
+          title: "Delivery charges & base rates",
+          text: `VU Qanchi Campus pickup is ${money(s.delivery_campus ?? 10000)}. Lahore rider delivery base charge is ${money(s.delivery_lahore)}. Other cities nationwide courier base charge is ${money(s.delivery_other)}. Note that these are minimum base advance charges; if actual rider fare or courier charges exceed this base amount, the extra fare difference is payable directly upon parcel delivery.`,
           icon: Truck,
-          badge: "CHARGES",
+          badge: "BASE RATES",
           accent: "cyan",
         },
         {
@@ -3050,14 +3155,17 @@ function SupportCallout({ data }: { data: Catalog }) {
                 <strong>{money(s.delivery_campus ?? 10000)}</strong>
               </a>
               <div className="rate-badge">
-                <span>🚀 Lahore Rider</span>
+                <span>🚀 Lahore Rider (Base)</span>
                 <strong>{money(s.delivery_lahore)}</strong>
               </div>
               <div className="rate-badge">
-                <span>📦 Other Cities</span>
+                <span>📦 Other Cities (Base)</span>
                 <strong>{money(s.delivery_other)}</strong>
               </div>
             </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", margin: "8px 0 0 0", lineHeight: 1.35 }}>
+              * Delivery charges are base minimum advance rates. Extra rider/courier fare difference if higher is payable directly upon delivery.
+            </p>
           </div>
 
           <div className="contact-info-panel">

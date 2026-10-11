@@ -3360,7 +3360,7 @@ function SettingsPage() {
                   }
                 />
               </Field>
-              <Field label="Lahore Delivery Fee (Rs.)">
+              <Field label="Lahore Base Delivery Fee (Rs.) (Min)">
                 <input
                   required
                   type="number"
@@ -3374,7 +3374,7 @@ function SettingsPage() {
                   }
                 />
               </Field>
-              <Field label="Other City Delivery Fee (Rs.)">
+              <Field label="Other City Base Delivery Fee (Rs.) (Min)">
                 <input
                   required
                   type="number"
@@ -3389,6 +3389,9 @@ function SettingsPage() {
                 />
               </Field>
             </div>
+            <p className="small-text muted" style={{ marginTop: 8 }}>
+              💡 <strong>Delivery Policy Note:</strong> Lahore and Other City fees are base minimum advance charges. Any excess rider fare or courier weight surcharge is paid directly by the student upon delivery.
+            </p>
           </div>
 
           {/* Bottom Save Button */}
