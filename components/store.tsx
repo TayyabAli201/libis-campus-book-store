@@ -732,16 +732,38 @@ export function OrderTrackerCard({ o }: { o: any }) {
 
         <div className="track-card-info">
           <span className="track-info-label">Status:</span>
-          <span
-            className={`track-status-badge ${currentStep === 6
-                ? "status-delivered"
-                : currentStep > 0
-                  ? "status-active"
-                  : "status-pending"
-              }`}
-          >
-            {o.payment_status || o.status || "PAYMENT_PENDING"}
-          </span>
+          {o.payment_status === "NEW_SLIP_REQUESTED" ? (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span
+                className="track-status-badge status-pending"
+                style={{ background: "#fee2e2", color: "#b91c1c", borderColor: "#fca5a5" }}
+              >
+                Action Required: New Slip Needed
+              </span>
+              <a
+                href="#upload-slip-section"
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "#dc2626",
+                  textDecoration: "underline",
+                }}
+              >
+                Upload Slip ⬆️
+              </a>
+            </div>
+          ) : (
+            <span
+              className={`track-status-badge ${currentStep === 6
+                  ? "status-delivered"
+                  : currentStep > 0
+                    ? "status-active"
+                    : "status-pending"
+                }`}
+            >
+              {o.payment_status || o.status || "PAYMENT_PENDING"}
+            </span>
+          )}
         </div>
 
         {(o.delivery_type === "campus" ||
@@ -2385,6 +2407,16 @@ function OrderTracking({ data }: { data: Catalog }) {
     [busy, setBusy] = useState(false);
   const { ready } = useApp();
   const latestLookup = useRef(0);
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (o?.payment_status === "NEW_SLIP_REQUESTED") {
+      setTimeout(() => {
+        uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    }
+  }, [o?.payment_status]);
+
   const load = async (id: string) => {
     if (!id.trim()) return;
     const lookup = ++latestLookup.current;
@@ -2418,7 +2450,7 @@ function OrderTracking({ data }: { data: Catalog }) {
   }, [ready]);
   return (
     <section className="section track-page-container">
-      <div className="home-track-section no-print" style={{ margin: "20px 0 35px" }}>
+      <div className="home-track-section no-print" style={{ margin: o ? "10px 0 18px" : "20px 0 35px" }}>
         <div className="home-track-badge">REAL-TIME ORDER TRACKING</div>
         <h1 className="home-track-title">Track Your Course Materials Order</h1>
         <p className="home-track-subtitle">
@@ -2467,15 +2499,13 @@ function OrderTracking({ data }: { data: Catalog }) {
         </div>
       ) : o ? (
         <>
-          <OrderTrackerCard o={o} />
-          <div className="print-only">
-            <OrderReceipt o={o} />
-          </div>
-          {/* Top Priority Action: When Admin requests a new payment proof */}
+          {/* Top Priority Action on Mobile & Desktop: When Admin requests a new payment proof, place it ABOVE everything else! */}
           {o.payment_status === "NEW_SLIP_REQUESTED" && (
             <div
+              ref={uploadSectionRef}
+              id="upload-slip-section"
               className="track-details-wrapper no-print"
-              style={{ maxWidth: 720, margin: "24px auto 0" }}
+              style={{ maxWidth: 720, margin: "0 auto 20px" }}
             >
               <div
                 className="panel"
@@ -2580,6 +2610,11 @@ function OrderTracking({ data }: { data: Catalog }) {
               </div>
             </div>
           )}
+
+          <OrderTrackerCard o={o} />
+          <div className="print-only">
+            <OrderReceipt o={o} />
+          </div>
 
           <div className="track-details-wrapper no-print" style={{ maxWidth: 720, margin: "24px auto 0" }}>
             <div className="panel">
