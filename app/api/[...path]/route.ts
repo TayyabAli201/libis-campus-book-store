@@ -303,7 +303,7 @@ async function handle(req: Request) {
           category: url.searchParams.get("category") || undefined,
         }),
         all("SELECT id,code,name,city FROM campuses WHERE active=1"),
-        all("SELECT id,rate,version FROM pricing_categories ORDER BY id"),
+        all("SELECT id,rate,binding_rate,version FROM pricing_categories ORDER BY id"),
       ]);
       return ok({ settings, books, campuses, prices });
     }
@@ -454,6 +454,7 @@ async function handle(req: Request) {
           .object({
             category: z.enum(["A", "B", "C", "D"]),
             rate: z.number().int().min(1).max(100000),
+            binding_rate: z.number().int().min(0).max(1000000).optional(),
             version: z.number().int(),
             confirmed: z.literal(true),
           })
@@ -462,6 +463,10 @@ async function handle(req: Request) {
           "SELECT * FROM pricing_categories WHERE id=?",
           b.category,
         );
+        const newBindingRate =
+          typeof b.binding_rate === "number"
+            ? b.binding_rate
+            : (old.binding_rate ?? 0);
         await batch([
           guard(
             "EXISTS(SELECT 1 FROM pricing_categories WHERE id=? AND version=?)",
@@ -469,16 +474,19 @@ async function handle(req: Request) {
             b.version,
           ),
           stmt(
-            "UPDATE pricing_categories SET rate=?,version=version+1 WHERE id=?",
+            "UPDATE pricing_categories SET rate=?,binding_rate=?,version=version+1 WHERE id=?",
             b.rate,
+            newBindingRate,
             b.category,
           ),
           stmt(
-            "INSERT INTO price_history(id,category,old_rate,new_rate,actor,created_at) VALUES(?,?,?,?,?,?)",
+            "INSERT INTO price_history(id,category,old_rate,new_rate,old_binding_rate,new_binding_rate,actor,created_at) VALUES(?,?,?,?,?,?,?,?)",
             uid(),
             b.category,
             old.rate,
             b.rate,
+            old.binding_rate ?? 0,
+            newBindingRate,
             u.email,
             now(),
           ),
@@ -487,7 +495,7 @@ async function handle(req: Request) {
             "PRICE_CHANGED",
             b.category,
             old,
-            { rate: b.rate },
+            { rate: b.rate, binding_rate: newBindingRate },
             req,
           ),
         ]);

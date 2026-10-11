@@ -28,7 +28,7 @@ export default async function BookPage({
     getSettings(),
     catalog(code),
     all<any>("SELECT id,name,city FROM campuses WHERE active=1"),
-    all<any>("SELECT id,rate FROM pricing_categories ORDER BY id"),
+    all<any>("SELECT id,rate,binding_rate FROM pricing_categories ORDER BY id"),
   ]);
   const book = books.find((b) => b.code.toLowerCase() === code.toLowerCase());
   if (!book) notFound();

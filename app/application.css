@@ -1572,15 +1572,56 @@ footer {
 }
 
 .pricing-admin .field {
-  margin-block: 20px;
+  margin-block: 12px;
 }
 
 .pricing-admin h2 {
-  font-size: 2rem;
+  font-size: 1.85rem;
+  line-height: 1.1;
 }
 
 .pricing-admin .eyebrow {
   font-size: 0.7rem;
+}
+
+.pricing-current-summary {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block: 14px 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pricing-subtext {
+  font-size: 0.8rem;
+  color: var(--muted-foreground, #666);
+  margin-top: 2px;
+}
+
+.pricing-binding-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: var(--muted, #f1f5f9);
+  padding: 6px 10px;
+  border-radius: 8px;
+  text-align: right;
+  border: 1px solid var(--border);
+}
+
+.pricing-binding-badge span {
+  font-size: 0.68rem;
+  color: var(--muted-foreground, #666);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.pricing-binding-badge strong {
+  font-size: 0.95rem;
+  color: var(--foreground);
 }
 
 .block-title {

@@ -63,11 +63,16 @@ export const pricing = sqliteTable(
   {
     id: id(),
     rate: integer("rate").notNull(),
+    bindingRate: integer("binding_rate").notNull().default(0),
     version: integer("version").notNull().default(1),
   },
   (t) => [
     check("four_categories", sql`${t.id} IN ('A','B','C','D')`),
     check("positive_rate", sql`${t.rate} > 0 AND ${t.rate} <= 100000`),
+    check(
+      "nonnegative_binding_rate",
+      sql`${t.bindingRate} >= 0 AND ${t.bindingRate} <= 1000000`,
+    ),
   ],
 );
 export const books = sqliteTable(
@@ -292,6 +297,8 @@ export const priceHistory = sqliteTable("price_history", {
     .references(() => pricing.id),
   oldRate: integer("old_rate").notNull(),
   newRate: integer("new_rate").notNull(),
+  oldBindingRate: integer("old_binding_rate").notNull().default(0),
+  newBindingRate: integer("new_binding_rate").notNull().default(0),
   actor: text("actor").notNull(),
   createdAt: stamp(),
 });

@@ -21,7 +21,7 @@ import {
 // The storefront and checkout share the Student rate for every page-priced book.
 export function getBookSql(category = STUDENT_CATEGORY) {
   const cat = ["A", "B", "C", "D"].includes(category) ? category : STUDENT_CATEGORY;
-  return `SELECT b.*,p.rate,COALESCE(b.fixed_price,b.pages*p.rate) AS price,c.name AS campus_name FROM books b JOIN pricing_categories p ON p.id='${cat}' LEFT JOIN campuses c ON c.id=b.campus_id`;
+  return `SELECT b.*,p.rate,COALESCE(p.binding_rate,0) AS binding_rate,CASE WHEN b.fixed_price IS NOT NULL OR b.pages IS NOT NULL THEN COALESCE(b.fixed_price,b.pages*p.rate)+COALESCE(p.binding_rate,0) ELSE NULL END AS price,c.name AS campus_name FROM books b JOIN pricing_categories p ON p.id='${cat}' LEFT JOIN campuses c ON c.id=b.campus_id`;
 }
 export const BOOK_SQL = getBookSql(STUDENT_CATEGORY);
 export async function getSettings() {

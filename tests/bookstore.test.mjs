@@ -87,6 +87,8 @@ function database(t) {
     "0002_bizarre_thena.sql",
     "0003_clear_book_catalog.sql",
     "0004_campus_pricing_category.sql",
+    "0005_password_resets.sql",
+    "0006_binding_rate.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -740,3 +742,103 @@ test("Campus pricing category calculates prices according to assigned rate (A, B
   // 2 items * 25000 = 50000 subtotal
   assert.equal(q.subtotal, 50000);
 });
+
+test("Binding rate is added to every book price (e.g. 500 Rs fixed + 30 Rs binding = 530 Rs)", async (t) => {
+  const sqlite = database(t);
+
+  // Insert a book with fixed price of Rs. 500 (50,000 paisa)
+  const { id: fixedBookId } = await saveBook(
+    bookInput("FIXED500", { fixed_price: 50000, pages: 150 }),
+    admin,
+    request,
+  );
+  // Insert a book with page-priced 100 pages (at Student rate 600 paisa = 60,000 paisa)
+  const { id: pageBookId } = await saveBook(
+    bookInput("PAGE100", { fixed_price: null, pages: 100 }),
+    admin,
+    request,
+  );
+  // Insert a draft book (no pages, no fixed price)
+  const { id: draftBookId } = await saveBook(
+    bookInput("DRAFT", { fixed_price: null, pages: null, active: false }),
+    admin,
+    request,
+  );
+
+  // Initial check before binding rate (default 0):
+  let books = await catalog("", admin);
+  let fixedBook = books.find((b) => b.id === fixedBookId);
+  let pageBook = books.find((b) => b.id === pageBookId);
+  let draftBook = books.find((b) => b.id === draftBookId);
+
+  assert.equal(fixedBook?.price, 50000); // 500 Rs
+  assert.equal(pageBook?.price, 60000);  // 600 Rs
+  assert.equal(draftBook?.price, null);   // Draft book remains null
+
+  // Now update Student Category (D) binding rate to Rs. 30 (3000 paisa)
+  sqlite.exec("UPDATE pricing_categories SET binding_rate=3000 WHERE id='D'");
+
+  books = await catalog("", admin);
+  fixedBook = books.find((b) => b.id === fixedBookId);
+  pageBook = books.find((b) => b.id === pageBookId);
+  draftBook = books.find((b) => b.id === draftBookId);
+
+  // Fixed book price: 500 Rs + 30 Rs binding = 530 Rs (53000 paisa)
+  assert.equal(fixedBook?.price, 53000);
+  assert.equal(fixedBook?.binding_rate, 3000);
+
+  // Page book price: 600 Rs (100 * 6) + 30 Rs binding = 630 Rs (63000 paisa)
+  assert.equal(pageBook?.price, 63000);
+  assert.equal(pageBook?.binding_rate, 3000);
+
+  // Draft book remains null
+  assert.equal(draftBook?.price, null);
+
+  // priceCart verification
+  const cartQuote = await priceCart(cart(fixedBookId, 1));
+  assert.equal(cartQuote.subtotal, 53000);
+
+  const catBefore = sqlite.prepare("SELECT * FROM pricing_categories WHERE id='D'").get();
+  // API update of binding_rate via POST /api/manage/pricing
+  const managePricingReq = new Request("http://127.0.0.1:5173/api/manage/pricing", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": "http://127.0.0.1:5173",
+      "X-Requested-With": "CampusBookstore",
+      cookie: "cbs_session=test_binding_session",
+    },
+    body: JSON.stringify({
+      category: "D",
+      rate: 650,
+      binding_rate: 4000, // Rs. 40
+      version: catBefore.version,
+      confirmed: true,
+    }),
+  });
+  sqlite.exec(
+    "INSERT OR REPLACE INTO users(id,email,name,role,active,must_change,password_hash,created_at) VALUES('admin','admin@example.invalid','Admin','SUPER_ADMIN',1,0,'hash','2026-01-01')",
+  );
+  sqlite
+    .prepare(
+      "INSERT OR REPLACE INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)",
+    )
+    .run(hash("test_binding_session"), "admin", Date.now() + 60000, "2026-01-01");
+
+  const res = await POST(managePricingReq);
+  assert.equal(res.status, 200);
+
+  const updatedCategory = sqlite
+    .prepare("SELECT * FROM pricing_categories WHERE id='D'")
+    .get();
+  assert.equal(updatedCategory.rate, 650);
+  assert.equal(updatedCategory.binding_rate, 4000);
+
+  const priceHistory = sqlite
+    .prepare("SELECT * FROM price_history ORDER BY created_at DESC LIMIT 1")
+    .get();
+  assert.equal(priceHistory.category, "D");
+  assert.equal(priceHistory.old_binding_rate, 3000);
+  assert.equal(priceHistory.new_binding_rate, 4000);
+});
+

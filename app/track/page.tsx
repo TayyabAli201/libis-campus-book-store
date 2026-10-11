@@ -17,7 +17,7 @@ export default async function TrackPage() {
     const [{ settings }, campuses, prices] = await Promise.all([
       getSettings(),
       all<any>("SELECT id,name,city FROM campuses WHERE active=1"),
-      all<any>("SELECT id,rate FROM pricing_categories ORDER BY id"),
+      all<any>("SELECT id,rate,binding_rate FROM pricing_categories ORDER BY id"),
     ]);
     data = { settings, books: [], campuses, prices };
   } catch {}

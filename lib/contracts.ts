@@ -164,6 +164,7 @@ export type Book = {
   campus_name: string | null;
   active: number;
   rate: number;
+  binding_rate?: number;
   price: number | null;
   version: number;
 };

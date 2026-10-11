@@ -1589,16 +1589,18 @@ function BookEditor({
       <div className="notice">
         Student price:{" "}
         {money(
-          b.fixed_price ??
-            (b.pages === null
+          b.fixed_price !== null
+            ? b.fixed_price + (rates.find((r) => r.id === "D")?.binding_rate || 0)
+            : b.pages === null
               ? null
-              : b.pages * (rates.find((r) => r.id === "D")?.rate || 0)),
+              : b.pages * (rates.find((r) => r.id === "D")?.rate || 0) +
+                (rates.find((r) => r.id === "D")?.binding_rate || 0),
         )}
-        {b.pages === null
-          ? " · Add pages to calculate the price"
+        {b.pages === null && b.fixed_price === null
+          ? " · Add pages or fixed price to calculate the price"
           : b.fixed_price === null
-            ? ` · ${b.pages} pages × Student category rate`
-            : " · fixed override"}
+            ? ` · ${b.pages} pages × Student category rate + binding (${money(rates.find((r) => r.id === "D")?.binding_rate || 0)})`
+            : ` · fixed override + binding (${money(rates.find((r) => r.id === "D")?.binding_rate || 0)})`}
       </div>
       <Field label="Cover image (JPG or PNG)">
         <input
@@ -1656,10 +1658,9 @@ function Pricing() {
       {data && (
         <>
           <div className="notice">
-            The homepage and checkout use the Student category rate for every
-            page-priced book. Fixed-price editions and existing orders keep
-            their saved prices. Categories A, B and C remain available for
-            reference.
+            The homepage and checkout use the Student category rate and binding rate for every book.
+            Fixed-price editions also receive the category binding rate. Categories A, B and C
+            remain available for campus-specific pricing and reference.
           </div>
           <div className="pricing-admin">
             {data.prices.map((p: any) => (
@@ -1672,6 +1673,9 @@ function Pricing() {
                   setChange({
                     ...p,
                     newRate: Math.round(Number(form.get("rate")) * 100),
+                    newBindingRate: Math.round(
+                      Number(form.get("binding_rate")) * 100,
+                    ),
                   });
                 }}
               >
@@ -1679,8 +1683,16 @@ function Pricing() {
                 {p.id === "D" && (
                   <p className="small-text">Default storefront pricing</p>
                 )}
-                <h2>{money(p.rate)}</h2>
-                <p>per page</p>
+                <div className="pricing-current-summary">
+                  <div>
+                    <h2>{money(p.rate)}</h2>
+                    <p className="pricing-subtext">per page</p>
+                  </div>
+                  <div className="pricing-binding-badge">
+                    <span>Binding</span>
+                    <strong>{money(p.binding_rate ?? 0)}</strong>
+                  </div>
+                </div>
                 <Field label="New price per page (PKR)">
                   <input
                     name="rate"
@@ -1690,6 +1702,17 @@ function Pricing() {
                     step="0.01"
                     required
                     defaultValue={p.rate / 100}
+                  />
+                </Field>
+                <Field label="New binding rate (PKR)">
+                  <input
+                    name="binding_rate"
+                    type="number"
+                    min="0"
+                    max="5000"
+                    step="0.01"
+                    required
+                    defaultValue={(p.binding_rate ?? 0) / 100}
                   />
                 </Field>
                 <button className="btn primary compact">Review change</button>
@@ -1702,7 +1725,7 @@ function Pricing() {
             title={"Update " + categoryLabel(change?.id || "") + "?"}
             description={
               change
-                ? `${money(change.rate)} to ${money(change.newRate)} per page. ${change.id === "D" ? "All page-priced books on the storefront will use the new Student rate." : "This updates the category reference rate. Storefront Student prices remain unchanged."}`
+                ? `Per-page rate: ${money(change.rate)} → ${money(change.newRate)}. Binding rate: ${money(change.binding_rate ?? 0)} → ${money(change.newBindingRate)}. ${change.id === "D" ? "All storefront books will use the new Student rate and binding rate." : "This updates the category reference rate and binding rate."}`
                 : ""
             }
             onConfirm={async () => {
@@ -1710,6 +1733,7 @@ function Pricing() {
                 await api("manage/pricing", {
                   category: change.id,
                   rate: change.newRate,
+                  binding_rate: change.newBindingRate,
                   version: change.version,
                   confirmed: true,
                 });
