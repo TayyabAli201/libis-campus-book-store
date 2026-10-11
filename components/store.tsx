@@ -1828,14 +1828,19 @@ function Checkout({ data }: { data: Catalog }) {
 export function ReceiptButtons({ order }: { order: any }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="actions no-print" style={{ display: "inline-flex", gap: 8, alignItems: "center", margin: 0, padding: 0 }}>
-      <button type="button" className="btn compact" onClick={() => window.print()}>
+    <div className="track-receipt-actions no-print" style={{ display: "inline-flex", gap: 10, alignItems: "center", margin: 0, padding: 0 }}>
+      <button
+        type="button"
+        className="track-receipt-btn-print"
+        onClick={() => window.print()}
+        title="Print official order slip"
+      >
         <Printer size={15} />
         <span>Print Slip</span>
       </button>
       <button
         type="button"
-        className="btn compact"
+        className="track-receipt-btn-download"
         disabled={busy}
         onClick={async () => {
           setBusy(true);
@@ -1854,6 +1859,7 @@ export function ReceiptButtons({ order }: { order: any }) {
             setBusy(false);
           }
         }}
+        title="Download official PDF receipt"
       >
         <Download size={15} />
         <span>{busy ? "Preparing…" : "Download Receipt"}</span>
@@ -2091,10 +2097,7 @@ function OrderTracking({ data }: { data: Catalog }) {
           </div>
           <div className="track-details-wrapper no-print" style={{ maxWidth: 720, margin: "24px auto 0" }}>
             <div className="panel">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-                <h3 style={{ margin: 0 }}>Order journey</h3>
-                {!o.tracking_only && <ReceiptButtons order={o} />}
-              </div>
+              <h3 style={{ margin: "0 0 16px 0" }}>Order journey</h3>
               <div className="timeline">
                 {o.history.map((h: any, i: number) => (
                   <div key={i}>
