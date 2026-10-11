@@ -842,3 +842,43 @@ test("Binding rate is added to every book price (e.g. 500 Rs fixed + 30 Rs bindi
   assert.equal(priceHistory.new_binding_rate, 4000);
 });
 
+test("Calculated book prices round up to the nearest multiple of Rs. 5 (e.g. 641.2 -> 645, 337 -> 340)", async (t) => {
+  const sqlite = database(t);
+
+  // Book 1: fixed price 641.20 PKR (64120 paisa)
+  const { id: book641 } = await saveBook(
+    bookInput("ROUND641", { fixed_price: 64120 }),
+    admin,
+    request,
+  );
+  // Book 2: fixed price 337.00 PKR (33700 paisa)
+  const { id: book337 } = await saveBook(
+    bookInput("ROUND337", { fixed_price: 33700 }),
+    admin,
+    request,
+  );
+  // Book 3: 123 pages with rate 2.50 PKR (250 paisa) + 30 PKR (3000 paisa) binding = 337.50 PKR
+  sqlite.exec("UPDATE pricing_categories SET rate=250, binding_rate=3000 WHERE id='D'");
+  const { id: bookPages } = await saveBook(
+    bookInput("ROUNDPAGE", { fixed_price: null, pages: 123 }),
+    admin,
+    request,
+  );
+
+  // When binding is 0:
+  sqlite.exec("UPDATE pricing_categories SET binding_rate=0 WHERE id='D'");
+  const booksNoBinding = await catalog("", admin);
+  const b1NoBinding = booksNoBinding.find((b) => b.id === book641);
+  const b2NoBinding = booksNoBinding.find((b) => b.id === book337);
+  assert.equal(b1NoBinding?.price, 64500); // 641.2 -> 645 PKR
+  assert.equal(b2NoBinding?.price, 34000); // 337 -> 340 PKR
+
+  // When binding is 30 PKR (3000 paisa):
+  // 123 pages * 2.50 = 307.50 + 30 = 337.50 PKR -> rounds up to 340 PKR (34000 paisa)
+  sqlite.exec("UPDATE pricing_categories SET binding_rate=3000 WHERE id='D'");
+  const booksWithBinding = await catalog("", admin);
+  const b3WithBinding = booksWithBinding.find((b) => b.id === bookPages);
+  assert.equal(b3WithBinding?.price, 34000); // 337.5 -> 340 PKR
+});
+
+

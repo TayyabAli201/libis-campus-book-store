@@ -204,7 +204,7 @@ export async function submitOrder(
   for (const b of current.items) {
     statements.push(
       guard(
-        "EXISTS(SELECT 1 FROM books b JOIN pricing_categories p ON p.id=? WHERE b.id=? AND b.active=1 AND b.deleted_at IS NULL AND b.version=? AND (CASE WHEN b.fixed_price IS NOT NULL OR b.pages IS NOT NULL THEN COALESCE(b.fixed_price,b.pages*p.rate)+COALESCE(p.binding_rate,0) ELSE NULL END)=?)",
+        "EXISTS(SELECT 1 FROM books b JOIN pricing_categories p ON p.id=? WHERE b.id=? AND b.active=1 AND b.deleted_at IS NULL AND b.version=? AND (CASE WHEN b.fixed_price IS NOT NULL OR b.pages IS NOT NULL THEN CAST(CEIL((COALESCE(b.fixed_price,b.pages*p.rate)+COALESCE(p.binding_rate,0))/500.0)*500 AS INTEGER) ELSE NULL END)=?)",
         pricingCategory,
         b.id,
         b.version,

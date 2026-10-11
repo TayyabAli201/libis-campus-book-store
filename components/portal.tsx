@@ -1590,17 +1590,20 @@ function BookEditor({
         Student price:{" "}
         {money(
           b.fixed_price !== null
-            ? b.fixed_price + (rates.find((r) => r.id === "D")?.binding_rate || 0)
+            ? Math.ceil((b.fixed_price + (rates.find((r) => r.id === "D")?.binding_rate || 0)) / 500) * 500
             : b.pages === null
               ? null
-              : b.pages * (rates.find((r) => r.id === "D")?.rate || 0) +
-                (rates.find((r) => r.id === "D")?.binding_rate || 0),
+              : Math.ceil(
+                  (b.pages * (rates.find((r) => r.id === "D")?.rate || 0) +
+                    (rates.find((r) => r.id === "D")?.binding_rate || 0)) /
+                    500,
+                ) * 500,
         )}
         {b.pages === null && b.fixed_price === null
           ? " · Add pages or fixed price to calculate the price"
           : b.fixed_price === null
-            ? ` · ${b.pages} pages × Student category rate + binding (${money(rates.find((r) => r.id === "D")?.binding_rate || 0)})`
-            : ` · fixed override + binding (${money(rates.find((r) => r.id === "D")?.binding_rate || 0)})`}
+            ? ` · ${b.pages} pages × Student category rate + binding (${money(rates.find((r) => r.id === "D")?.binding_rate || 0)}) (rounded up to Rs. 5)`
+            : ` · fixed override + binding (${money(rates.find((r) => r.id === "D")?.binding_rate || 0)}) (rounded up to Rs. 5)`}
       </div>
       <Field label="Cover image (JPG or PNG)">
         <input
