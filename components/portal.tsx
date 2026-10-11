@@ -2215,7 +2215,7 @@ function Orders({
       const currentDate = `${dd}-${mm}-${yyyy}`;
 
       let deliveryPrefix = "Orders";
-      if (deliveryType === "campus") deliveryPrefix = "VU Qanchi Campus Pickup";
+      if (deliveryType === "campus") deliveryPrefix = "VU Qanchi Campus";
       else if (deliveryType === "lahore") deliveryPrefix = "Lahore";
       else if (deliveryType === "other") deliveryPrefix = "Other City";
 
@@ -2351,7 +2351,7 @@ function Orders({
           label="Delivery type"
           options={[
             { value: "all", label: "All delivery types" },
-            { value: "campus", label: "VU Qanchi Campus Pickup" },
+            { value: "campus", label: "VU Qanchi Campus" },
             { value: "lahore", label: "Lahore" },
             { value: "other", label: "Other City" },
           ]}
@@ -2378,7 +2378,7 @@ function Orders({
           className="btn compact"
           onClick={exportOrders}
           disabled={exporting || loading}
-          title={`Export ${deliveryType === "all" ? (status === "all" ? "all" : statuses[status] || status) : (deliveryType === "other" ? "Other City" : deliveryType === "campus" ? "VU Qanchi Campus Pickup" : "Lahore")} orders to Excel`}
+          title={`Export ${deliveryType === "all" ? (status === "all" ? "all" : statuses[status] || status) : (deliveryType === "other" ? "Other City" : deliveryType === "campus" ? "VU Qanchi Campus" : "Lahore")} orders to Excel`}
         >
           <Download size={15} />
           {exporting
@@ -2390,7 +2390,7 @@ function Orders({
                     ? deliveryType === "other"
                       ? "Other City"
                       : deliveryType === "campus"
-                        ? "VU Qanchi Campus Pickup"
+                        ? "VU Qanchi Campus"
                         : "Lahore"
                     : statuses[status] || status
               }`}
@@ -2437,7 +2437,7 @@ function Orders({
                     {o.delivery_type && (
                       <span className="small-text muted">
                         {o.delivery_type === "campus"
-                          ? "🏫 VU Qanchi Campus Pickup"
+                          ? "🏫 VU Qanchi Campus"
                           : o.delivery_type === "lahore"
                             ? "🛵 Lahore Delivery"
                             : "📦 Other Cities"}
@@ -2487,7 +2487,7 @@ function Orders({
                     {o.delivery_type && (
                       <span className="small-text muted">
                         {o.delivery_type === "campus"
-                          ? "🏫 VU Qanchi Campus Pickup"
+                          ? "🏫 VU Qanchi Campus"
                           : o.delivery_type === "lahore"
                             ? "🛵 Lahore Delivery"
                             : "📦 Other Cities"}
