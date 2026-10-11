@@ -824,33 +824,40 @@ export function OrderTrackerCard({ o }: { o: any }) {
         </div>
       </div>
 
-      <div className="track-card-footer">
-        <span className="track-items-summary">
-          {totalBooks} book(s) in this order
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div className="track-total-price">
-            Total:{" "}
-            <strong>
-              {money(o.total || (o.subtotal || 0) + (o.delivery || 0), o.currency)}
-            </strong>
+      <div className="track-card-footer" style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "stretch" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 16, flexWrap: "wrap" }}>
+          <span className="track-items-summary">
+            {totalBooks} book(s) in this order
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <div className="track-total-price">
+              Total:{" "}
+              <strong>
+                {money(o.total || (o.subtotal || 0) + (o.delivery || 0), o.currency)}
+              </strong>
+            </div>
+            {!o.tracking_only && <ReceiptButtons order={o} />}
           </div>
-          {!o.tracking_only && <ReceiptButtons order={o} />}
         </div>
         {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
           <div
             style={{
               width: "100%",
-              marginTop: 10,
               padding: "10px 14px",
               borderRadius: "8px",
               background: "rgba(239, 68, 68, 0.06)",
               border: "1.5px solid #ef4444",
               fontSize: "0.82rem",
               lineHeight: 1.45,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            <strong style={{ color: "#dc2626" }}>⚠️ Delivery Notice:</strong> Order total includes {money(o.delivery, o.currency)} minimum base delivery fee. If actual rider fare or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.
+            <AlertTriangle size={18} style={{ color: "#dc2626", flexShrink: 0 }} />
+            <div>
+              <strong style={{ color: "#dc2626" }}>Delivery Notice:</strong> Order total includes {money(o.delivery, o.currency)} minimum base delivery fee. If actual rider fare or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.
+            </div>
           </div>
         )}
       </div>
