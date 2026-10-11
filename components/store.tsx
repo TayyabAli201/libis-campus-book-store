@@ -805,11 +805,14 @@ export function OrderTrackerCard({ o }: { o: any }) {
         <span className="track-items-summary">
           {totalBooks} book(s) in this order
         </span>
-        <div className="track-total-price">
-          Total:{" "}
-          <strong>
-            {money(o.total || (o.subtotal || 0) + (o.delivery || 0), o.currency)}
-          </strong>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div className="track-total-price">
+            Total:{" "}
+            <strong>
+              {money(o.total || (o.subtotal || 0) + (o.delivery || 0), o.currency)}
+            </strong>
+          </div>
+          {!o.tracking_only && <ReceiptButtons order={o} />}
         </div>
       </div>
     </div>
@@ -1825,13 +1828,14 @@ function Checkout({ data }: { data: Catalog }) {
 export function ReceiptButtons({ order }: { order: any }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="actions no-print">
-      <button className="btn" onClick={() => window.print()}>
-        <Printer size={17} />
-        Print Receipt
+    <div className="actions no-print" style={{ display: "inline-flex", gap: 8, alignItems: "center", margin: 0, padding: 0 }}>
+      <button type="button" className="btn compact" onClick={() => window.print()}>
+        <Printer size={15} />
+        <span>Print Slip</span>
       </button>
       <button
-        className="btn"
+        type="button"
+        className="btn compact"
         disabled={busy}
         onClick={async () => {
           setBusy(true);
@@ -1851,8 +1855,8 @@ export function ReceiptButtons({ order }: { order: any }) {
           }
         }}
       >
-        <Download size={17} />
-        {busy ? "Preparing…" : "Download Receipt"}
+        <Download size={15} />
+        <span>{busy ? "Preparing…" : "Download Receipt"}</span>
       </button>
     </div>
   );
@@ -2082,13 +2086,15 @@ function OrderTracking({ data }: { data: Catalog }) {
       ) : o ? (
         <>
           <OrderTrackerCard o={o} />
-          <div className="checkout-grid" style={{ marginTop: 24 }}>
-            <div className="panel receipt-panel">
-              <OrderReceipt o={o} />
-              {!o.tracking_only && <ReceiptButtons order={o} />}
-            </div>
-            <aside className="panel no-print">
-              <h3>Order journey</h3>
+          <div className="print-only">
+            <OrderReceipt o={o} />
+          </div>
+          <div className="track-details-wrapper no-print" style={{ maxWidth: 720, margin: "24px auto 0" }}>
+            <div className="panel">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+                <h3 style={{ margin: 0 }}>Order journey</h3>
+                {!o.tracking_only && <ReceiptButtons order={o} />}
+              </div>
               <div className="timeline">
                 {o.history.map((h: any, i: number) => (
                   <div key={i}>
@@ -2115,7 +2121,7 @@ function OrderTracking({ data }: { data: Catalog }) {
                   replacement payment proof, or contact support.
                 </p>
               )}
-            </aside>
+            </div>
           </div>
         </>
       ) : null}
