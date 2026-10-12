@@ -341,6 +341,7 @@ export async function getOrder(
     // Public tracking has an explicit allowlist: no customer details, proofs or free-form notes.
     return {
       reference: o.reference,
+      delivery_type: o.delivery_type,
       status: o.status,
       payment_status: o.payment_status,
       subtotal: o.subtotal,

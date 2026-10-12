@@ -616,6 +616,7 @@ test("Order ID alone tracks an existing order without cookies or a key and exclu
       "created_at",
       "currency",
       "delivery",
+      "delivery_type",
       "history",
       "items",
       "payment_status",

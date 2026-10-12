@@ -775,9 +775,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
           )}
         </div>
 
-        {(o.delivery_type === "campus" ||
-          (o.city && o.city.toLowerCase().includes("campus")) ||
-          (o.address && o.address.toLowerCase().includes("campus"))) && (
+        {isCampusPickup && (
           <div className="track-card-info">
             <span className="track-info-label">Pickup Location:</span>
             <a
