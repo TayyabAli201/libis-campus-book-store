@@ -2781,17 +2781,11 @@ function OrderTracking({ data }: { data: Catalog }) {
                   </div>
                 )}
 
-                {!o.tracking_only ? (
-                  <ProofUploader
-                    path={"proofs?order=" + o.id}
-                    max={data.settings.max_upload_mb}
-                    onUploaded={() => load(o.id)}
-                  />
-                ) : (
-                  <p className="notice" style={{ margin: 0 }}>
-                    Use the device you placed this order on to upload a replacement payment proof, or contact support.
-                  </p>
-                )}
+                <ProofUploader
+                  path={"proofs?order=" + (o.reference || o.id)}
+                  max={data.settings.max_upload_mb}
+                  onUploaded={() => load(reference || o.reference || o.id)}
+                />
               </div>
             </div>
           )}

@@ -361,6 +361,9 @@ export async function getOrder(
         status,
         created_at,
       })),
+      ...(o.payment_status === "NEW_SLIP_REQUESTED" && o.payment_note
+        ? { payment_note: o.payment_note }
+        : {}),
     };
   }
   delete o.owner;

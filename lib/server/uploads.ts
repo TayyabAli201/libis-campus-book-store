@@ -69,17 +69,40 @@ export async function upload(req: Request, cover = false) {
   let order: any;
   if (!cover) {
     if (url.searchParams.has("order")) {
-      order = await getOrder(req, url.searchParams.get("order")!);
-      if (
-        order.status !== "PAYMENT_PENDING" ||
-        !["NEW_SLIP_REQUESTED", "PENDING", "MANUAL_REVIEW"].includes(
-          order.payment_status,
-        )
-      )
+      const orderParam = (url.searchParams.get("order") || "").trim();
+      if (!/^[a-zA-Z0-9-]{1,100}$/.test(orderParam)) {
+        throw new AppError(404, "Order not found.");
+      }
+      order = await one<any>(
+        "SELECT o.*, p.status AS payment_status FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=? OR o.reference=?",
+        orderParam.toLowerCase(),
+        orderParam.toUpperCase(),
+      );
+      if (!order) {
+        throw new AppError(404, "Order not found.");
+      }
+      const isOwner = order.owner === owner;
+      const allowsUpload = isOwner
+        ? ["NEW_SLIP_REQUESTED", "PENDING", "MANUAL_REVIEW"].includes(
+            order.payment_status,
+          )
+        : order.payment_status === "NEW_SLIP_REQUESTED";
+
+      if (!allowsUpload) {
+        if (!isOwner) {
+          throw new AppError(404, "Order not found.");
+        }
         throw new AppError(
           409,
           "This order no longer accepts replacement proof.",
         );
+      }
+      if (order.status !== "PAYMENT_PENDING") {
+        throw new AppError(
+          409,
+          "This order no longer accepts replacement proof.",
+        );
+      }
       total = order.total;
     } else {
       const q = await one<any>(
@@ -141,7 +164,7 @@ export async function upload(req: Request, cover = false) {
       stmt(
         "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at,order_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         id,
-        owner,
+        order?.owner || owner,
         key,
         mime,
         bytes.length,
