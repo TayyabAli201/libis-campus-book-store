@@ -2323,27 +2323,18 @@ function Orders({
         );
       } catch (excelErr) {
         // Fallback to structured CSV with book items
-        let totalBooks = 0;
-        rows.forEach((o: any) => {
-          const items =
-            o.items && o.items.length > 0
-              ? o.items
-              : [{ code: "—", title: "Order Record", quantity: 1 }];
-          items.forEach((item: any) => {
-            totalBooks += Number(item.quantity) || 1;
-          });
-        });
+        let grandTotalBooks = 0;
 
         const csvRows: unknown[][] = [
           [
             "Sr No",
             "Order Number",
             "Student Name",
-            "Date",
             ...(includeAddress ? ["Address"] : []),
             "Book Code",
             "Book Name",
-            `Quantity (Total Books: ${totalBooks})`,
+            "Quantity",
+            "Total Books",
           ],
         ];
 
@@ -2352,11 +2343,12 @@ function Orders({
             o.items && o.items.length > 0
               ? o.items
               : [{ code: "—", title: "Order Record", quantity: 1 }];
-          const d = o.created_at ? new Date(o.created_at) : null;
-          const dateStr =
-            d && !isNaN(d.getTime())
-              ? `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`
-              : "—";
+          const orderTotalBooks = items.reduce(
+            (sum: number, it: any) => sum + (Number(it.quantity) || 1),
+            0,
+          );
+          grandTotalBooks += orderTotalBooks;
+
           const fullAddress = o.address
             ? o.city && !o.address.toLowerCase().includes(o.city.toLowerCase())
               ? `${o.address}, ${o.city}`
@@ -2368,14 +2360,21 @@ function Orders({
               idx === 0 ? orderIdx + 1 : "",
               idx === 0 ? o.reference || "—" : "",
               idx === 0 ? o.name || "Student" : "",
-              idx === 0 ? dateStr : "",
               ...(includeAddress ? [idx === 0 ? fullAddress : ""] : []),
               item.code || "—",
               item.title || "—",
-              item.quantity || 1,
+              Number(item.quantity) || 1,
+              idx === 0 ? orderTotalBooks : "",
             ]);
           });
         });
+
+        const prefixCount = includeAddress ? 6 : 5;
+        csvRows.push([
+          ...Array(prefixCount).fill(""),
+          `(Total Books: ${grandTotalBooks})`,
+          "",
+        ]);
 
         download(filename.replace(/\.xlsx$/, ".csv"), csv(csvRows));
         toast.success(`Exported ${rows.length} order(s).`);

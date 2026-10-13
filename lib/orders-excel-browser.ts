@@ -13,11 +13,11 @@ export async function exportOrdersExcel(
       { width: 10 }, // Sr No
       { width: 24 }, // Order Number
       { width: 26 }, // Student Name
-      { width: 18 }, // Date
       ...(includeAddress ? [{ width: 36 }] : []), // Address
       { width: 16 }, // Book Code
       { width: 46 }, // Book Name
-      { width: 24 }, // Quantity (Total Books: ...)
+      { width: 12 }, // Quantity
+      { width: 14 }, // Total Books
     ],
     stickyRowsCount: 1,
   }).toFile(filename);
