@@ -146,3 +146,7 @@ outputs/
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+*.db
+*.sqlite
+*.sqlite3
