@@ -2480,6 +2480,7 @@ function Orders({
           }}
           label="Order status"
           allLabel="All statuses"
+          width={180}
           options={Object.keys(transitions).map((s) => ({
             value: s,
             label: statuses[s],
@@ -2493,6 +2494,7 @@ function Orders({
           }}
           label="Delivery type"
           allLabel="All delivery types"
+          width={175}
           options={[
             { value: "campus", label: "VU Qanchi Campus" },
             { value: "lahore", label: "Lahore" },
@@ -2522,25 +2524,10 @@ function Orders({
           onClick={exportOrders}
           disabled={exporting || loading}
           title="Export orders to Excel"
+          style={{ whiteSpace: "nowrap" }}
         >
           <Download size={15} />
-          {exporting
-            ? "Exporting…"
-            : `Export ${
-                statusList.length === 0 && deliveryTypeList.length === 0
-                  ? "Orders"
-                  : deliveryTypeList.length > 0
-                    ? deliveryTypeList.length === 1
-                      ? deliveryTypeList[0] === "other"
-                        ? "Other City"
-                        : deliveryTypeList[0] === "campus"
-                          ? "VU Qanchi Campus"
-                          : "Lahore"
-                      : `${deliveryTypeList.length} Routes`
-                    : statusList.length === 1
-                      ? statuses[statusList[0]] || statusList[0]
-                      : `${statusList.length} Statuses`
-              }`}
+          {exporting ? "Exporting…" : "Export Orders"}
         </button>
         {canUpdate && !payments && (
           <button

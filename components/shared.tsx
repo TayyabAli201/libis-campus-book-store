@@ -105,12 +105,14 @@ export function MultiChoose({
   options,
   label,
   allLabel = "All options",
+  width = 175,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
   options: { value: string; label: string }[];
   label: string;
   allLabel?: string;
+  width?: number | string;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -163,7 +165,16 @@ export function MultiChoose({
   };
 
   return (
-    <div className="relative inline-block" ref={containerRef} style={{ position: "relative" }}>
+    <div
+      className="relative inline-block"
+      ref={containerRef}
+      style={{
+        position: "relative",
+        userSelect: "none",
+        transition: "none",
+        animation: "none",
+      }}
+    >
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -182,11 +193,24 @@ export function MultiChoose({
           fontWeight: 500,
           whiteSpace: "nowrap",
           userSelect: "none",
+          width,
+          minWidth: width,
+          maxWidth: width,
           transition: "none",
           animation: "none",
+          outline: "none",
+          boxShadow: "none",
         }}
       >
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+            textAlign: "left",
+          }}
+        >
           {getButtonText()}
         </span>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
@@ -226,7 +250,7 @@ export function MultiChoose({
             top: "calc(100% + 4px)",
             left: 0,
             zIndex: 60,
-            minWidth: "220px",
+            minWidth: "210px",
             background: "var(--popover)",
             color: "var(--popover-foreground)",
             border: "1px solid var(--border)",
@@ -254,9 +278,10 @@ export function MultiChoose({
               cursor: "pointer",
               fontSize: "0.85rem",
               fontWeight: allSelected ? 600 : 400,
-              background: allSelected ? "rgba(var(--primary-rgb, 59, 130, 246), 0.08)" : "transparent",
+              background: "transparent",
               transition: "none",
               animation: "none",
+              userSelect: "none",
             }}
           >
             <div
@@ -297,9 +322,10 @@ export function MultiChoose({
                   cursor: "pointer",
                   fontSize: "0.85rem",
                   fontWeight: isChecked ? 600 : 400,
-                  background: isChecked ? "rgba(var(--primary-rgb, 59, 130, 246), 0.08)" : "transparent",
+                  background: "transparent",
                   transition: "none",
                   animation: "none",
+                  userSelect: "none",
                 }}
               >
                 <div
@@ -323,31 +349,6 @@ export function MultiChoose({
               </div>
             );
           })}
-
-          {!allSelected && (
-            <>
-              <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--primary)",
-                  fontSize: "0.78rem",
-                  padding: "5px 10px",
-                  cursor: "pointer",
-                  textAlign: "center",
-                  fontWeight: 600,
-                  borderRadius: "4px",
-                  transition: "none",
-                  animation: "none",
-                }}
-              >
-                Reset to {allLabel}
-              </button>
-            </>
-          )}
         </div>
       )}
     </div>
@@ -418,9 +419,9 @@ export function DataTable({
         </TableHeader>
         <TableBody>
           {rows.map((r, i) => (
-            <TableRow key={i}>
+            <TableRow key={i} style={{ transition: "none", animation: "none" }}>
               {r.map((c, j) => (
-                <TableCell key={j}>{c}</TableCell>
+                <TableCell key={j} style={{ transition: "none", animation: "none" }}>{c}</TableCell>
               ))}
             </TableRow>
           ))}
