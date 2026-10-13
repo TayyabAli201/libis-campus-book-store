@@ -146,25 +146,21 @@ export async function submitOrder(
   const id = uid(),
     at = now();
   let dd = "01",
-    mm = "01",
-    yy = "26";
+    mm = "01";
   try {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Karachi",
       day: "2-digit",
       month: "2-digit",
-      year: "2-digit",
     }).formatToParts(new Date());
     dd = parts.find((p) => p.type === "day")?.value || "01";
     mm = parts.find((p) => p.type === "month")?.value || "01";
-    yy = parts.find((p) => p.type === "year")?.value || "26";
   } catch {
-    const [y, m, d] = at.slice(0, 10).split("-");
+    const [, m, d] = at.slice(0, 10).split("-");
     dd = d || "01";
     mm = m || "01";
-    yy = (y || "2026").slice(-2);
   }
-  const dateKey = `${dd}${mm}${yy}`;
+  const dateKey = `${dd}${mm}`;
   const prefix =
     data.settings?.order_prefix && data.settings.order_prefix !== "CBS"
       ? data.settings.order_prefix

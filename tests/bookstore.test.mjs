@@ -882,24 +882,24 @@ test("Calculated book prices round up to the nearest multiple of Rs. 5 (e.g. 641
   assert.equal(b3WithBinding?.price, 34000); // 337.5 -> 340 PKR
 });
 
-test("Order reference follows DDMMYY-XXXX format and maintains continuous sequence across days", async (t) => {
+test("Order reference follows DDMM-XXXX format and maintains continuous sequence across days", async (t) => {
   const sqlite = database(t);
   const { id: bookId } = await saveBook(bookInput(), admin, request);
 
   const order1 = await order(sqlite, bookId, 1);
-  assert.match(order1.reference, /^QA-\d{6}-0001$/);
+  assert.match(order1.reference, /^QA-\d{4}-0001$/);
 
   const order2 = await order(sqlite, bookId, 2);
-  assert.match(order2.reference, /^QA-\d{6}-0002$/);
+  assert.match(order2.reference, /^QA-\d{4}-0002$/);
 
   // Simulate an order from yesterday or an earlier sequence
   sqlite
-    .prepare("UPDATE orders SET reference='QA-121026-0042', created_at='2026-10-12T00:00:00.000Z' WHERE id=?")
+    .prepare("UPDATE orders SET reference='QA-1210-0042', created_at='2026-10-12T00:00:00.000Z' WHERE id=?")
     .run(order2.id);
 
   const order3 = await order(sqlite, bookId, 3);
   // Next sequence must continue from 0042 -> 0043 on current date, not reset to 0001
-  assert.match(order3.reference, /^QA-\d{6}-0043$/);
+  assert.match(order3.reference, /^QA-\d{4}-0043$/);
 });
 
 
