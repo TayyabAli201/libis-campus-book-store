@@ -2172,6 +2172,27 @@
   color: #ffffff;
 }
 
+/* Clickable WhatsApp Phone Link */
+.whatsapp-phone-link {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.whatsapp-phone-link:hover {
+  color: #15803d;
+  opacity: 0.9;
+}
+:is(.dark *) .whatsapp-phone-link:hover {
+  color: #4ade80;
+}
+
 /* Online Payment Slip Viewer */
 .slip-online-panel {
   border: 1px solid var(--border);

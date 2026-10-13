@@ -29,6 +29,94 @@ export const statuses: Record<string, string> = {
   OCR_FAILED: "OCR Failed",
   PROOF_UPLOADED: "Payment Proof Uploaded",
 };
+
+export function getCampusName(o: any): string {
+  const directCampus = (o?.campus_name || o?.campus || "").trim();
+  if (directCampus) {
+    const cleaned = directCampus.replace(/\s*campus\s*/gi, "").trim();
+    if (cleaned) return cleaned;
+  }
+  const city = (o?.city || "").trim();
+  if (city && /campus/i.test(city)) {
+    const cleaned = city.replace(/\s*campus\s*/gi, "").trim();
+    if (cleaned) return cleaned;
+  }
+  if (o?.address && /qanchi/i.test(o.address)) {
+    return "VU Qanchi";
+  }
+  return "VU Qanchi";
+}
+
+export function getOrderWhatsAppMessage(o: any): string {
+  const studentName = (o?.name || "Student").trim();
+  const status = (o?.status || "").toUpperCase();
+
+  const isCampus =
+    o?.delivery_type === "campus" ||
+    (o?.city && o.city.toLowerCase().includes("campus")) ||
+    (o?.address && o.address.toLowerCase().includes("campus"));
+
+  const isLahore =
+    !isCampus &&
+    (o?.delivery_type === "lahore" ||
+      o?.delivery_type === "lahore_home" ||
+      (o?.city && o.city.toLowerCase().includes("lahore")));
+
+  // 1. Confirmed (For all types)
+  if (status === "CONFIRMED") {
+    return `Salam ${studentName}, your payment has been verified. Your order is now confirmed and will be processed soon.`;
+  }
+
+  // 2. Processing (For all types)
+  if (status === "PROCESSING") {
+    const amountStr = money(o?.total ?? null);
+    return `Salam ${studentName}, your order worth ${amountStr} is currently in processing. It will be shipped very soon.`;
+  }
+
+  // 3. Shipped (Different for each type - Very Important)
+  if (status === "SHIPPED") {
+    if (isCampus) {
+      const campusName = getCampusName(o);
+      return `Salam ${studentName}, your books have arrived at ${campusName} campus. You can receive them now.`;
+    }
+    if (isLahore) {
+      return `Salam ${studentName}, your books have reached us and will be delivered to you within 1 day.`;
+    }
+    // Other Cities Order
+    return `Salam ${studentName}, your order has been shipped via courier.`;
+  }
+
+  // 4. Delivered (For all types)
+  if (status === "DELIVERED") {
+    return `Salam ${studentName}, your order has been delivered. Please confirm.`;
+  }
+
+  // Fallback for other statuses
+  if (status === "PAYMENT_PENDING") {
+    return `Salam ${studentName}, we have received your order (${o?.reference || "Book Store"}). We are currently verifying your payment.`;
+  }
+  if (status === "READY") {
+    return `Salam ${studentName}, your order (${o?.reference || "Book Store"}) is ready for dispatch and will be shipped soon.`;
+  }
+
+  return `Salam ${studentName}, regarding your order (${o?.reference || "Book Store"}).`;
+}
+
+export function formatWhatsAppPhone(phone: string): string {
+  let num = (phone || "").replace(/[^0-9]/g, "");
+  if (num.startsWith("0")) {
+    num = "92" + num.slice(1);
+  } else if (!num.startsWith("92") && num.length === 10) {
+    num = "92" + num;
+  }
+  return num;
+}
+
+export function getWhatsAppUrl(o: any): string {
+  const phone = formatWhatsAppPhone(o?.phone || "");
+  const message = getOrderWhatsAppMessage(o);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
 export const permissions = [
   "orders.read",
   "orders.update",

@@ -39,6 +39,7 @@ import {
   Share2,
   CreditCard,
   Clock,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -85,6 +86,7 @@ import {
   statuses,
   transitions,
   permissions,
+  getWhatsAppUrl,
   type User,
   type Book,
   type StoreSettings,
@@ -2672,7 +2674,23 @@ function Orders({
                   refCell,
                   <div>
                     {o.name}
-                    <p>{o.phone}</p>
+                    <p style={{ margin: "2px 0" }}>
+                      {o.phone ? (
+                        <a
+                          href={getWhatsAppUrl(o)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="whatsapp-phone-link"
+                          title="Open WhatsApp chat with auto-generated order message"
+                        >
+                          <MessageCircle size={12} style={{ color: "#25D366", flexShrink: 0 }} />
+                          <span>{o.phone}</span>
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </p>
                     {o.delivery_type && (
                       <span className="small-text muted">
                         {o.delivery_type === "campus"
@@ -2722,7 +2740,23 @@ function Orders({
                   refCell,
                   <div>
                     {o.name}
-                    <p>{o.phone}</p>
+                    <p style={{ margin: "2px 0" }}>
+                      {o.phone ? (
+                        <a
+                          href={getWhatsAppUrl(o)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="whatsapp-phone-link"
+                          title="Open WhatsApp chat with auto-generated order message"
+                        >
+                          <MessageCircle size={12} style={{ color: "#25D366", flexShrink: 0 }} />
+                          <span>{o.phone}</span>
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </p>
                     {o.delivery_type && (
                       <span className="small-text muted">
                         {o.delivery_type === "campus"
