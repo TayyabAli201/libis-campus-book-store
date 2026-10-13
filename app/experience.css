@@ -2112,43 +2112,43 @@
   color: white;
 }
 
-/* Category Variant 1: VU Qanchi Campus (University / Campus Pickup) */
+/* Category Variant 1: VU Qanchi Campus (University Blue Shade) */
 .map-pin-pill.campus-badge {
-  background: color-mix(in srgb, #4f46e5 12%, transparent);
-  color: #4338ca;
-  border-color: color-mix(in srgb, #4f46e5 32%, transparent);
+  background: color-mix(in srgb, #2563eb 12%, transparent);
+  color: #1d4ed8;
+  border-color: color-mix(in srgb, #2563eb 32%, transparent);
 }
 .map-pin-pill.campus-badge:hover {
-  background: #4f46e5;
+  background: #2563eb;
   color: #ffffff;
 }
 :is(.dark *) .map-pin-pill.campus-badge {
-  background: color-mix(in srgb, #818cf8 16%, transparent);
-  color: #a5b4fc;
-  border-color: color-mix(in srgb, #818cf8 35%, transparent);
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #93c5fd;
+  border-color: color-mix(in srgb, #3b82f6 38%, transparent);
 }
 :is(.dark *) .map-pin-pill.campus-badge:hover {
-  background: #6366f1;
+  background: #2563eb;
   color: #ffffff;
 }
 
-/* Category Variant 2: Lahore Route (Local Rider / Delivery) */
+/* Category Variant 2: Lahore Route (Bykea Red Type Ride) */
 .map-pin-pill.lahore-badge {
-  background: color-mix(in srgb, #059669 12%, transparent);
-  color: #047857;
-  border-color: color-mix(in srgb, #059669 32%, transparent);
+  background: color-mix(in srgb, #dc2626 12%, transparent);
+  color: #b91c1c;
+  border-color: color-mix(in srgb, #dc2626 32%, transparent);
 }
 .map-pin-pill.lahore-badge:hover {
-  background: #059669;
+  background: #dc2626;
   color: #ffffff;
 }
 :is(.dark *) .map-pin-pill.lahore-badge {
-  background: color-mix(in srgb, #34d399 16%, transparent);
-  color: #6ee7b7;
-  border-color: color-mix(in srgb, #34d399 35%, transparent);
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  color: #fca5a5;
+  border-color: color-mix(in srgb, #ef4444 38%, transparent);
 }
 :is(.dark *) .map-pin-pill.lahore-badge:hover {
-  background: #10b981;
+  background: #dc2626;
   color: #ffffff;
 }
 

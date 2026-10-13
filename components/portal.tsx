@@ -28,6 +28,7 @@ import {
   Clock3,
   CheckCircle2,
   Truck,
+  Bike,
   MapPin,
   Navigation,
   X,
@@ -2633,7 +2634,7 @@ function Orders({
               ? Building2
               : isOther
                 ? Truck
-                : Navigation;
+                : Bike;
 
             const badgeLabel = isCampus
               ? "VU Qanchi Campus"
@@ -2645,7 +2646,7 @@ function Orders({
               ? "Open VU Qanchi campus pickup location on Google Maps"
               : isOther
                 ? `Open ${o.city || "delivery city"} destination on Google Maps`
-                : "Open InDrive style live route navigation to student location";
+                : "Open Bykea / live rider route navigation to student location";
 
             const refCell = (
               <div>
