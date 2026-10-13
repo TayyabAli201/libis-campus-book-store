@@ -1862,6 +1862,16 @@ function getMapDirectionsUrl(o: any) {
     }
   }
 
+  // 6. Other cities courier delivery destination search
+  if (o.delivery_type === "other" || (o.city && !o.city.toLowerCase().includes("lahore") && !o.city.toLowerCase().includes("campus"))) {
+    const cleanAddress = (o.address || "")
+      .replace(/📍 Pin Location:.*$/i, "")
+      .replace(/^Pickup from [^,]+,?\s*/i, "")
+      .trim();
+    const destination = [cleanAddress, o.city, "Pakistan"].filter(Boolean).join(", ");
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination || "Pakistan")}`;
+  }
+
   return null;
 }
 
@@ -2609,6 +2619,34 @@ function Orders({
               o.delivery_type === "campus" ||
               (o.city && o.city.toLowerCase().includes("campus")) ||
               (o.address && o.address.toLowerCase().includes("campus"));
+            const isOther =
+              o.delivery_type === "other" ||
+              (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
+
+            const badgeClass = isCampus
+              ? "campus-badge"
+              : isOther
+                ? "other-badge"
+                : "lahore-badge";
+
+            const BadgeIcon = isCampus
+              ? Building2
+              : isOther
+                ? Truck
+                : Navigation;
+
+            const badgeLabel = isCampus
+              ? "VU Qanchi Campus"
+              : isOther
+                ? (o.city ? `${o.city} · Other City` : "Other City")
+                : "Lahore Route";
+
+            const badgeTitle = isCampus
+              ? "Open VU Qanchi campus pickup location on Google Maps"
+              : isOther
+                ? `Open ${o.city || "delivery city"} destination on Google Maps`
+                : "Open InDrive style live route navigation to student location";
+
             const refCell = (
               <div>
                 <strong>{o.reference}</strong>
@@ -2618,15 +2656,11 @@ function Orders({
                       href={mapUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="map-pin-pill"
+                      className={`map-pin-pill ${badgeClass}`}
                       onClick={(e) => e.stopPropagation()}
-                      title={
-                        isCampus
-                          ? "Open VU Qanchi campus pickup location on Google Maps"
-                          : "Open InDrive style live route navigation from your location to student location"
-                      }
+                      title={badgeTitle}
                     >
-                      <Navigation size={12} /> {isCampus ? "VU Qanchi Campus" : "Lahore Route"}
+                      <BadgeIcon size={12} /> {badgeLabel}
                     </a>
                   </div>
                 )}
