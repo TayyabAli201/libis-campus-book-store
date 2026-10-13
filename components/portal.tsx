@@ -103,7 +103,27 @@ const nav = [
   ["audit", "Audit log", ScrollText, "admin"],
   ["profile", "My profile", UserRound, "profile"],
 ] as const;
-export function Login({ portal }: { portal: "admin" | "campus" }) {
+
+export function BrandText({ name = "Campus Bookstore" }: { name?: string }) {
+  const parts = (name || "Campus Bookstore").trim().split(/\s+/);
+  if (parts.length > 1) {
+    return (
+      <span className="brand-text-wrap" style={{ display: "inline-flex", alignItems: "baseline", gap: 5, flexWrap: "wrap" }}>
+        <strong style={{ fontWeight: 750 }}>{parts[0]}</strong>
+        <span style={{ fontWeight: 400 }}>{parts.slice(1).join(" ")}</span>
+      </span>
+    );
+  }
+  return <strong style={{ fontWeight: 750 }}>{parts[0] || "Campus"}</strong>;
+}
+
+export function Login({
+  portal,
+  storeName = "Campus Bookstore",
+}: {
+  portal: "admin" | "campus";
+  storeName?: string;
+}) {
   const signingIn = useRef(false);
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
@@ -135,7 +155,7 @@ export function Login({ portal }: { portal: "admin" | "campus" }) {
       <section className="login-story">
         <a href="/" className="brand">
           <BookOpen />
-          campus<span>bookstore</span>
+          <BrandText name={storeName} />
         </a>
         <div>
           <span className="eyebrow">
@@ -153,7 +173,7 @@ export function Login({ portal }: { portal: "admin" | "campus" }) {
           </p>
         </div>
         <span>
-          Campus Bookstore /{" "}
+          {storeName} /{" "}
           {portal === "admin" ? "Super Admin" : "Campus Portal"}
         </span>
       </section>
@@ -444,16 +464,36 @@ export function Portal({
   section = "dashboard",
   record,
   pendingOrders = 0,
+  storeName = "Campus Bookstore",
 }: {
   user: User;
   section?: string;
   record?: string;
   pendingOrders?: number;
+  storeName?: string;
 }) {
   const isAdmin = user.role === "SUPER_ADMIN",
     base = isAdmin ? "/admin" : "/campus";
   const title = nav.find((n) => n[0] === section)?.[1] || "Overview";
   const [pendingCount, setPendingCount] = useState(pendingOrders);
+  const [currentStoreName, setCurrentStoreName] = useState(storeName);
+
+  useEffect(() => {
+    setCurrentStoreName(storeName);
+  }, [storeName]);
+
+  useEffect(() => {
+    const handleSettingsUpdated = (e: any) => {
+      if (e.detail?.store_name) {
+        setCurrentStoreName(e.detail.store_name);
+      }
+    };
+    window.addEventListener("store-settings-updated", handleSettingsUpdated);
+    return () => {
+      window.removeEventListener("store-settings-updated", handleSettingsUpdated);
+    };
+  }, []);
+
   useEffect(() => {
     if (!isAdmin || user.must_change) return;
     let disposed = false,
@@ -487,7 +527,7 @@ export function Portal({
         <SidebarHeader>
           <a className="brand portal-brand" href={base + "/dashboard"}>
             <BookOpen />
-            campus<span>bookstore</span>
+            <BrandText name={currentStoreName} />
           </a>
           <span className="portal-label">
             {isAdmin ? "SUPER ADMIN" : "CAMPUS PORTAL"}
@@ -562,7 +602,9 @@ export function Portal({
           <div className="portal-page-head no-print">
             <div>
               <span className="eyebrow">
-                {isAdmin ? "CAMPUS BOOKSTORE OPERATIONS" : "CAMPUS WORKSPACE"}
+                {isAdmin
+                  ? `${(currentStoreName || "Campus Bookstore").toUpperCase()} OPERATIONS`
+                  : "CAMPUS WORKSPACE"}
               </span>
               <h1>{title}</h1>
             </div>
@@ -3165,6 +3207,13 @@ function SettingsPage() {
         version: data!.version,
       });
       toast.success("System configuration saved successfully.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("store-settings-updated", {
+            detail: { store_name: form.store_name },
+          }),
+        );
+      }
       await reload();
     } catch (e) {
       toast.error(errorText(e));
@@ -3198,7 +3247,10 @@ function SettingsPage() {
               <h3>GENERAL CONFIGURATION</h3>
             </div>
             <div className="form-grid">
-              <Field label="Site Title">
+              <Field
+                label="Store Name / Site Title"
+                hint="Controls the brand name displayed across every page and the admin panel."
+              >
                 <input
                   required
                   value={form.store_name || ""}

@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { user } from "./security";
 import { Portal } from "@/components/portal";
 import { pendingOrderCount } from "./orders";
+import { getSettings } from "./catalog";
 export async function PortalPage({
   portal,
   segments,
@@ -87,14 +88,18 @@ export async function PortalPage({
         </main>
       );
   }
-  const pendingOrders =
-    u.role === "SUPER_ADMIN" && !u.must_change ? await pendingOrderCount() : 0;
+  const [pendingOrders, settingsRes] = await Promise.all([
+    u.role === "SUPER_ADMIN" && !u.must_change ? pendingOrderCount() : 0,
+    getSettings().catch(() => null),
+  ]);
+  const storeName = settingsRes?.settings?.store_name || "Campus Bookstore";
   return (
     <Portal
       user={u}
       section={section}
       record={segments[1]}
       pendingOrders={pendingOrders}
+      storeName={storeName}
     />
   );
 }
