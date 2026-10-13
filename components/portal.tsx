@@ -1862,16 +1862,6 @@ function getMapDirectionsUrl(o: any) {
     }
   }
 
-  // 6. Other cities delivery address: search destination on Google Maps
-  if (o.address || o.city) {
-    const cleanAddress = (o.address || "")
-      .replace(/📍 Pin Location:.*$/i, "")
-      .replace(/^Pickup from [^,]+,?\s*/i, "")
-      .trim();
-    const destination = [cleanAddress, o.city, "Pakistan"].filter(Boolean).join(", ");
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
-  }
-
   return null;
 }
 
@@ -2499,7 +2489,18 @@ function Orders({
         <MultiChoose
           values={deliveryTypeList}
           onChange={(v) => {
-            setDeliveryTypeList(v);
+            let next = v;
+            const added = v.filter((x) => !deliveryTypeList.includes(x));
+            if (added.includes("other")) {
+              // Selecting "Other City" automatically excludes VU Qanchi Campus and Lahore
+              next = ["other"];
+            } else if (added.some((x) => x === "campus" || x === "lahore")) {
+              // Selecting VU Qanchi Campus or Lahore automatically excludes Other City
+              next = v.filter((x) => x !== "other");
+            } else if (v.includes("other") && (v.includes("campus") || v.includes("lahore"))) {
+              next = ["other"];
+            }
+            setDeliveryTypeList(next);
             setPage(1);
           }}
           label="Delivery type"
@@ -2608,16 +2609,6 @@ function Orders({
               o.delivery_type === "campus" ||
               (o.city && o.city.toLowerCase().includes("campus")) ||
               (o.address && o.address.toLowerCase().includes("campus"));
-            const pillLabel = isCampus
-              ? "VU Qanchi Campus"
-              : o.delivery_type === "other"
-                ? (o.city || "Other City")
-                : "Lahore Route";
-            const pillTitle = isCampus
-              ? "Open VU Qanchi campus pickup location on Google Maps"
-              : o.delivery_type === "other"
-                ? `Open ${o.city || "delivery destination"} location on Google Maps`
-                : "Open InDrive style live route navigation from your location to student location";
             const refCell = (
               <div>
                 <strong>{o.reference}</strong>
@@ -2629,9 +2620,13 @@ function Orders({
                       rel="noreferrer"
                       className="map-pin-pill"
                       onClick={(e) => e.stopPropagation()}
-                      title={pillTitle}
+                      title={
+                        isCampus
+                          ? "Open VU Qanchi campus pickup location on Google Maps"
+                          : "Open InDrive style live route navigation from your location to student location"
+                      }
                     >
-                      <Navigation size={12} /> {pillLabel}
+                      <Navigation size={12} /> {isCampus ? "VU Qanchi Campus" : "Lahore Route"}
                     </a>
                   </div>
                 )}
