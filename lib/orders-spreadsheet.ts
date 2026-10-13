@@ -25,6 +25,9 @@ export function orderSheet(
 ) {
   const includeAddress = Boolean(options?.includeAddress);
 
+  const ROW_HEIGHT = 22.5;
+  const FONT_FAMILY = "Lora";
+
   const headerCols = [
     { value: "Sr No", width: 10 },
     { value: "Order Number", width: 24 },
@@ -36,9 +39,11 @@ export function orderSheet(
     { value: "Total Books", width: 14 },
   ];
 
-  // Theme Header Style: Royal Blue matching Bookstore Brand Theme
+  // Theme Header Style: Royal Blue matching Bookstore Brand Theme with Lora font and 22.5pt height
   const headerRow = headerCols.map((col) => ({
     value: col.value,
+    fontFamily: FONT_FAMILY,
+    height: ROW_HEIGHT,
     fontWeight: "bold" as const,
     backgroundColor: "#1F65A8",
     textColor: "#FFFFFF",
@@ -82,6 +87,8 @@ export function orderSheet(
     const addressCell = {
       value: fullAddress,
       rowSpan: N,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
       align: "left" as const,
       alignVertical: "center" as const,
       borderColor: border,
@@ -97,6 +104,8 @@ export function orderSheet(
             value: srNo,
             type: Number,
             rowSpan: N,
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -105,6 +114,8 @@ export function orderSheet(
           {
             value: o.reference || "—",
             rowSpan: N,
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             fontWeight: "bold" as const,
             textColor: "#1E40AF",
             align: "center" as const,
@@ -115,6 +126,8 @@ export function orderSheet(
           {
             value: o.name || "Student",
             rowSpan: N,
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -123,6 +136,8 @@ export function orderSheet(
           ...(includeAddress ? [addressCell] : []),
           {
             value: item.code || "—",
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             fontWeight: "bold" as const,
             align: "center" as const,
             alignVertical: "center" as const,
@@ -131,6 +146,8 @@ export function orderSheet(
           },
           {
             value: item.title || "—",
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "left" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -139,6 +156,8 @@ export function orderSheet(
           {
             value: Number(item.quantity) || 1,
             type: Number,
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -148,6 +167,8 @@ export function orderSheet(
             value: orderTotalBooks,
             type: Number,
             rowSpan: N,
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -163,6 +184,8 @@ export function orderSheet(
           ...(includeAddress ? [null] : []),
           {
             value: item.code || "—",
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             fontWeight: "bold" as const,
             align: "center" as const,
             alignVertical: "center" as const,
@@ -171,6 +194,8 @@ export function orderSheet(
           },
           {
             value: item.title || "—",
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "left" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -179,6 +204,8 @@ export function orderSheet(
           {
             value: Number(item.quantity) || 1,
             type: Number,
+            fontFamily: FONT_FAMILY,
+            height: ROW_HEIGHT,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
@@ -195,7 +222,11 @@ export function orderSheet(
     ...Array(prefixCount).fill(null),
     {
       value: `(Total Books: ${grandTotalBooks})`,
+      columnSpan: 2,
+      span: 2,
       colSpan: 2,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
       fontWeight: "bold" as const,
       backgroundColor: "#1F65A8",
       textColor: "#FFFFFF",

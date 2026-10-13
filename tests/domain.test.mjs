@@ -44,9 +44,16 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
   assert.equal(standardSheet[3].length, 7);
   assert.deepEqual(standardSheet[3].slice(0, 5), [null, null, null, null, null]);
   assert.equal(standardSheet[3][5].value, '(Total Books: 3)');
-  assert.equal(standardSheet[3][5].colSpan, 2);
+  assert.equal(standardSheet[3][5].columnSpan, 2);
+  assert.equal(standardSheet[3][5].fontFamily, 'Lora');
+  assert.equal(standardSheet[3][5].height, 22.5);
   assert.equal(standardSheet[3][5].backgroundColor, '#1F65A8');
   assert.equal(standardSheet[3][6], null);
+  // Verify Lora font and 22.5pt height across headers and data cells
+  assert.equal(standardSheet[0][0].fontFamily, 'Lora');
+  assert.equal(standardSheet[0][0].height, 22.5);
+  assert.equal(standardSheet[1][0].fontFamily, 'Lora');
+  assert.equal(standardSheet[1][0].height, 22.5);
 
   const otherCitySheet = orderSheet(sampleOrders, { includeAddress: true });
   assert.equal(otherCitySheet.length, 4);
@@ -54,6 +61,8 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
   assert.deepEqual(otherCitySheet[0].map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS_WITH_ADDRESS));
   assert.equal(otherCitySheet[1][3].value, 'House 12, Street 4, F-8/1, Islamabad');
   assert.equal(otherCitySheet[1][3].rowSpan, 2);
+  assert.equal(otherCitySheet[1][3].fontFamily, 'Lora');
+  assert.equal(otherCitySheet[1][3].height, 22.5);
   assert.equal(otherCitySheet[1][4].value, 'CS101');
   assert.equal(otherCitySheet[1][6].value, 1);
   assert.equal(otherCitySheet[1][7].value, 3);
@@ -65,7 +74,9 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
   assert.equal(otherCitySheet[3].length, 8);
   assert.deepEqual(otherCitySheet[3].slice(0, 6), [null, null, null, null, null, null]);
   assert.equal(otherCitySheet[3][6].value, '(Total Books: 3)');
-  assert.equal(otherCitySheet[3][6].colSpan, 2);
+  assert.equal(otherCitySheet[3][6].columnSpan, 2);
+  assert.equal(otherCitySheet[3][6].fontFamily, 'Lora');
+  assert.equal(otherCitySheet[3][6].height, 22.5);
   assert.equal(otherCitySheet[3][6].backgroundColor, '#1F65A8');
   assert.equal(otherCitySheet[3][7], null);
 });
