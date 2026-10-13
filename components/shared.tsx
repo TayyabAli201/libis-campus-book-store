@@ -182,6 +182,8 @@ export function MultiChoose({
           fontWeight: 500,
           whiteSpace: "nowrap",
           userSelect: "none",
+          transition: "none",
+          animation: "none",
         }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>
@@ -198,6 +200,8 @@ export function MultiChoose({
                 padding: "1px 6px",
                 fontWeight: 600,
                 lineHeight: "1.2",
+                transition: "none",
+                animation: "none",
               }}
             >
               {values.length}
@@ -206,7 +210,8 @@ export function MultiChoose({
           <ChevronDown
             size={14}
             style={{
-              transition: "transform 0.15s ease",
+              transition: "none",
+              animation: "none",
               transform: open ? "rotate(180deg)" : "none",
               color: "var(--muted-foreground)",
             }}
@@ -233,6 +238,8 @@ export function MultiChoose({
             gap: "2px",
             maxHeight: "320px",
             overflowY: "auto",
+            transition: "none",
+            animation: "none",
           }}
         >
           {/* Option: All */}
@@ -248,6 +255,8 @@ export function MultiChoose({
               fontSize: "0.85rem",
               fontWeight: allSelected ? 600 : 400,
               background: allSelected ? "rgba(var(--primary-rgb, 59, 130, 246), 0.08)" : "transparent",
+              transition: "none",
+              animation: "none",
             }}
           >
             <div
@@ -261,9 +270,11 @@ export function MultiChoose({
                 placeContent: "center",
                 color: "var(--primary-foreground)",
                 flexShrink: 0,
+                transition: "none",
+                animation: "none",
               }}
             >
-              {allSelected && <Check size={12} strokeWidth={3} />}
+              {allSelected && <Check size={12} strokeWidth={3} style={{ transition: "none", animation: "none" }} />}
             </div>
             <span>{allLabel}</span>
           </div>
@@ -287,6 +298,8 @@ export function MultiChoose({
                   fontSize: "0.85rem",
                   fontWeight: isChecked ? 600 : 400,
                   background: isChecked ? "rgba(var(--primary-rgb, 59, 130, 246), 0.08)" : "transparent",
+                  transition: "none",
+                  animation: "none",
                 }}
               >
                 <div
@@ -300,9 +313,11 @@ export function MultiChoose({
                     placeContent: "center",
                     color: "var(--primary-foreground)",
                     flexShrink: 0,
+                    transition: "none",
+                    animation: "none",
                   }}
                 >
-                  {isChecked && <Check size={12} strokeWidth={3} />}
+                  {isChecked && <Check size={12} strokeWidth={3} style={{ transition: "none", animation: "none" }} />}
                 </div>
                 <span>{opt.label}</span>
               </div>
@@ -325,6 +340,8 @@ export function MultiChoose({
                   textAlign: "center",
                   fontWeight: 600,
                   borderRadius: "4px",
+                  transition: "none",
+                  animation: "none",
                 }}
               >
                 Reset to {allLabel}

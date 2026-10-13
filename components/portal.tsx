@@ -664,16 +664,22 @@ export function Portal({
 }
 function useData<T = any>(path: string) {
   const requestId = useRef(0);
+  const hasLoadedRef = useRef(false);
   const [data, setData] = useState<T | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
   const load = async () => {
     const current = ++requestId.current;
-    setLoading(true);
+    if (!hasLoadedRef.current) {
+      setLoading(true);
+    }
     setError("");
     try {
       const result = await api(path);
-      if (current === requestId.current) setData(result);
+      if (current === requestId.current) {
+        setData(result);
+        hasLoadedRef.current = true;
+      }
     } catch (e) {
       if (current === requestId.current) setError(errorText(e));
     } finally {
