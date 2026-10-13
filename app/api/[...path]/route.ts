@@ -43,6 +43,7 @@ import {
   pendingOrderCount,
   decidePayment,
   changeStatus,
+  batchChangeStatus,
 } from "@/lib/server/orders";
 import { upload } from "@/lib/server/uploads";
 import { bootstrap } from "@/lib/server/seed";
@@ -511,6 +512,22 @@ async function handle(req: Request) {
         req,
         method === "GET" ? "orders.read" : "orders.update",
       );
+      if (id === "batch-status" && method === "POST") {
+        const body = await json(req);
+        const parsed = z
+          .object({
+            fromStatus: z.string(),
+            toStatus: z.string(),
+            orderIds: z.array(z.string()).optional(),
+            q: z.string().optional(),
+            deliveryType: z.string().optional(),
+            from: z.string().optional(),
+            to: z.string().optional(),
+            campusId: z.string().optional(),
+          })
+          .parse(body);
+        return ok(await batchChangeStatus(req, u, parsed));
+      }
       if (method === "GET") {
         if (id) return ok(await getOrder(req, id, u));
         const page = Math.max(

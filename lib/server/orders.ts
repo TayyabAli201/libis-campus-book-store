@@ -1,6 +1,7 @@
 import {
   checkoutInput,
   transitions,
+  statuses,
   type Quote,
   type User,
   type Book,
@@ -665,4 +666,133 @@ export async function changeStatus(
   );
   await batch(statements);
   return { status };
+}
+
+export async function batchChangeStatus(
+  req: Request,
+  u: User,
+  params: {
+    fromStatus: string;
+    toStatus: string;
+    orderIds?: string[];
+    q?: string;
+    deliveryType?: string;
+    from?: string;
+    to?: string;
+    campusId?: string;
+  },
+) {
+  const { fromStatus, toStatus } = params;
+  const validTransitions: Record<string, string> = {
+    CONFIRMED: "PROCESSING",
+    PROCESSING: "READY",
+    READY: "SHIPPED",
+    SHIPPED: "DELIVERED",
+  };
+
+  if (!fromStatus || validTransitions[fromStatus] !== toStatus) {
+    throw new AppError(
+      400,
+      `Invalid status transition from "${fromStatus}" to "${toStatus}".`,
+    );
+  }
+
+  if (
+    u.role !== "SUPER_ADMIN" &&
+    !["PROCESSING", "READY", "SHIPPED", "DELIVERED"].includes(toStatus)
+  ) {
+    throw new AppError(403, "Only authorized staff can update order statuses.");
+  }
+
+  const s = scope(u);
+  const filters = [s.sql, "o.status=?"];
+  const args: unknown[] = [...s.args, fromStatus];
+
+  if (params.orderIds && params.orderIds.length > 0) {
+    const placeholders = params.orderIds.map(() => "?").join(",");
+    filters.push(`o.id IN (${placeholders})`);
+    args.push(...params.orderIds);
+  } else {
+    if (params.campusId) {
+      filters.push("o.campus_id=?");
+      args.push(params.campusId);
+    }
+    if (params.q) {
+      filters.push("(o.reference LIKE ? OR o.name LIKE ? OR o.phone LIKE ?)");
+      args.push(...Array(3).fill("%" + params.q.slice(0, 100) + "%"));
+    }
+    if (params.deliveryType && params.deliveryType !== "all") {
+      const types = params.deliveryType
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t && t !== "all");
+      if (types.length === 1) {
+        filters.push("o.delivery_type=?");
+        args.push(types[0]);
+      } else if (types.length > 1) {
+        const placeholders = types.map(() => "?").join(",");
+        filters.push(`o.delivery_type IN (${placeholders})`);
+        args.push(...types);
+      }
+    }
+    if (params.from) {
+      filters.push("o.created_at>=?");
+      args.push(params.from);
+    }
+    if (params.to) {
+      filters.push("o.created_at<?");
+      args.push(params.to + "T23:59:59.999Z");
+    }
+  }
+
+  const where = filters.join(" AND ");
+  const orders = await all<{ id: string; status: string; version: number }>(
+    `SELECT o.id, o.status, o.version FROM orders o WHERE ${where} LIMIT 1000`,
+    ...args,
+  );
+
+  if (!orders.length) {
+    return { count: 0, status: toStatus };
+  }
+
+  const at = now();
+  const chunkSize = 25;
+  for (let i = 0; i < orders.length; i += chunkSize) {
+    const chunk = orders.slice(i, i + chunkSize);
+    const statements = [];
+    for (const ord of chunk) {
+      statements.push(
+        stmt(
+          "UPDATE orders SET status=?,updated_at=?,version=version+1 WHERE id=? AND status=?",
+          toStatus,
+          at,
+          ord.id,
+          fromStatus,
+        ),
+        stmt(
+          "INSERT INTO order_history(id,order_id,status,note,actor,created_at) VALUES(?,?,?,?,?,?)",
+          uid(),
+          ord.id,
+          toStatus,
+          `Bulk status update to ${statuses[toStatus] || toStatus}`,
+          u.email,
+          at,
+        ),
+      );
+    }
+    await batch(statements);
+  }
+
+  await batch([
+    auditStmt(
+      u.email,
+      "BATCH_ORDER_STATUS",
+      `${fromStatus}_TO_${toStatus}`,
+      { fromStatus, count: orders.length },
+      { toStatus, orderCount: orders.length },
+      req,
+    ),
+  ]);
+
+  return { count: orders.length, status: toStatus };
 }

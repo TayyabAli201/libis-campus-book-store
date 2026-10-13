@@ -24,6 +24,7 @@ import {
   Bell,
   Trash2,
   ArrowUpRight,
+  ArrowRightCircle,
   Clock3,
   CheckCircle2,
   Truck,
@@ -2231,6 +2232,32 @@ function OrderModalPopup({
   );
 }
 
+const STATUS_ADVANCE_FLOW: Record<
+  string,
+  { to: string; toLabel: string; fromLabel: string }
+> = {
+  CONFIRMED: {
+    to: "PROCESSING",
+    toLabel: "Processing",
+    fromLabel: "Order Confirmed",
+  },
+  PROCESSING: {
+    to: "READY",
+    toLabel: "Ready for Dispatch",
+    fromLabel: "Processing",
+  },
+  READY: {
+    to: "SHIPPED",
+    toLabel: "Shipped",
+    fromLabel: "Ready for Dispatch",
+  },
+  SHIPPED: {
+    to: "DELIVERED",
+    toLabel: "Delivered",
+    fromLabel: "Shipped",
+  },
+};
+
 function Orders({
   base,
   payments,
@@ -2254,9 +2281,18 @@ function Orders({
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
     [deletingOrder, setDeletingOrder] = useState<any | null>(null),
+    [batchUpdating, setBatchUpdating] = useState(false),
+    [batchConfirm, setBatchConfirm] = useState<{
+      fromStatus: string;
+      toStatus: string;
+      count: number;
+      fromLabel: string;
+      toLabel: string;
+    } | null>(null),
     [exporting, setExporting] = useState(false);
 
   const isAdmin = user?.role === "SUPER_ADMIN";
+  const canUpdate = isAdmin || user?.permissions?.includes("orders.update");
 
   const exportOrders = async () => {
     setExporting(true);
@@ -2368,6 +2404,41 @@ function Orders({
     return () => window.removeEventListener("orders-updated", handler);
   }, [reload]);
 
+  const activeFlowStep =
+    statusList.length === 1 && STATUS_ADVANCE_FLOW[statusList[0]]
+      ? STATUS_ADVANCE_FLOW[statusList[0]]
+      : null;
+  const filteredCount = data?.total ?? data?.rows?.length ?? 0;
+
+  const handleBatchStatusChange = async () => {
+    if (!activeFlowStep) return;
+    setBatchUpdating(true);
+    try {
+      const res = await api("manage/orders/batch-status", {
+        fromStatus: statusList[0],
+        toStatus: activeFlowStep.to,
+        q,
+        deliveryType: deliveryTypeList.join(","),
+        from: dates.from,
+        to: dates.to,
+        campusId: campus,
+      });
+      const updatedCount = res.count ?? filteredCount;
+      toast.success(
+        `Successfully updated ${updatedCount} order(s) from "${activeFlowStep.fromLabel}" to "${activeFlowStep.toLabel}".`,
+      );
+      setBatchConfirm(null);
+      setStatusList([activeFlowStep.to]);
+      setPage(1);
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBatchUpdating(false);
+    }
+  };
+
   const headers = payments
     ? [
         "Order",
@@ -2471,6 +2542,65 @@ function Orders({
                       : `${statusList.length} Statuses`
               }`}
         </button>
+        {canUpdate && !payments && (
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => {
+              if (activeFlowStep && filteredCount > 0) {
+                setBatchConfirm({
+                  fromStatus: statusList[0],
+                  toStatus: activeFlowStep.to,
+                  count: filteredCount,
+                  fromLabel: activeFlowStep.fromLabel,
+                  toLabel: activeFlowStep.toLabel,
+                });
+              }
+            }}
+            disabled={
+              !activeFlowStep || filteredCount === 0 || batchUpdating || loading
+            }
+            title={
+              statusList.length === 0
+                ? "Select a status filter (Order Confirmed, Processing, Ready for Dispatch, or Shipped) to enable status change"
+                : statusList.length > 1
+                  ? "Select a single status filter to change status"
+                  : !activeFlowStep
+                    ? `No next status available for ${statuses[statusList[0]] || statusList[0]}`
+                    : filteredCount === 0
+                      ? "No orders found matching current filter"
+                      : `Change all ${filteredCount} order(s) from ${activeFlowStep.fromLabel} to ${activeFlowStep.toLabel}`
+            }
+            style={{
+              gap: 6,
+              background:
+                activeFlowStep && filteredCount > 0
+                  ? "var(--primary)"
+                  : undefined,
+              color:
+                activeFlowStep && filteredCount > 0
+                  ? "var(--primary-foreground)"
+                  : undefined,
+              border:
+                activeFlowStep && filteredCount > 0
+                  ? "1px solid var(--primary)"
+                  : undefined,
+              fontWeight: 600,
+              opacity: !activeFlowStep || filteredCount === 0 ? 0.6 : 1,
+              cursor:
+                !activeFlowStep || filteredCount === 0
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
+            <ArrowRightCircle size={15} />
+            {batchUpdating
+              ? "Updating…"
+              : activeFlowStep
+                ? `Move All to ${activeFlowStep.toLabel} (${filteredCount})`
+                : "Change All Status"}
+          </button>
+        )}
       </div>
       <Result loading={loading} error={error}>
         <DataTable
@@ -2643,6 +2773,14 @@ function Orders({
             toast.error(errorText(e));
           }
         }}
+      />
+
+      <Confirm
+        open={!!batchConfirm}
+        onClose={() => setBatchConfirm(null)}
+        title={`Change status of ${batchConfirm?.count} order(s)?`}
+        description={`Are you sure you want to change all ${batchConfirm?.count} matching order(s) from "${batchConfirm?.fromLabel}" to "${batchConfirm?.toLabel}"? This will update their tracking status.`}
+        onConfirm={handleBatchStatusChange}
       />
     </>
   );

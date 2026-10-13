@@ -902,5 +902,69 @@ test("Order reference follows DDMM-XXXX format and maintains continuous sequence
   assert.match(order3.reference, /^QA-\d{4}-0043$/);
 });
 
+test("Batch order status progression updates filtered orders across the full lifecycle", async (t) => {
+  const sqlite = database(t);
+  const adminSession = "batch-status-admin-session";
+  sqlite.exec("UPDATE users SET must_change=0 WHERE id='admin'");
+  sqlite
+    .prepare("INSERT INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)")
+    .run(hash(adminSession), "admin", Date.now() + 60000, "2026-01-01");
+
+  const { id: bookId } = await saveBook(bookInput(), admin, request);
+  const o1 = await order(sqlite, bookId, 1);
+  const o2 = await order(sqlite, bookId, 2);
+
+  // Approve both orders -> CONFIRMED
+  await decidePayment(request, admin, o1.id, "approve", "Approved", 1);
+  await decidePayment(request, admin, o2.id, "approve", "Approved", 1);
+
+  const batchRequest = (body) =>
+    POST(
+      new Request("http://127.0.0.1:5173/api/manage/orders/batch-status", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "origin": "http://127.0.0.1:5173",
+          cookie: "cbs_session=" + adminSession,
+          "x-requested-with": "CampusBookstore",
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  // 1. Advance from CONFIRMED to PROCESSING
+  const resp1 = await batchRequest({ fromStatus: "CONFIRMED", toStatus: "PROCESSING" });
+  const res1 = await resp1.json();
+  assert.equal(resp1.status, 200);
+  assert.equal(res1.count, 2);
+  assert.equal(res1.status, "PROCESSING");
+
+  const rows1 = sqlite.prepare("SELECT status FROM orders WHERE id IN (?, ?)").all(o1.id, o2.id);
+  assert.deepEqual(rows1.map((r) => r.status), ["PROCESSING", "PROCESSING"]);
+
+  // 2. Advance from PROCESSING to READY
+  const res2 = await (await batchRequest({ fromStatus: "PROCESSING", toStatus: "READY" })).json();
+  assert.equal(res2.count, 2);
+  assert.equal(res2.status, "READY");
+
+  // 3. Advance from READY to SHIPPED
+  const res3 = await (await batchRequest({ fromStatus: "READY", toStatus: "SHIPPED" })).json();
+  assert.equal(res3.count, 2);
+  assert.equal(res3.status, "SHIPPED");
+
+  // 4. Advance from SHIPPED to DELIVERED
+  const res4 = await (await batchRequest({ fromStatus: "SHIPPED", toStatus: "DELIVERED" })).json();
+  assert.equal(res4.count, 2);
+  assert.equal(res4.status, "DELIVERED");
+
+  const finalRows = sqlite.prepare("SELECT status FROM orders WHERE id IN (?, ?)").all(o1.id, o2.id);
+  assert.deepEqual(finalRows.map((r) => r.status), ["DELIVERED", "DELIVERED"]);
+
+  // 5. Invalid transition returns 400
+  const invalidRes = await batchRequest({ fromStatus: "DELIVERED", toStatus: "CONFIRMED" });
+  assert.equal(invalidRes.status, 400);
+});
+
+
 
 
