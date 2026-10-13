@@ -128,7 +128,7 @@ export function MultiChoose({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const allSelected = values.length === 0 || values.includes("all") || values.length === options.length;
+  const allSelected = values.length === 0 || values.includes("all");
 
   const toggle = (val: string) => {
     if (val === "all") {
@@ -142,15 +142,11 @@ export function MultiChoose({
     } else {
       next = [...cleanValues, val];
     }
-    if (next.length === options.length) {
-      onChange([]);
-    } else {
-      onChange(next);
-    }
+    onChange(next);
   };
 
   const getButtonText = () => {
-    if (allSelected) return allLabel;
+    if (allSelected || values.length === options.length) return allLabel;
     if (values.length === 1) {
       const match = options.find((o) => o.value === values[0]);
       return match ? match.label : values[0];
@@ -408,7 +404,15 @@ export function DataTable({
   rows: ReactNode[][];
 }) {
   return (
-    <div className="data-table">
+    <div
+      className="data-table"
+      style={{
+        minHeight: "340px",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-start",
+      }}
+    >
       <Table>
         <TableHeader>
           <TableRow>

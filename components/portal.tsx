@@ -1862,6 +1862,16 @@ function getMapDirectionsUrl(o: any) {
     }
   }
 
+  // 6. Other cities delivery address: search destination on Google Maps
+  if (o.address || o.city) {
+    const cleanAddress = (o.address || "")
+      .replace(/📍 Pin Location:.*$/i, "")
+      .replace(/^Pickup from [^,]+,?\s*/i, "")
+      .trim();
+    const destination = [cleanAddress, o.city, "Pakistan"].filter(Boolean).join(", ");
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+  }
+
   return null;
 }
 
@@ -2598,6 +2608,16 @@ function Orders({
               o.delivery_type === "campus" ||
               (o.city && o.city.toLowerCase().includes("campus")) ||
               (o.address && o.address.toLowerCase().includes("campus"));
+            const pillLabel = isCampus
+              ? "VU Qanchi Campus"
+              : o.delivery_type === "other"
+                ? (o.city || "Other City")
+                : "Lahore Route";
+            const pillTitle = isCampus
+              ? "Open VU Qanchi campus pickup location on Google Maps"
+              : o.delivery_type === "other"
+                ? `Open ${o.city || "delivery destination"} location on Google Maps`
+                : "Open InDrive style live route navigation from your location to student location";
             const refCell = (
               <div>
                 <strong>{o.reference}</strong>
@@ -2609,13 +2629,9 @@ function Orders({
                       rel="noreferrer"
                       className="map-pin-pill"
                       onClick={(e) => e.stopPropagation()}
-                      title={
-                        isCampus
-                          ? "Open VU Qanchi campus pickup location on Google Maps"
-                          : "Open InDrive style live route navigation from your location to student location"
-                      }
+                      title={pillTitle}
                     >
-                      <Navigation size={12} /> {isCampus ? "VU Qanchi Campus" : "Lahore Route"}
+                      <Navigation size={12} /> {pillLabel}
                     </a>
                   </div>
                 )}

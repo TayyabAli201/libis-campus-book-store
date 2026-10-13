@@ -3,6 +3,7 @@
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 html {
+  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

@@ -2104,7 +2104,7 @@
   font-weight: 600;
   border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
   text-decoration: none;
-  transition: all 0.2s;
+  transition: background 0.15s ease, color 0.15s ease;
   margin-top: 4px;
 }
 .map-pin-pill:hover {
