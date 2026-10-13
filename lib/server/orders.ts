@@ -316,7 +316,7 @@ export async function getOrder(
       "Order not found. Check your Order ID and try again.",
     );
   const o = await one<any>(
-    "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
+    "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
     identifier.toLowerCase(),
     identifier.toUpperCase(),
   );
@@ -438,14 +438,14 @@ export async function listOrders(
   }
   const where = filters.join(" AND ");
   const total = await one<any>(
-    "SELECT COUNT(*) AS n FROM orders o WHERE " + where,
+    `SELECT COUNT(DISTINCT o.id) AS n, COALESCE(SUM(oi.quantity), 0) AS total_books FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id WHERE ${where}`,
     ...args,
   );
   const isAll = limit === "all";
   const limitClause = isAll ? "LIMIT 10000" : "LIMIT 50 OFFSET ?";
   const queryArgs = isAll ? [...args] : [...args, (page - 1) * 50];
   const rows = await all(
-    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
+    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
     ...queryArgs,
   );
   rows.forEach((o) => {
@@ -476,7 +476,7 @@ export async function listOrders(
       (r as any).items = itemsByOrder.get(r.id) || [];
     }
   }
-  return { rows, total: total?.n || 0, page };
+  return { rows, total: total?.n || 0, total_books: total?.total_books || 0, page };
 }
 export function movementStatements(
   o: any,

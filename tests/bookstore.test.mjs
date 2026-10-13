@@ -965,6 +965,34 @@ test("Batch order status progression updates filtered orders across the full lif
   assert.equal(invalidRes.status, 400);
 });
 
+test("Admin manage/orders returns total_books count per order and in response aggregate", async (t) => {
+  const sqlite = database(t);
+  const adminSession = "total-books-admin-session";
+  sqlite.exec("UPDATE users SET must_change=0 WHERE id='admin'");
+  sqlite
+    .prepare("INSERT INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)")
+    .run(hash(adminSession), "admin", Date.now() + 60000, "2026-01-01");
+
+  const { id: bookId } = await saveBook(bookInput(), admin, request);
+  const o1 = await order(sqlite, bookId, 2);
+
+  const req = new Request("http://127.0.0.1:5173/api/manage/orders", {
+    headers: {
+      cookie: "cbs_session=" + adminSession,
+      "x-requested-with": "CampusBookstore",
+    },
+  });
+  const res = await GET(req);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.ok(Array.isArray(data.rows));
+  assert.equal(typeof data.total_books, "number");
+  assert.ok(data.total_books >= 2);
+  const found = data.rows.find((r) => r.id === o1.id);
+  assert.ok(found);
+  assert.equal(found.total_books, 2);
+});
+
 
 
 

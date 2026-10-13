@@ -2104,6 +2104,13 @@ function OrderModalPopup({
                       Order total <strong>{money(o.total)}</strong>
                     </div>
                     <div>
+                      Total books ordered{" "}
+                      <strong>
+                        {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                        {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                      </strong>
+                    </div>
+                    <div>
                       Detected amount{" "}
                       <strong>
                         {o.detected_amount === null
@@ -2455,6 +2462,7 @@ function Orders({
     ? [
         "Order",
         "Customer",
+        "Books",
         "Total",
         "OCR amount / difference",
         "Status",
@@ -2464,6 +2472,7 @@ function Orders({
     : [
         "Order",
         "Student",
+        "Books",
         "Date",
         "Total",
         "Order status",
@@ -2668,6 +2677,22 @@ function Orders({
                 )}
               </div>
             );
+            const booksCount = Number(
+              o.total_books ??
+                (o.items?.reduce(
+                  (s: number, it: any) => s + (it.quantity || 1),
+                  0,
+                ) || 0),
+            );
+            const booksCell = (
+              <div style={{ whiteSpace: "nowrap" }} title={`${booksCount} book(s) ordered by student`}>
+                <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
+                <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
+                  {booksCount === 1 ? "book" : "books"}
+                </span>
+              </div>
+            );
+
             return payments
               ? [
                   refCell,
@@ -2699,6 +2724,7 @@ function Orders({
                       </span>
                     )}
                   </div>,
+                  booksCell,
                   money(o.total),
                   <div>
                     {o.detected_amount === null
@@ -2764,6 +2790,7 @@ function Orders({
                       </span>
                     )}
                   </div>,
+                  booksCell,
                   new Date(o.created_at).toLocaleDateString(),
                   money(o.total),
                   <Status value={o.status} />,
@@ -2801,6 +2828,7 @@ function Orders({
             </button>
             <span>
               Page {page} · {data.total} orders
+              {data.total_books !== undefined && ` · ${data.total_books} books ordered`}
             </span>
             <button
               className="btn compact"
@@ -2898,6 +2926,13 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                 <p>{o.ocr_message}</p>
                 <div>
                   Order total <strong>{money(o.total)}</strong>
+                </div>
+                <div>
+                  Total books ordered{" "}
+                  <strong>
+                    {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                    {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                  </strong>
                 </div>
                 <div>
                   Detected amount{" "}
