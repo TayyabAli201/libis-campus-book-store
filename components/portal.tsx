@@ -32,7 +32,6 @@ import {
   MapPin,
   Navigation,
   X,
-  Printer,
   Eye,
   Globe,
   Mail,
@@ -1932,34 +1931,6 @@ function OrderModalPopup({
     }
   };
 
-  const printSlip = (slipId: string) => {
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Payment Slip - ${o?.reference || slipId}</title>
-            <style>
-              body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
-              img, iframe { max-width: 100%; max-height: 98vh; object-fit: contain; }
-              @media print {
-                body { background: none; }
-                img, iframe { max-width: 100%; max-height: 100%; page-break-inside: avoid; }
-              }
-            </style>
-          </head>
-          <body>
-            <img src="/api/proofs/${slipId}" onload="window.print(); window.close();" onError="alert('Could not load image');" />
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } else {
-      toast.error("Could not open print window. Please allow popups.");
-    }
-  };
-
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="order-modal-popup-content">
@@ -2046,15 +2017,8 @@ function OrderModalPopup({
                       <div className="slip-panel-header">
                         <h3>Attached Payment Slip</h3>
                         <div className="slip-actions">
-                          <button
-                            type="button"
-                            className="btn primary compact"
-                            onClick={() => printSlip(o.slip_id)}
-                          >
-                            <Printer size={15} /> Print Slip
-                          </button>
                           <a
-                            className="btn compact"
+                            className="btn primary compact"
                             href={"/api/proofs/" + o.slip_id + "?download=1"}
                             download
                           >
@@ -2714,15 +2678,6 @@ function Orders({
                         "—"
                       )}
                     </p>
-                    {o.delivery_type && (
-                      <span className="small-text muted">
-                        {o.delivery_type === "campus"
-                          ? "🏫 VU Qanchi Campus"
-                          : o.delivery_type === "lahore"
-                            ? "🛵 Lahore Delivery"
-                            : "📦 Other Cities"}
-                      </span>
-                    )}
                   </div>,
                   booksCell,
                   money(o.total),
@@ -2780,15 +2735,6 @@ function Orders({
                         "—"
                       )}
                     </p>
-                    {o.delivery_type && (
-                      <span className="small-text muted">
-                        {o.delivery_type === "campus"
-                          ? "🏫 VU Qanchi Campus"
-                          : o.delivery_type === "lahore"
-                            ? "🛵 Lahore Delivery"
-                            : "📦 Other Cities"}
-                      </span>
-                    )}
                   </div>,
                   booksCell,
                   new Date(o.created_at).toLocaleDateString(),
