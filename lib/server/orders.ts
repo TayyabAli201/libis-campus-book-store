@@ -146,21 +146,25 @@ export async function submitOrder(
   const id = uid(),
     at = now();
   let dd = "01",
-    mm = "01";
+    mm = "01",
+    yy = "26";
   try {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Karachi",
       day: "2-digit",
       month: "2-digit",
+      year: "2-digit",
     }).formatToParts(new Date());
     dd = parts.find((p) => p.type === "day")?.value || "01";
     mm = parts.find((p) => p.type === "month")?.value || "01";
+    yy = parts.find((p) => p.type === "year")?.value || "26";
   } catch {
-    const [, m, d] = at.slice(0, 10).split("-");
+    const [y, m, d] = at.slice(0, 10).split("-");
     dd = d || "01";
     mm = m || "01";
+    yy = (y || "2026").slice(-2);
   }
-  const dateKey = `${dd}${mm}`;
+  const dateKey = `${dd}${mm}${yy}`;
   const prefix =
     data.settings?.order_prefix && data.settings.order_prefix !== "CBS"
       ? data.settings.order_prefix
@@ -168,14 +172,17 @@ export async function submitOrder(
   const basePrefix = `${prefix}-${dateKey}-`;
 
   const latestOrder = await one<{ reference: string }>(
-    "SELECT reference FROM orders WHERE reference LIKE ? ORDER BY LENGTH(reference) DESC, reference DESC LIMIT 1",
-    `${basePrefix}%`,
+    "SELECT reference FROM orders WHERE reference LIKE ? OR reference LIKE ? ORDER BY rowid DESC LIMIT 1",
+    `${prefix}-%`,
+    `${prefix.toLowerCase()}-%`,
   );
 
   let nextSeq = 1;
   if (latestOrder?.reference) {
-    const lastPart = latestOrder.reference.slice(basePrefix.length);
-    const parsed = parseInt(lastPart, 10);
+    const match = latestOrder.reference.match(/(\d+)$/);
+    const parsed = match
+      ? parseInt(match[1], 10)
+      : parseInt(latestOrder.reference.slice(-4), 10);
     if (!isNaN(parsed) && parsed >= 1) {
       nextSeq = parsed + 1;
     }
