@@ -103,13 +103,8 @@ export function getOrderWhatsAppMessage(o: any): string {
 }
 
 export function formatWhatsAppPhone(phone: string): string {
-  let num = (phone || "").replace(/[^0-9]/g, "");
-  if (num.startsWith("0")) {
-    num = "92" + num.slice(1);
-  } else if (!num.startsWith("92") && num.length === 10) {
-    num = "92" + num;
-  }
-  return num;
+  // Preserve exact digits as entered by user without altering, adding or removing digits
+  return (phone || "").replace(/[^0-9]/g, "");
 }
 
 export function getWhatsAppUrl(o: any): string {

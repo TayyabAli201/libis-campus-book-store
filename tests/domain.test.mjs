@@ -45,12 +45,13 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
 });
 test('Real migration enforces pricing categories, totals and atomic stock constraints',()=>{const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');db.exec(fs.readFileSync('drizzle/0000_modern_marrow.sql','utf8'));db.prepare('INSERT INTO pricing_categories(id,rate) VALUES(?,?)').run('A',250);assert.throws(()=>db.prepare('INSERT INTO pricing_categories(id,rate) VALUES(?,?)').run('E',700));db.exec("INSERT INTO books(id,code,course_code,course_name,title,author,description,pages,category,created_at) VALUES('b','CS','CS','Computing','Book','Author','Description',100,'A','2026-01-01');INSERT INTO inventory(book_id,stock,reserved) VALUES('b',1,0)");assert.throws(()=>db.exec("UPDATE inventory SET reserved=2 WHERE book_id='b'"));db.exec('BEGIN');db.exec("UPDATE inventory SET reserved=1 WHERE book_id='b'");try{db.exec("INSERT INTO transaction_guards(id,ok) VALUES('g',0)");assert.fail('guard must fail')}catch{db.exec('ROLLBACK');}assert.equal(db.prepare("SELECT reserved FROM inventory WHERE book_id='b'").get().reserved,0);db.close();});
 
-test('WhatsApp phone formatting handles local leading zero, international prefix and spaces',()=>{
-  assert.equal(formatWhatsAppPhone('03001234567'), '923001234567');
+test('WhatsApp phone formatting preserves exact digits as entered by user without alterations',()=>{
+  assert.equal(formatWhatsAppPhone('03001234567'), '03001234567');
   assert.equal(formatWhatsAppPhone('+92 300 1234567'), '923001234567');
-  assert.equal(formatWhatsAppPhone('0310-4584041'), '923104584041');
+  assert.equal(formatWhatsAppPhone('0310-4584041'), '03104584041');
   assert.equal(formatWhatsAppPhone('923001234567'), '923001234567');
-  assert.equal(formatWhatsAppPhone('3001234567'), '923001234567');
+  assert.equal(formatWhatsAppPhone('3001234567'), '3001234567');
+  assert.equal(formatWhatsAppPhone('+1 (555) 234-5678'), '15552345678');
 });
 
 test('WhatsApp message generator accurately generates messages for Confirmed, Processing, Shipped and Delivered',()=>{
@@ -114,11 +115,11 @@ test('WhatsApp message generator accurately generates messages for Confirmed, Pr
     'Salam Hamza Farooq, your order has been delivered. Please confirm.'
   );
 
-  // WhatsApp wa.me URL format with encodeURIComponent
+  // WhatsApp wa.me URL format with encodeURIComponent (preserving exact digits)
   const fullUrl = getWhatsAppUrl(campusShippedOrder);
   assert.equal(
     fullUrl,
-    'https://wa.me/923335555555?text=' + encodeURIComponent('Salam Bilal Ahmed, your books have arrived at VU Qanchi campus. You can receive them now.')
+    'https://wa.me/03335555555?text=' + encodeURIComponent('Salam Bilal Ahmed, your books have arrived at VU Qanchi campus. You can receive them now.')
   );
 });
 
