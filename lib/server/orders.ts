@@ -399,13 +399,33 @@ export async function listOrders(
     filters.push("(o.reference LIKE ? OR o.name LIKE ? OR o.phone LIKE ?)");
     args.push(...Array(3).fill("%" + q.slice(0, 100) + "%"));
   }
-  if (status) {
-    filters.push("o.status=?");
-    args.push(status);
+  if (status && status !== "all") {
+    const statuses = status
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s && s !== "all");
+    if (statuses.length === 1) {
+      filters.push("o.status=?");
+      args.push(statuses[0]);
+    } else if (statuses.length > 1) {
+      const placeholders = statuses.map(() => "?").join(",");
+      filters.push(`o.status IN (${placeholders})`);
+      args.push(...statuses);
+    }
   }
   if (deliveryType && deliveryType !== "all") {
-    filters.push("o.delivery_type=?");
-    args.push(deliveryType.trim());
+    const types = deliveryType
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t && t !== "all");
+    if (types.length === 1) {
+      filters.push("o.delivery_type=?");
+      args.push(types[0]);
+    } else if (types.length > 1) {
+      const placeholders = types.map(() => "?").join(",");
+      filters.push(`o.delivery_type IN (${placeholders})`);
+      args.push(...types);
+    }
   }
   if (from) {
     filters.push("o.created_at>=?");

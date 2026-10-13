@@ -1,5 +1,6 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
+import { ChevronDown, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -95,6 +96,244 @@ export function Choose({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+export function MultiChoose({
+  values,
+  onChange,
+  options,
+  label,
+  allLabel = "All options",
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: { value: string; label: string }[];
+  label: string;
+  allLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const allSelected = values.length === 0 || values.includes("all") || values.length === options.length;
+
+  const toggle = (val: string) => {
+    if (val === "all") {
+      onChange([]);
+      return;
+    }
+    const cleanValues = values.filter((v) => v !== "all");
+    let next: string[];
+    if (cleanValues.includes(val)) {
+      next = cleanValues.filter((v) => v !== val);
+    } else {
+      next = [...cleanValues, val];
+    }
+    if (next.length === options.length) {
+      onChange([]);
+    } else {
+      onChange(next);
+    }
+  };
+
+  const getButtonText = () => {
+    if (allSelected) return allLabel;
+    if (values.length === 1) {
+      const match = options.find((o) => o.value === values[0]);
+      return match ? match.label : values[0];
+    }
+    const matchedLabels = values.map(
+      (v) => options.find((o) => o.value === v)?.label || v,
+    );
+    if (matchedLabels.length <= 2) {
+      return matchedLabels.join(", ");
+    }
+    return `${matchedLabels.length} selected`;
+  };
+
+  return (
+    <div className="relative inline-block" ref={containerRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="choice"
+        aria-label={label}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "0 12px",
+          cursor: "pointer",
+          border: "1px solid var(--border)",
+          background: "var(--card)",
+          color: "var(--foreground)",
+          fontWeight: 500,
+          whiteSpace: "nowrap",
+          userSelect: "none",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>
+          {getButtonText()}
+        </span>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+          {!allSelected && values.length > 1 && (
+            <span
+              style={{
+                fontSize: "0.72rem",
+                background: "var(--primary)",
+                color: "var(--primary-foreground)",
+                borderRadius: "10px",
+                padding: "1px 6px",
+                fontWeight: 600,
+                lineHeight: "1.2",
+              }}
+            >
+              {values.length}
+            </span>
+          )}
+          <ChevronDown
+            size={14}
+            style={{
+              transition: "transform 0.15s ease",
+              transform: open ? "rotate(180deg)" : "none",
+              color: "var(--muted-foreground)",
+            }}
+          />
+        </div>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            zIndex: 60,
+            minWidth: "220px",
+            background: "var(--popover)",
+            color: "var(--popover-foreground)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+            padding: "6px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "2px",
+            maxHeight: "320px",
+            overflowY: "auto",
+          }}
+        >
+          {/* Option: All */}
+          <div
+            onClick={() => toggle("all")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "7px 10px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: allSelected ? 600 : 400,
+              background: allSelected ? "rgba(var(--primary-rgb, 59, 130, 246), 0.08)" : "transparent",
+            }}
+          >
+            <div
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 4,
+                border: allSelected ? "1.5px solid var(--primary)" : "1.5px solid var(--muted-foreground)",
+                background: allSelected ? "var(--primary)" : "transparent",
+                display: "grid",
+                placeContent: "center",
+                color: "var(--primary-foreground)",
+                flexShrink: 0,
+              }}
+            >
+              {allSelected && <Check size={12} strokeWidth={3} />}
+            </div>
+            <span>{allLabel}</span>
+          </div>
+
+          <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
+
+          {/* Individual Options with Checkboxes */}
+          {options.map((opt) => {
+            const isChecked = !allSelected && values.includes(opt.value);
+            return (
+              <div
+                key={opt.value}
+                onClick={() => toggle(opt.value)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "7px 10px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontWeight: isChecked ? 600 : 400,
+                  background: isChecked ? "rgba(var(--primary-rgb, 59, 130, 246), 0.08)" : "transparent",
+                }}
+              >
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 4,
+                    border: isChecked ? "1.5px solid var(--primary)" : "1.5px solid var(--muted-foreground)",
+                    background: isChecked ? "var(--primary)" : "transparent",
+                    display: "grid",
+                    placeContent: "center",
+                    color: "var(--primary-foreground)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isChecked && <Check size={12} strokeWidth={3} />}
+                </div>
+                <span>{opt.label}</span>
+              </div>
+            );
+          })}
+
+          {!allSelected && (
+            <>
+              <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--primary)",
+                  fontSize: "0.78rem",
+                  padding: "5px 10px",
+                  cursor: "pointer",
+                  textAlign: "center",
+                  fontWeight: 600,
+                  borderRadius: "4px",
+                }}
+              >
+                Reset to {allLabel}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 export function Blank({

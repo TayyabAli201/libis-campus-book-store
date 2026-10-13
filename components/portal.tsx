@@ -67,6 +67,7 @@ import {
   Loading,
   Field,
   Choose,
+  MultiChoose,
   errorText,
   Status,
   DataTable,
@@ -2239,8 +2240,10 @@ function Orders({
     [],
   );
   const [q, setQ] = useState(""),
-    [status, setStatus] = useState(payments ? "PAYMENT_PENDING" : "all"),
-    [deliveryType, setDeliveryType] = useState("all"),
+    [statusList, setStatusList] = useState<string[]>(
+      payments ? ["PAYMENT_PENDING"] : [],
+    ),
+    [deliveryTypeList, setDeliveryTypeList] = useState<string[]>([]),
     [page, setPage] = useState(1),
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
@@ -2252,7 +2255,9 @@ function Orders({
   const exportOrders = async () => {
     setExporting(true);
     try {
-      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&delivery_type=${deliveryType === "all" ? "" : deliveryType}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
+      const statusParam = statusList.join(",");
+      const deliveryTypeParam = deliveryTypeList.join(",");
+      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
       const res = await api(exportPath);
       const rows = res.rows || [];
       if (!rows.length) {
@@ -2266,14 +2271,24 @@ function Orders({
       const currentDate = `${dd}-${mm}-${yyyy}`;
 
       let deliveryPrefix = "Orders";
-      if (deliveryType === "campus") deliveryPrefix = "VU Qanchi Campus";
-      else if (deliveryType === "lahore") deliveryPrefix = "Lahore";
-      else if (deliveryType === "other") deliveryPrefix = "Other City";
+      if (deliveryTypeList.length === 1) {
+        if (deliveryTypeList[0] === "campus") deliveryPrefix = "VU Qanchi Campus";
+        else if (deliveryTypeList[0] === "lahore") deliveryPrefix = "Lahore";
+        else if (deliveryTypeList[0] === "other") deliveryPrefix = "Other City";
+      } else if (deliveryTypeList.length > 1) {
+        deliveryPrefix = deliveryTypeList
+          .map((t) => (t === "campus" ? "Qanchi" : t === "lahore" ? "Lahore" : "Other City"))
+          .join(" & ");
+      }
 
-      const statusPart =
-        status && status !== "all" ? ` - ${statuses[status] || status}` : "";
+      let statusPart = "";
+      if (statusList.length === 1) {
+        statusPart = ` - ${statuses[statusList[0]] || statusList[0]}`;
+      } else if (statusList.length > 1) {
+        statusPart = ` - ${statusList.map((s) => statuses[s] || s).join(", ")}`;
+      }
       const filename = `${deliveryPrefix}${statusPart} - ${currentDate}.xlsx`;
-      const includeAddress = deliveryType === "other";
+      const includeAddress = deliveryTypeList.length === 0 || deliveryTypeList.includes("other");
 
       try {
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
@@ -2336,7 +2351,9 @@ function Orders({
     }
   };
 
-  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${status === "all" ? "" : status}&delivery_type=${deliveryType === "all" ? "" : deliveryType}&page=${page}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
+  const statusParam = statusList.join(",");
+  const deliveryTypeParam = deliveryTypeList.join(",");
+  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&page=${page}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
   const { data, error, loading, reload } = useData(path);
 
   useEffect(() => {
@@ -2378,30 +2395,28 @@ function Orders({
           aria-label="Search orders"
           placeholder="Order ID, student or WhatsApp…"
         />
-        <Choose
-          value={status}
+        <MultiChoose
+          values={statusList}
           onChange={(v) => {
-            setStatus(v);
+            setStatusList(v);
             setPage(1);
           }}
           label="Order status"
-          options={[
-            { value: "all", label: "All statuses" },
-            ...Object.keys(transitions).map((s) => ({
-              value: s,
-              label: statuses[s],
-            })),
-          ]}
+          allLabel="All statuses"
+          options={Object.keys(transitions).map((s) => ({
+            value: s,
+            label: statuses[s],
+          }))}
         />
-        <Choose
-          value={deliveryType}
+        <MultiChoose
+          values={deliveryTypeList}
           onChange={(v) => {
-            setDeliveryType(v);
+            setDeliveryTypeList(v);
             setPage(1);
           }}
           label="Delivery type"
+          allLabel="All delivery types"
           options={[
-            { value: "all", label: "All delivery types" },
             { value: "campus", label: "VU Qanchi Campus" },
             { value: "lahore", label: "Lahore" },
             { value: "other", label: "Other City" },
@@ -2429,21 +2444,25 @@ function Orders({
           className="btn compact"
           onClick={exportOrders}
           disabled={exporting || loading}
-          title={`Export ${deliveryType === "all" ? (status === "all" ? "all" : statuses[status] || status) : (deliveryType === "other" ? "Other City" : deliveryType === "campus" ? "VU Qanchi Campus" : "Lahore")} orders to Excel`}
+          title="Export orders to Excel"
         >
           <Download size={15} />
           {exporting
             ? "Exporting…"
             : `Export ${
-                status === "all" && deliveryType === "all"
+                statusList.length === 0 && deliveryTypeList.length === 0
                   ? "Orders"
-                  : deliveryType !== "all"
-                    ? deliveryType === "other"
-                      ? "Other City"
-                      : deliveryType === "campus"
-                        ? "VU Qanchi Campus"
-                        : "Lahore"
-                    : statuses[status] || status
+                  : deliveryTypeList.length > 0
+                    ? deliveryTypeList.length === 1
+                      ? deliveryTypeList[0] === "other"
+                        ? "Other City"
+                        : deliveryTypeList[0] === "campus"
+                          ? "VU Qanchi Campus"
+                          : "Lahore"
+                      : `${deliveryTypeList.length} Routes`
+                    : statusList.length === 1
+                      ? statuses[statusList[0]] || statusList[0]
+                      : `${statusList.length} Statuses`
               }`}
         </button>
       </div>
