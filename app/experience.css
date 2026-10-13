@@ -2175,9 +2175,7 @@
 /* Clickable WhatsApp Phone Link */
 .whatsapp-phone-link {
   color: inherit;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+  display: inline;
   font-size: 0.84rem;
   font-weight: 500;
   text-decoration: underline;
@@ -2186,11 +2184,8 @@
   transition: color 0.15s ease, opacity 0.15s ease;
 }
 .whatsapp-phone-link:hover {
-  color: #15803d;
-  opacity: 0.9;
-}
-:is(.dark *) .whatsapp-phone-link:hover {
-  color: #4ade80;
+  color: var(--primary);
+  opacity: 0.85;
 }
 
 /* Online Payment Slip Viewer */

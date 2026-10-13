@@ -39,7 +39,6 @@ import {
   Share2,
   CreditCard,
   Clock,
-  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -2684,8 +2683,7 @@ function Orders({
                           className="whatsapp-phone-link"
                           title="Open WhatsApp chat with auto-generated order message"
                         >
-                          <MessageCircle size={12} style={{ color: "#25D366", flexShrink: 0 }} />
-                          <span>{o.phone}</span>
+                          {o.phone}
                         </a>
                       ) : (
                         "—"
@@ -2750,8 +2748,7 @@ function Orders({
                           className="whatsapp-phone-link"
                           title="Open WhatsApp chat with auto-generated order message"
                         >
-                          <MessageCircle size={12} style={{ color: "#25D366", flexShrink: 0 }} />
-                          <span>{o.phone}</span>
+                          {o.phone}
                         </a>
                       ) : (
                         "—"
