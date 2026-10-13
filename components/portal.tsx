@@ -108,13 +108,13 @@ export function BrandText({ name = "Campus Bookstore" }: { name?: string }) {
   const parts = (name || "Campus Bookstore").trim().split(/\s+/);
   if (parts.length > 1) {
     return (
-      <span className="brand-text-wrap" style={{ display: "inline-flex", alignItems: "baseline", gap: 5, flexWrap: "wrap" }}>
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
         <strong style={{ fontWeight: 750 }}>{parts[0]}</strong>
         <span style={{ fontWeight: 400 }}>{parts.slice(1).join(" ")}</span>
       </span>
     );
   }
-  return <strong style={{ fontWeight: 750 }}>{parts[0] || "Campus"}</strong>;
+  return <strong style={{ fontWeight: 750, whiteSpace: "nowrap" }}>{parts[0] || "Campus"}</strong>;
 }
 
 export function Login({
@@ -525,8 +525,17 @@ export function Portal({
     <SidebarProvider className="portal-shell">
       <Sidebar className="no-print">
         <SidebarHeader>
-          <a className="brand portal-brand" href={base + "/dashboard"}>
-            <BookOpen />
+          <a
+            className="brand portal-brand"
+            href={base + "/dashboard"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <BookOpen size={20} style={{ flexShrink: 0 }} />
             <BrandText name={currentStoreName} />
           </a>
           <span className="portal-label">

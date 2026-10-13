@@ -1257,6 +1257,7 @@ footer {
 .portal-brand {
   font-size: 1.05rem;
   padding: 20px 8px 0;
+  white-space: nowrap;
 }
 
 .portal-label {
