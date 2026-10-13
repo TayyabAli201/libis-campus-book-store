@@ -17,7 +17,7 @@ export async function exportOrdersExcel(
       ...(includeAddress ? [{ width: 36 }] : []), // Address
       { width: 16 }, // Book Code
       { width: 46 }, // Book Name
-      { width: 12 }, // Quantity
+      { width: 24 }, // Quantity (Total Books: ...)
     ],
     stickyRowsCount: 1,
   }).toFile(filename);

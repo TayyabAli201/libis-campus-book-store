@@ -26,7 +26,8 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
   ];
   const standardSheet = orderSheet(sampleOrders);
   assert.equal(standardSheet[0].length, 7);
-  assert.deepEqual(standardSheet[0].map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS));
+  assert.deepEqual(standardSheet[0].slice(0, 6).map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS).slice(0, 6));
+  assert.equal(standardSheet[0][6].value, 'Quantity (Total Books: 3)');
   assert.equal(standardSheet[1][0].rowSpan, 2);
   assert.equal(standardSheet[1][1].value, 'ORD-101');
   assert.equal(standardSheet[1][3].value, '10-10-2026');
@@ -36,7 +37,8 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
 
   const otherCitySheet = orderSheet(sampleOrders, { includeAddress: true });
   assert.equal(otherCitySheet[0].length, 8);
-  assert.deepEqual(otherCitySheet[0].map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS_WITH_ADDRESS));
+  assert.deepEqual(otherCitySheet[0].slice(0, 7).map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS_WITH_ADDRESS).slice(0, 7));
+  assert.equal(otherCitySheet[0][7].value, 'Quantity (Total Books: 3)');
   assert.equal(otherCitySheet[1][4].value, 'House 12, Street 4, F-8/1, Islamabad');
   assert.equal(otherCitySheet[1][4].rowSpan, 2);
   assert.equal(otherCitySheet[1][5].value, 'CS101');

@@ -25,6 +25,26 @@ export function orderSheet(
 ) {
   const includeAddress = Boolean(options?.includeAddress);
 
+  // Total Books Calculation across all exported orders
+  let totalBooks = 0;
+  orders.forEach((o) => {
+    const items =
+      o.items && o.items.length > 0
+        ? o.items
+        : [
+            {
+              code: "—",
+              title: "Order Record",
+              quantity: 1,
+            },
+          ];
+    items.forEach((item: any) => {
+      totalBooks += Number(item.quantity) || 1;
+    });
+  });
+
+  const quantityHeading = `Quantity (Total Books: ${totalBooks})`;
+
   const headerCols = [
     { value: "Sr No", width: 10 },
     { value: "Order Number", width: 24 },
@@ -33,7 +53,7 @@ export function orderSheet(
     ...(includeAddress ? [{ value: "Address", width: 36 }] : []),
     { value: "Book Code", width: 16 },
     { value: "Book Name", width: 46 },
-    { value: "Quantity", width: 12 },
+    { value: quantityHeading, width: 24 },
   ];
 
   // Theme Header Style: Royal Blue matching Bookstore Brand Theme

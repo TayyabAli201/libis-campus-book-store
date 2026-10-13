@@ -2323,6 +2323,17 @@ function Orders({
         );
       } catch (excelErr) {
         // Fallback to structured CSV with book items
+        let totalBooks = 0;
+        rows.forEach((o: any) => {
+          const items =
+            o.items && o.items.length > 0
+              ? o.items
+              : [{ code: "—", title: "Order Record", quantity: 1 }];
+          items.forEach((item: any) => {
+            totalBooks += Number(item.quantity) || 1;
+          });
+        });
+
         const csvRows: unknown[][] = [
           [
             "Sr No",
@@ -2332,7 +2343,7 @@ function Orders({
             ...(includeAddress ? ["Address"] : []),
             "Book Code",
             "Book Name",
-            "Quantity",
+            `Quantity (Total Books: ${totalBooks})`,
           ],
         ];
 
