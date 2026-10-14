@@ -271,3 +271,20 @@ export type Quote = {
   settings: StoreSettings;
   expires_at: number;
 };
+
+export function formatReceiptBookTitle(
+  code?: string | null,
+  title?: string | null,
+): string {
+  const c = (code || "").trim();
+  const t = (title || "").trim();
+  if (!c || c === "—") return t || "Book";
+  if (!t || t === "—") return c;
+  const escaped = c.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+  const regex = new RegExp(`^${escaped}\\s*[-:·|]?\\s*`, "i");
+  if (regex.test(t)) {
+    const rest = t.replace(regex, "").trim();
+    return rest ? `${c} - ${rest}` : c;
+  }
+  return `${c} - ${t}`;
+}

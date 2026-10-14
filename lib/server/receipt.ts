@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
-import { statuses, money } from "../contracts";
+import { statuses, money, formatReceiptBookTitle } from "../contracts";
 import { receiptDate, receiptPaymentNote } from "../receipt-format";
 
 export async function receipt(o: any) {
@@ -190,11 +190,11 @@ export async function receipt(o: any) {
   ensure(95);
   tableHeader();
   for (const item of o.items) {
-    const titleLines = wrap(item.title, 248, 10, bold);
-    const detailLines = wrap(`${item.code} | ${item.pages} pages`, 248, 8);
+    const displayName = formatReceiptBookTitle(item.code, item.title);
+    const titleLines = wrap(displayName, 248, 10, bold);
     const rowHeight = Math.max(
-      52,
-      titleLines.length * 14 + detailLines.length * 12 + 22,
+      38,
+      titleLines.length * 14 + 20,
     );
     if (y - rowHeight < 107) {
       nextPage();
@@ -202,14 +202,6 @@ export async function receipt(o: any) {
     }
     const top = y - 12;
     lines(titleLines, margin + 10, top, 10, true);
-    lines(
-      detailLines,
-      margin + 10,
-      top - titleLines.length * 14 - 4,
-      8,
-      false,
-      muted,
-    );
     right(item.quantity, 352, top, 9);
     right(money(item.unit_price, o.currency), 446, top, 9);
     const amount = money(item.quantity * item.unit_price, o.currency);

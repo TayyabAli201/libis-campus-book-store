@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {compareAmount} from '../lib/payment-status.ts';
-import {money,checkoutInput,transitions,getOrderWhatsAppMessage,formatWhatsAppPhone,getWhatsAppUrl} from '../lib/contracts.ts';
+import {money,checkoutInput,transitions,getOrderWhatsAppMessage,formatWhatsAppPhone,getWhatsAppUrl,formatReceiptBookTitle} from '../lib/contracts.ts';
 import {orderSheet, ORDER_EXPORT_COLUMNS, ORDER_EXPORT_COLUMNS_WITH_ADDRESS} from '../lib/orders-spreadsheet.ts';
 test('OCR outcomes distinguish exact, lower, higher, unreadable amounts and never claim verification',()=>{assert.equal(compareAmount(400000,400000).status,'AMOUNT_MATCHED');assert.equal(compareAmount(399999,400000).status,'AMOUNT_MISMATCH');assert.equal(compareAmount(500000,400000).status,'AMOUNT_MISMATCH');assert.equal(compareAmount(null,400000).status,'OCR_FAILED');for(const amount of [0,400000,500000,null])assert.notEqual(compareAmount(amount,400000).status,'VERIFIED');});
 test('Currency formatting is deterministic between server and browser locales',()=>{assert.equal(money(122500),'Rs. 1,225');assert.equal(money(250),'Rs. 2.50');assert.equal(money(0),'Rs. 0');assert.equal(money(-80000),'Rs. -800');});
@@ -159,4 +159,17 @@ test('WhatsApp message generator accurately generates messages for Confirmed, Pr
     'https://wa.me/03335555555?text=' + encodeURIComponent('Salam Bilal Ahmed, your books have arrived at VU Qanchi campus. You can receive them now.')
   );
 });
+
+test('formatReceiptBookTitle prefixes book code to book title and normalizes duplicates', () => {
+  assert.equal(formatReceiptBookTitle('CS101', 'Introduction To Computing'), 'CS101 - Introduction To Computing');
+  assert.equal(formatReceiptBookTitle('CS607', 'Artificial Intelligence'), 'CS607 - Artificial Intelligence');
+  assert.equal(formatReceiptBookTitle('CS614', 'Dataware Housing'), 'CS614 - Dataware Housing');
+  assert.equal(formatReceiptBookTitle('CS101', 'CS101 - Introduction To Computing'), 'CS101 - Introduction To Computing');
+  assert.equal(formatReceiptBookTitle('CS101', 'cs101: Introduction To Computing'), 'CS101 - Introduction To Computing');
+  assert.equal(formatReceiptBookTitle('CS101', 'CS101'), 'CS101');
+  assert.equal(formatReceiptBookTitle('', 'Artificial Intelligence'), 'Artificial Intelligence');
+  assert.equal(formatReceiptBookTitle(null, 'Introduction To Computing'), 'Introduction To Computing');
+  assert.equal(formatReceiptBookTitle('CS101', null), 'CS101');
+});
+
 

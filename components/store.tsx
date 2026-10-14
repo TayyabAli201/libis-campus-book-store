@@ -97,6 +97,7 @@ import {
 import {
   money,
   statuses,
+  formatReceiptBookTitle,
   type Book,
   type StoreSettings,
   type Quote,
@@ -1992,8 +1993,7 @@ export function printOrderReceiptSlip(order: any) {
       (b: any) => `
         <tr>
           <td>
-            <strong>${escapeHtml(b.title)}</strong>
-            <small>${escapeHtml(b.code)} · ${b.pages} pages</small>
+            <strong>${escapeHtml(formatReceiptBookTitle(b.code, b.title))}</strong>
           </td>
           <td>${b.quantity}</td>
           <td>${escapeHtml(money(b.unit_price, order.currency))}</td>
@@ -2522,10 +2522,7 @@ export function OrderReceipt({ o }: { o: any }) {
           {o.items.map((b: any) => (
             <tr key={b.id || b.code}>
               <td>
-                <strong>{b.title}</strong>
-                <small>
-                  {b.code} · {b.pages} pages
-                </small>
+                <strong>{formatReceiptBookTitle(b.code, b.title)}</strong>
               </td>
               <td>{b.quantity}</td>
               <td>{money(b.unit_price, o.currency)}</td>
