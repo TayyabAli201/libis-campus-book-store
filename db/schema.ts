@@ -168,6 +168,8 @@ export const orders = sqliteTable(
     currency: text("currency").notNull(),
     storeSnapshot: text("store_snapshot").notNull(),
     status: text("status").notNull(),
+    courierName: text("courier_name"),
+    courierTrackingId: text("courier_tracking_id"),
     // RELEASED means no stock commitment; legacy rows retain their recorded state.
     inventoryState: text("inventory_state").notNull().default("RESERVED"),
     createdAt: stamp(),

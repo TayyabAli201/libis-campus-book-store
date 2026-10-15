@@ -2172,6 +2172,162 @@
   color: #ffffff;
 }
 
+/* Other City External Courier Tracking Buttons & Badges */
+.courier-add-tracking-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, #2563eb 10%, transparent);
+  color: #1d4ed8;
+  border: 1px dashed #60a5fa;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.courier-add-tracking-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-style: solid;
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+  transform: translateY(-1px);
+}
+
+:is(.dark *) .courier-add-tracking-btn {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #93c5fd;
+  border-color: #3b82f6;
+}
+
+:is(.dark *) .courier-add-tracking-btn:hover {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+  transform: translateY(-1px);
+}
+
+.courier-tracking-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, #059669 12%, transparent);
+  color: #047857;
+  border: 1px solid #10b981;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  line-height: 1.2;
+}
+
+.courier-tracking-pill:hover {
+  background: #059669;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.28);
+  transform: translateY(-1px);
+}
+
+:is(.dark *) .courier-tracking-pill {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  color: #6ee7b7;
+  border-color: #059669;
+}
+
+:is(.dark *) .courier-tracking-pill:hover {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+.quick-courier-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-courier-pill:hover {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.quick-courier-pill.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.courier-modal-banner {
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)) !important;
+  background: color-mix(in srgb, var(--primary) 4%, var(--card)) !important;
+  border-radius: 10px;
+}
+
+/* Student tracking courier card */
+.courier-tracking-card {
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid #93c5fd;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+  color: #1e3a8a;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+:is(.dark *) .courier-tracking-card {
+  border-color: #1e40af;
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.25) 0%, rgba(6, 78, 59, 0.2) 100%);
+  color: #bfdbfe;
+}
+
+.courier-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #2563eb;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.courier-tracking-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.95rem;
+  color: #1d4ed8;
+  letter-spacing: 0.05em;
+}
+
+:is(.dark *) .courier-tracking-code {
+  color: #93c5fd;
+}
+
+.courier-timeline-item {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #2563eb 8%, var(--card));
+  border: 1px solid color-mix(in srgb, #2563eb 25%, var(--border));
+}
+
 /* Clickable WhatsApp Phone Link */
 .whatsapp-phone-link {
   color: inherit;

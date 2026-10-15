@@ -2634,7 +2634,7 @@ function OrderTracking({ data }: { data: Catalog }) {
         <div className="home-track-badge">REAL-TIME ORDER TRACKING</div>
         <h1 className="home-track-title">Track Your Course Materials Order</h1>
         <p className="home-track-subtitle">
-          Enter your unique Order ID (e.g. VU-1210-0001) to view status details.
+          Enter your Order ID (e.g. VU-1210-0001) or Phone Number to view status details.
         </p>
 
         <form
@@ -2649,9 +2649,8 @@ function OrderTracking({ data }: { data: Catalog }) {
             <input
               type="text"
               className="home-track-input"
-              placeholder="e.g. VU-1210-0001"
+              placeholder="Order ID or Phone Number (e.g. 03001234567)"
               value={reference}
-              autoCapitalize="characters"
               spellCheck={false}
               onChange={(e) => setReference(e.target.value)}
               required
@@ -2786,6 +2785,58 @@ function OrderTracking({ data }: { data: Catalog }) {
           )}
 
           <OrderTrackerCard o={o} />
+
+          {o.courier_name && o.courier_tracking_id && (
+            <div
+              className="track-details-wrapper no-print"
+              style={{ maxWidth: 720, margin: "16px auto 0" }}
+            >
+              <div className="courier-tracking-card">
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                  <div
+                    style={{
+                      background: "#2563eb",
+                      color: "#ffffff",
+                      borderRadius: 10,
+                      padding: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Truck size={24} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span className="courier-badge">EXTERNAL COURIER DISPATCHED</span>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1d4ed8" }}>
+                        {o.courier_name}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "1.05rem", fontWeight: 700, margin: "4px 0" }}>
+                      Tracking #:{" "}
+                      <span className="courier-tracking-code">{o.courier_tracking_id}</span>
+                    </div>
+                    <p style={{ margin: "4px 0 0", fontSize: "0.84rem", opacity: 0.9 }}>
+                      Your parcel has been dispatched via <strong>{o.courier_name}</strong>. You can
+                      track parcel status on {o.courier_name}’s official website using tracking
+                      number <strong className="courier-tracking-code">{o.courier_tracking_id}</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="print-only">
             <OrderReceipt o={o} />
           </div>
@@ -2800,13 +2851,37 @@ function OrderTracking({ data }: { data: Catalog }) {
                     (o.city && String(o.city).toLowerCase().includes("campus")) ||
                     (o.address && String(o.address).toLowerCase().includes("campus")) ||
                     (o.delivery_title && String(o.delivery_title).toLowerCase().includes("campus"));
+                  const isCourierEntry =
+                    h.note &&
+                    (h.note.includes("Shipped via") ||
+                      h.note.includes("Tracking #:") ||
+                      h.note.includes("Courier tracking"));
                   return (
-                    <div key={i}>
-                      <Status
-                        value={h.status}
-                        label={h.status === "SHIPPED" && isCampus ? "Arrived at Campus - Ready for Pickup" : undefined}
-                      />
-                      {h.note && <p>{h.note}</p>}
+                    <div key={i} className={isCourierEntry ? "courier-timeline-item" : undefined}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {isCourierEntry && <Truck size={16} style={{ color: "#2563eb" }} />}
+                        <Status
+                          value={h.status}
+                          label={
+                            h.status === "SHIPPED" && isCampus
+                              ? "Arrived at Campus - Ready for Pickup"
+                              : isCourierEntry && h.status === "SHIPPED"
+                                ? `Shipped via ${o.courier_name || "Courier"}`
+                                : undefined
+                          }
+                        />
+                      </div>
+                      {h.note && (
+                        <p
+                          style={
+                            isCourierEntry
+                              ? { fontWeight: 600, color: "var(--primary)", marginTop: 6 }
+                              : undefined
+                          }
+                        >
+                          {h.note}
+                        </p>
+                      )}
                       <small>{new Date(h.created_at).toLocaleString()}</small>
                     </div>
                   );

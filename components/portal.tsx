@@ -38,6 +38,7 @@ import {
   Share2,
   CreditCard,
   Clock,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -1880,6 +1881,210 @@ function getMapLocation(o: any) {
   return getMapDirectionsUrl(o);
 }
 
+function CourierTrackingModal({
+  order,
+  onClose,
+  onSaved,
+}: {
+  order: any;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [courierName, setCourierName] = useState(order.courier_name || "");
+  const [trackingId, setTrackingId] = useState(order.courier_tracking_id || "");
+  const [busy, setBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const isPaymentPending =
+    order.status === "PAYMENT_PENDING" || order.payment_status !== "VERIFIED";
+
+  const popularCouriers = [
+    "Leopards",
+    "TCS",
+    "Pakistan Post",
+    "M&P",
+    "Trax",
+    "PostEx",
+    "Call Courier",
+  ];
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isPaymentPending && !order.courier_tracking_id) {
+      toast.error(
+        "Payment verification is pending. Please verify and approve payment before adding courier tracking details.",
+      );
+      return;
+    }
+    if (!courierName.trim() || !trackingId.trim()) {
+      toast.error("Please enter both courier company name and tracking number.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("manage/orders/" + order.id, {
+        action: "courier",
+        courier_name: courierName.trim(),
+        courier_tracking_id: trackingId.trim(),
+      });
+      toast.success("Courier tracking details saved successfully!");
+      window.dispatchEvent(new Event("orders-updated"));
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setBusy(true);
+    try {
+      await api("manage/orders/" + order.id, {
+        action: "remove_courier",
+      });
+      toast.success("Courier tracking details removed.");
+      window.dispatchEvent(new Event("orders-updated"));
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+      setConfirmRemove(false);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="courier-dialog-content" style={{ maxWidth: 480 }}>
+        <DialogHeader>
+          <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "1.1rem" }}>
+            <Truck size={20} style={{ color: "var(--primary)" }} />
+            {order.courier_tracking_id ? "Edit Courier Tracking" : "Add External Courier Tracking"}
+          </DialogTitle>
+          <DialogDescription>
+            Order <strong>{order.reference}</strong> · {order.name} ({order.city || "Other City"})
+          </DialogDescription>
+        </DialogHeader>
+
+        {isPaymentPending && !order.courier_tracking_id && (
+          <div
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid #f59e0b",
+              color: "#b45309",
+              fontSize: "0.85rem",
+              marginTop: 10,
+              lineHeight: 1.45,
+            }}
+          >
+            <strong>Payment Verification Pending:</strong> Please approve the student’s payment before adding courier tracking details.
+          </div>
+        )}
+
+        <form onSubmit={submit} className="stack" style={{ gap: 16, marginTop: 12 }}>
+          <div>
+            <label className="field-label" style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: "0.85rem" }}>
+              Courier Company Name <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <input
+              type="text"
+              className="input full-width"
+              placeholder="e.g. Leopards, TCS, Pakistan Post"
+              value={courierName}
+              onChange={(e) => setCourierName(e.target.value)}
+              required
+              autoFocus
+            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {popularCouriers.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`quick-courier-pill ${courierName.toLowerCase() === c.toLowerCase() ? "active" : ""}`}
+                  onClick={() => setCourierName(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label" style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: "0.85rem" }}>
+              Tracking Number / Tracking ID <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <input
+              type="text"
+              className="input full-width"
+              placeholder="e.g. 7849302194"
+              value={trackingId}
+              onChange={(e) => setTrackingId(e.target.value)}
+              required
+            />
+            <p className="small-text muted" style={{ margin: "5px 0 0", fontSize: "0.78rem" }}>
+              Student will see this in their order journey as:
+              <br />
+              <code style={{ fontSize: "0.78rem", color: "var(--primary)" }}>
+                Shipped via {courierName || "[Courier Company Name]"} - Tracking #: {trackingId || "[Tracking Number]"}
+              </code>
+            </p>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 16 }}>
+            <div>
+              {order.courier_tracking_id && (
+                <button
+                  type="button"
+                  className="btn compact danger-button"
+                  onClick={() => setConfirmRemove(true)}
+                  disabled={busy}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  title="Remove tracking details and return order to Ready for Dispatch"
+                >
+                  <Trash2 size={14} />
+                  Remove Tracking
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn compact"
+                onClick={onClose}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn primary compact"
+                disabled={busy || (isPaymentPending && !order.courier_tracking_id)}
+                title={isPaymentPending && !order.courier_tracking_id ? "Approve payment before saving tracking" : undefined}
+              >
+                <Package size={15} />
+                {busy ? "Saving…" : "Save Courier Details"}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <Confirm
+          open={confirmRemove}
+          onClose={() => setConfirmRemove(false)}
+          title={`Remove tracking from ${order.reference}?`}
+          description="Are you sure you want to remove the courier tracking details? If this parcel has not dispatched yet, the order status will be returned to Ready for Dispatch."
+          onConfirm={handleRemove}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function OrderModalPopup({
   id,
   user,
@@ -1896,6 +2101,7 @@ function OrderModalPopup({
   const [next, setNext] = useState("");
   const [decision, setDecision] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+  const [courierModalOpen, setCourierModalOpen] = useState(false);
 
   const admin = user.role === "SUPER_ADMIN";
   const canUpdate = admin || user.permissions.includes("orders.update");
@@ -2005,6 +2211,107 @@ function OrderModalPopup({
                         : "Start InDrive Live Route Navigation"}{" "}
                       <ExternalLink size={14} />
                     </a>
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const isCampus =
+                  o.delivery_type === "campus" ||
+                  (o.city && o.city.toLowerCase().includes("campus")) ||
+                  (o.address && o.address.toLowerCase().includes("campus"));
+                const isOther =
+                  o.delivery_type === "other" ||
+                  (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
+                if (!isOther) return null;
+
+                const isPaymentVerified =
+                  o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING";
+
+                return (
+                  <div
+                    className="courier-modal-banner"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 14,
+                      padding: "14px 18px",
+                      margin: "2px 0 10px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        className="courier-badge"
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: 8,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: isPaymentVerified || o.courier_tracking_id ? undefined : "#f59e0b",
+                        }}
+                      >
+                        {isPaymentVerified || o.courier_tracking_id ? <Truck size={20} /> : <Clock size={20} />}
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: "0.95rem", display: "block" }}>
+                          {o.courier_tracking_id
+                            ? "External Courier Tracking Attached"
+                            : isPaymentVerified
+                              ? "External Courier Tracking (Other City)"
+                              : "External Courier Tracking (Pending Payment Verification)"}
+                        </strong>
+                        <p className="small-text" style={{ margin: "2px 0 0" }}>
+                          {o.courier_name && o.courier_tracking_id ? (
+                            <>
+                              Shipped via <strong>{o.courier_name}</strong> · Tracking ID:{" "}
+                              <code className="courier-tracking-code">
+                                {o.courier_tracking_id}
+                              </code>
+                            </>
+                          ) : isPaymentVerified ? (
+                            "Add courier tracking details (e.g. Leopards, TCS, Trax) for student tracking."
+                          ) : (
+                            "Payment verification is pending. Please approve payment first to add courier tracking details."
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {canUpdate && (
+                      <button
+                        type="button"
+                        className={isPaymentVerified || o.courier_tracking_id ? "btn primary compact" : "btn compact"}
+                        onClick={() => {
+                          if (!isPaymentVerified && !o.courier_tracking_id) {
+                            toast.error("Payment verification is pending. Please approve payment before adding courier tracking.");
+                            return;
+                          }
+                          setCourierModalOpen(true);
+                        }}
+                        disabled={!isPaymentVerified && !o.courier_tracking_id}
+                        title={
+                          !isPaymentVerified && !o.courier_tracking_id
+                            ? "Approve payment before adding courier tracking"
+                            : undefined
+                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          whiteSpace: "nowrap",
+                          opacity: !isPaymentVerified && !o.courier_tracking_id ? 0.6 : 1,
+                          cursor: !isPaymentVerified && !o.courier_tracking_id ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <Truck size={14} />
+                        {o.courier_tracking_id
+                          ? "Edit Tracking"
+                          : isPaymentVerified
+                            ? "Add Courier Details"
+                            : "Payment Pending"}
+                      </button>
+                    )}
                   </div>
                 );
               })()}
@@ -2210,6 +2517,14 @@ function OrderModalPopup({
           description="Are you sure you want to permanently delete this order? This action cannot be undone."
           onConfirm={deleteOrder}
         />
+
+        {courierModalOpen && o && (
+          <CourierTrackingModal
+            order={o}
+            onClose={() => setCourierModalOpen(false)}
+            onSaved={reload}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -2272,7 +2587,8 @@ function Orders({
       fromLabel: string;
       toLabel: string;
     } | null>(null),
-    [exporting, setExporting] = useState(false);
+    [exporting, setExporting] = useState(false),
+    [editingCourierOrder, setEditingCourierOrder] = useState<any | null>(null);
 
   const isAdmin = user?.role === "SUPER_ADMIN";
   const canUpdate = isAdmin || user?.permissions?.includes("orders.update");
@@ -2649,6 +2965,35 @@ function Orders({
                     </a>
                   </div>
                 )}
+                {isOther && (
+                  <div style={{ marginTop: 4 }}>
+                    {o.courier_name && o.courier_tracking_id ? (
+                      <button
+                        type="button"
+                        className="courier-tracking-pill"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCourierOrder(o);
+                        }}
+                        title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit tracking details.`}
+                      >
+                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}
+                      </button>
+                    ) : o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING" ? (
+                      <button
+                        type="button"
+                        className="courier-add-tracking-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCourierOrder(o);
+                        }}
+                        title="Add courier tracking number (Leopards, TCS, Trax, etc.) for this Other City order"
+                      >
+                        <Truck size={11} /> Add Tracking
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </div>
             );
             const booksCount = Number(
@@ -2830,6 +3175,14 @@ function Orders({
         description={`Are you sure you want to change all ${batchConfirm?.count} matching order(s) from "${batchConfirm?.fromLabel}" to "${batchConfirm?.toLabel}"? This will update their tracking status.`}
         onConfirm={handleBatchStatusChange}
       />
+
+      {editingCourierOrder && (
+        <CourierTrackingModal
+          order={editingCourierOrder}
+          onClose={() => setEditingCourierOrder(null)}
+          onSaved={reload}
+        />
+      )}
     </>
   );
 }
@@ -2837,7 +3190,8 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
   const { data: o, error, loading, reload } = useData("manage/orders/" + id),
     [note, setNote] = useState(""),
     [next, setNext] = useState(""),
-    [decision, setDecision] = useState<any>(null);
+    [decision, setDecision] = useState<any>(null),
+    [courierModalOpen, setCourierModalOpen] = useState(false);
   const admin = user.role === "SUPER_ADMIN",
     canUpdate = admin || user.permissions.includes("orders.update");
   const act = async (action: string, status?: string) => {
@@ -2861,6 +3215,107 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
     <Result loading={loading} error={error}>
       {o && (
         <>
+          {(() => {
+            const isCampus =
+              o.delivery_type === "campus" ||
+              (o.city && o.city.toLowerCase().includes("campus")) ||
+              (o.address && o.address.toLowerCase().includes("campus"));
+            const isOther =
+              o.delivery_type === "other" ||
+              (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
+            if (!isOther) return null;
+
+            const isPaymentVerified =
+              o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING";
+
+            return (
+              <div
+                className="courier-modal-banner no-print"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 14,
+                  padding: "14px 18px",
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div
+                    className="courier-badge"
+                    style={{
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: isPaymentVerified || o.courier_tracking_id ? undefined : "#f59e0b",
+                    }}
+                  >
+                    {isPaymentVerified || o.courier_tracking_id ? <Truck size={20} /> : <Clock size={20} />}
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: "0.95rem", display: "block" }}>
+                      {o.courier_tracking_id
+                        ? "External Courier Tracking Attached"
+                        : isPaymentVerified
+                          ? "External Courier Tracking (Other City)"
+                          : "External Courier Tracking (Pending Payment Verification)"}
+                    </strong>
+                    <p className="small-text" style={{ margin: "2px 0 0" }}>
+                      {o.courier_name && o.courier_tracking_id ? (
+                        <>
+                          Shipped via <strong>{o.courier_name}</strong> · Tracking ID:{" "}
+                          <code className="courier-tracking-code">
+                            {o.courier_tracking_id}
+                          </code>
+                        </>
+                      ) : isPaymentVerified ? (
+                        "Add courier tracking details (e.g. Leopards, TCS, Trax) for student tracking."
+                      ) : (
+                        "Payment verification is pending. Please approve payment first to add courier tracking details."
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {canUpdate && (
+                  <button
+                    type="button"
+                    className={isPaymentVerified || o.courier_tracking_id ? "btn primary compact" : "btn compact"}
+                    onClick={() => {
+                      if (!isPaymentVerified && !o.courier_tracking_id) {
+                        toast.error("Payment verification is pending. Please approve payment before adding courier tracking.");
+                        return;
+                      }
+                      setCourierModalOpen(true);
+                    }}
+                    disabled={!isPaymentVerified && !o.courier_tracking_id}
+                    title={
+                      !isPaymentVerified && !o.courier_tracking_id
+                        ? "Approve payment before adding courier tracking"
+                        : undefined
+                    }
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      whiteSpace: "nowrap",
+                      opacity: !isPaymentVerified && !o.courier_tracking_id ? 0.6 : 1,
+                      cursor: !isPaymentVerified && !o.courier_tracking_id ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <Truck size={14} />
+                    {o.courier_tracking_id
+                      ? "Edit Tracking"
+                      : isPaymentVerified
+                        ? "Add Courier Details"
+                        : "Payment Pending"}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="checkout-grid">
             <div className="print-only">
               <OrderReceipt o={o} />
@@ -3024,6 +3479,14 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             }
             onConfirm={() => act(decision.action, decision.status)}
           />
+
+          {courierModalOpen && (
+            <CourierTrackingModal
+              order={o}
+              onClose={() => setCourierModalOpen(false)}
+              onSaved={reload}
+            />
+          )}
         </>
       )}
     </Result>

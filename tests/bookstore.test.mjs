@@ -89,6 +89,7 @@ function database(t) {
     "0004_campus_pricing_category.sql",
     "0005_password_resets.sql",
     "0006_binding_rate.sql",
+    "0007_courier_tracking.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -992,6 +993,141 @@ test("Admin manage/orders returns total_books count per order and in response ag
   assert.ok(found);
   assert.equal(found.total_books, 2);
 });
+
+test("External courier tracking can be attached to Other City orders and tracked by Order ID and Phone Number", async (t) => {
+  const sqlite = database(t);
+  const adminSession = "courier-admin-session";
+  sqlite.exec("UPDATE users SET must_change=0 WHERE id='admin'");
+  sqlite
+    .prepare("INSERT INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)")
+    .run(hash(adminSession), "admin", Date.now() + 60000, "2026-01-01");
+
+  const { id: bookId } = await saveBook(bookInput(), admin, request);
+  const placed = await order(sqlite, bookId, 2);
+
+  const postCourier = (orderId, body) =>
+    POST(
+      new Request("http://127.0.0.1:5173/api/manage/orders/" + orderId, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://127.0.0.1:5173",
+          cookie: "cbs_session=" + adminSession,
+          "x-requested-with": "CampusBookstore",
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  // 1. Should reject courier tracking for Lahore/Campus orders
+  const rejectRes = await postCourier(placed.id, {
+    action: "courier",
+    courier_name: "Leopards",
+    courier_tracking_id: "LEO-12345",
+  });
+  assert.equal(rejectRes.status, 400);
+
+  // 2. Convert to Other City order and add student phone number
+  sqlite
+    .prepare(
+      "UPDATE orders SET delivery_type='other', city='Faisalabad', phone='03019876543' WHERE id=?",
+    )
+    .run(placed.id);
+
+  // 3. Should reject courier tracking while payment verification is pending
+  const rejectPendingRes = await postCourier(placed.id, {
+    action: "courier",
+    courier_name: "Leopards Courier",
+    courier_tracking_id: "LEO-987654321",
+  });
+  assert.equal(rejectPendingRes.status, 400);
+  const rejectPendingData = await rejectPendingRes.json();
+  assert.match(rejectPendingData.error, /Payment verification is pending/);
+
+  // 4. Approve payment so payment is verified
+  await decidePayment(request, admin, placed.id, "approve", "Approved", 1);
+
+  // 5. Attach external courier tracking after payment verification
+  const attachRes = await postCourier(placed.id, {
+    action: "courier",
+    courier_name: "Leopards Courier",
+    courier_tracking_id: "LEO-987654321",
+  });
+  assert.equal(attachRes.status, 200);
+  const attachData = await attachRes.json();
+  assert.equal(attachData.ok, true);
+  assert.equal(attachData.courier_name, "Leopards Courier");
+  assert.equal(attachData.courier_tracking_id, "LEO-987654321");
+  assert.equal(attachData.status, "SHIPPED");
+
+  // Verify database record
+  const dbOrder = sqlite
+    .prepare("SELECT status, courier_name, courier_tracking_id FROM orders WHERE id=?")
+    .get(placed.id);
+  assert.equal(dbOrder.status, "SHIPPED");
+  assert.equal(dbOrder.courier_name, "Leopards Courier");
+  assert.equal(dbOrder.courier_tracking_id, "LEO-987654321");
+
+  // 4. Student tracking by Order ID
+  const trackByIdRes = await GET(
+    new Request("http://127.0.0.1:5173/api/orders/" + placed.reference),
+  );
+  assert.equal(trackByIdRes.status, 200);
+  const trackById = await trackByIdRes.json();
+  assert.equal(trackById.reference, placed.reference);
+  assert.equal(trackById.status, "SHIPPED");
+  assert.equal(trackById.courier_name, "Leopards Courier");
+  assert.equal(trackById.courier_tracking_id, "LEO-987654321");
+
+  const courierHistory = trackById.history.find(
+    (h) => h.note && h.note.includes("Shipped via Leopards Courier"),
+  );
+  assert.ok(courierHistory);
+  assert.equal(
+    courierHistory.note,
+    "Shipped via Leopards Courier - Tracking #: LEO-987654321",
+  );
+
+  // 5. Student tracking by Phone Number
+  const trackByPhoneRes = await GET(
+    new Request("http://127.0.0.1:5173/api/orders/03019876543"),
+  );
+  assert.equal(trackByPhoneRes.status, 200);
+  const trackByPhone = await trackByPhoneRes.json();
+  assert.equal(trackByPhone.reference, placed.reference);
+  assert.equal(trackByPhone.courier_name, "Leopards Courier");
+  assert.equal(trackByPhone.courier_tracking_id, "LEO-987654321");
+
+  // 6. Admin can remove courier tracking if parcel was not dispatched yet
+  const removeRes = await postCourier(placed.id, {
+    action: "remove_courier",
+  });
+  assert.equal(removeRes.status, 200);
+  const removeData = await removeRes.json();
+  assert.equal(removeData.ok, true);
+  assert.equal(removeData.removed, true);
+  assert.equal(removeData.status, "READY");
+
+  // Verify database record
+  const dbOrderAfterRemove = sqlite
+    .prepare("SELECT status, courier_name, courier_tracking_id FROM orders WHERE id=?")
+    .get(placed.id);
+  assert.equal(dbOrderAfterRemove.status, "READY");
+  assert.equal(dbOrderAfterRemove.courier_name, null);
+  assert.equal(dbOrderAfterRemove.courier_tracking_id, null);
+
+  // 7. Student tracking lookup reflects removal
+  const trackAfterRemoveRes = await GET(
+    new Request("http://127.0.0.1:5173/api/orders/" + placed.reference),
+  );
+  assert.equal(trackAfterRemoveRes.status, 200);
+  const trackAfterRemove = await trackAfterRemoveRes.json();
+  assert.equal(trackAfterRemove.courier_name, undefined);
+  assert.equal(trackAfterRemove.courier_tracking_id, undefined);
+  assert.equal(trackAfterRemove.status, "READY");
+});
+
+
 
 
 

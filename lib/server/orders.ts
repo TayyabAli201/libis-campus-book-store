@@ -310,16 +310,29 @@ export async function getOrder(
   access: "private" | "tracking" = "private",
 ) {
   const identifier = id.trim();
-  if (!/^[a-zA-Z0-9-]{1,100}$/.test(identifier))
+  if (!/^[a-zA-Z0-9-+\s()]{1,100}$/.test(identifier))
     throw new AppError(
       404,
-      "Order not found. Check your Order ID and try again.",
+      "Order not found. Check your Order ID or Phone Number and try again.",
     );
-  const o = await one<any>(
-    "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
-    identifier.toLowerCase(),
-    identifier.toUpperCase(),
-  );
+  const digits = identifier.replace(/\D/g, "");
+  let o: any;
+  if (digits.length >= 7) {
+    const phoneWildcard = `%${digits.slice(-10)}%`;
+    o = await one<any>(
+      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=? OR o.phone=? OR o.phone LIKE ? ORDER BY o.created_at DESC LIMIT 1",
+      identifier.toLowerCase(),
+      identifier.toUpperCase(),
+      identifier,
+      phoneWildcard,
+    );
+  } else {
+    o = await one<any>(
+      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
+      identifier.toLowerCase(),
+      identifier.toUpperCase(),
+    );
+  }
   if (!o)
     throw new AppError(
       404,
@@ -342,7 +355,7 @@ export async function getOrder(
     o.id,
   );
   if (!privateAccess) {
-    // Public tracking has an explicit allowlist: no customer details, proofs or free-form notes.
+    // Public tracking has an explicit allowlist: no customer details, proofs or internal notes.
     return {
       reference: o.reference,
       delivery_type: o.delivery_type,
@@ -354,6 +367,10 @@ export async function getOrder(
       currency: o.currency,
       created_at: o.created_at,
       updated_at: o.updated_at,
+      ...(o.courier_name ? { courier_name: o.courier_name } : {}),
+      ...(o.courier_tracking_id
+        ? { courier_tracking_id: o.courier_tracking_id }
+        : {}),
       tracking_only: true,
       items: items.map(({ code, title, pages, quantity, unit_price }) => ({
         code,
@@ -362,10 +379,17 @@ export async function getOrder(
         quantity,
         unit_price,
       })),
-      history: history.map(({ status, created_at }) => ({
-        status,
-        created_at,
-      })),
+      history: history.map(({ status, created_at, note }) => {
+        const isCourierNote =
+          typeof note === "string" &&
+          (note.startsWith("Shipped via ") ||
+            note.startsWith("Courier tracking details removed"));
+        return {
+          status,
+          created_at,
+          ...(isCourierNote ? { note } : {}),
+        };
+      }),
       ...(o.payment_status === "NEW_SLIP_REQUESTED" && o.payment_note
         ? { payment_note: o.payment_note }
         : {}),
@@ -666,6 +690,119 @@ export async function changeStatus(
   );
   await batch(statements);
   return { status };
+}
+
+export async function setCourierTracking(
+  req: Request,
+  u: User,
+  id: string,
+  courierName: string,
+  trackingId: string,
+) {
+  const o = await getOrder(req, id, u);
+  const cName = courierName.trim();
+  const tId = trackingId.trim();
+  if (!cName || !tId) {
+    throw new AppError(400, "Courier company name and tracking number are required.");
+  }
+  const isCampus =
+    o.delivery_type === "campus" ||
+    (o.city && o.city.toLowerCase().includes("campus")) ||
+    (o.address && o.address.toLowerCase().includes("campus"));
+  const isLahore =
+    !isCampus &&
+    (o.delivery_type === "lahore" ||
+      o.delivery_type === "lahore_home" ||
+      (o.city && o.city.toLowerCase().includes("lahore")));
+  if (isCampus || isLahore) {
+    throw new AppError(400, "Courier tracking details are only for Other City orders.");
+  }
+
+  const isPaymentVerified =
+    o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING";
+  if (!isPaymentVerified) {
+    throw new AppError(
+      400,
+      "Payment verification is pending. Please verify and approve payment before adding courier tracking details.",
+    );
+  }
+
+  const at = now();
+  const nextStatus = o.status === "DELIVERED" ? "DELIVERED" : "SHIPPED";
+  const note = `Shipped via ${cName} - Tracking #: ${tId}`;
+
+  const statements = [
+    stmt(
+      "UPDATE orders SET courier_name=?,courier_tracking_id=?,status=?,updated_at=?,version=version+1 WHERE id=?",
+      cName,
+      tId,
+      nextStatus,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      nextStatus,
+      note,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "SET_COURIER_TRACKING",
+      o.id,
+      { courier_name: o.courier_name, courier_tracking_id: o.courier_tracking_id },
+      { courier_name: cName, courier_tracking_id: tId },
+      req,
+    ),
+  ];
+  await batch(statements);
+  return { ok: true, courier_name: cName, courier_tracking_id: tId, status: nextStatus };
+}
+
+export async function removeCourierTracking(
+  req: Request,
+  u: User,
+  id: string,
+) {
+  const o = await getOrder(req, id, u);
+  const at = now();
+  const nextStatus = o.status === "SHIPPED" ? "READY" : o.status;
+  const note = "Courier tracking details removed (order returned to Ready for Dispatch)";
+
+  const statements = [
+    stmt(
+      "UPDATE orders SET courier_name=NULL,courier_tracking_id=NULL,status=?,updated_at=?,version=version+1 WHERE id=?",
+      nextStatus,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      nextStatus,
+      note,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "REMOVE_COURIER_TRACKING",
+      o.id,
+      {
+        courier_name: o.courier_name,
+        courier_tracking_id: o.courier_tracking_id,
+        status: o.status,
+      },
+      { courier_name: null, courier_tracking_id: null, status: nextStatus },
+      req,
+    ),
+  ];
+  await batch(statements);
+  return { ok: true, removed: true, status: nextStatus };
 }
 
 export async function batchChangeStatus(

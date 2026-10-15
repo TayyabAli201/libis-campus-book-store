@@ -21,7 +21,7 @@ test("Turso schema migrations are repeatable and preserve existing catalog rows"
     await db
       .prepare("SELECT COUNT(*) n FROM __bookstore_migrations")
       .first("n"),
-    7,
+    8,
   );
   assert.equal(
     (await db.prepare("SELECT * FROM books WHERE id=?").bind("book").first())

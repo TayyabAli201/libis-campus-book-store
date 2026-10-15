@@ -43,6 +43,8 @@ import {
   pendingOrderCount,
   decidePayment,
   changeStatus,
+  setCourierTracking,
+  removeCourierTracking,
   batchChangeStatus,
 } from "@/lib/server/orders";
 import { upload } from "@/lib/server/uploads";
@@ -573,10 +575,14 @@ async function handle(req: Request) {
               "reject",
               "request",
               "manual",
+              "courier",
+              "remove_courier",
             ]),
             status: z.string().optional(),
+            courier_name: z.string().trim().max(100).optional(),
+            courier_tracking_id: z.string().trim().max(100).optional(),
             note: z.string().trim().max(2000).default(""),
-            version: z.number().int(),
+            version: z.number().int().optional(),
           })
           .parse(await json(req));
         if (b.action === "note") {
@@ -606,11 +612,23 @@ async function handle(req: Request) {
         }
         if (b.action === "status")
           return ok(
-            await changeStatus(req, u, id, b.status || "", b.note, b.version),
+            await changeStatus(req, u, id, b.status || "", b.note, b.version!),
           );
+        if (b.action === "courier")
+          return ok(
+            await setCourierTracking(
+              req,
+              u,
+              id,
+              b.courier_name || "",
+              b.courier_tracking_id || "",
+            ),
+          );
+        if (b.action === "remove_courier")
+          return ok(await removeCourierTracking(req, u, id));
         if (u.role !== "SUPER_ADMIN")
           throw new AppError(403, "Only Super Admin may verify payments.");
-        return ok(await decidePayment(req, u, id, b.action, b.note, b.version));
+        return ok(await decidePayment(req, u, id, b.action, b.note, b.version!));
       }
     }
     if (section === "reports" && method === "GET") {
