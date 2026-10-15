@@ -992,6 +992,37 @@ test("Admin manage/orders returns total_books count per order and in response ag
   const found = data.rows.find((r) => r.id === o1.id);
   assert.ok(found);
   assert.equal(found.total_books, 2);
+
+  // Test DateRangePicker parameters (from & to)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dateReq = new Request(
+    `http://127.0.0.1:5173/api/manage/orders?from=${todayStr}&to=${todayStr}`,
+    {
+      headers: {
+        cookie: "cbs_session=" + adminSession,
+        "x-requested-with": "CampusBookstore",
+      },
+    },
+  );
+  const dateRes = await GET(dateReq);
+  assert.equal(dateRes.status, 200);
+  const dateData = await dateRes.json();
+  assert.ok(Array.isArray(dateData.rows));
+
+  // Past dates query should exclude newly placed order
+  const pastReq = new Request(
+    "http://127.0.0.1:5173/api/manage/orders?from=2020-01-01&to=2020-01-02",
+    {
+      headers: {
+        cookie: "cbs_session=" + adminSession,
+        "x-requested-with": "CampusBookstore",
+      },
+    },
+  );
+  const pastRes = await GET(pastReq);
+  assert.equal(pastRes.status, 200);
+  const pastData = await pastRes.json();
+  assert.equal(pastData.rows.length, 0);
 });
 
 test("External courier tracking can be attached to Other City orders and tracked by Order ID and Phone Number", async (t) => {

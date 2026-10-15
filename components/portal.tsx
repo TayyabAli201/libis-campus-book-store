@@ -39,6 +39,9 @@ import {
   CreditCard,
   Clock,
   Package,
+  Search,
+  Calendar,
+  ListFilter,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -70,8 +73,11 @@ import {
   Field,
   Choose,
   MultiChoose,
+  DateRangePicker,
+  formatDateDMY,
   errorText,
   Status,
+  TableActionButton,
   DataTable,
   Confirm,
   csv,
@@ -621,14 +627,17 @@ export function Portal({
               </span>
               <h1>{title}</h1>
             </div>
-            <span className="muted">
-              {new Date().toLocaleDateString("en-GB", {
-                timeZone: "Asia/Karachi",
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
+            <div className="portal-header-date-badge" title="Current Pakistan Standard Time">
+              <Calendar size={13} className="date-badge-icon" />
+              <span>
+                {new Date().toLocaleDateString("en-GB", {
+                  timeZone: "Asia/Karachi",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
           </div>
           {!!user.must_change && (
             <div className="notice">
@@ -2773,16 +2782,34 @@ function Orders({
 
   return (
     <>
-      <div className="toolbar">
-        <input
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
-          aria-label="Search orders"
-          placeholder="Order ID, student or WhatsApp…"
-        />
+      <div className="toolbar orders-toolbar">
+        <div className="toolbar-search-box">
+          <Search size={15} className="toolbar-search-icon" />
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Search orders"
+            placeholder="Order ID, student or WhatsApp…"
+            className="toolbar-search-input"
+          />
+          {q && (
+            <button
+              type="button"
+              className="toolbar-search-clear"
+              onClick={() => {
+                setQ("");
+                setPage(1);
+              }}
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
         <MultiChoose
           values={statusList}
           onChange={(v) => {
@@ -2791,7 +2818,9 @@ function Orders({
           }}
           label="Order status"
           allLabel="All statuses"
-          width={180}
+          width={188}
+          icon={<ListFilter size={13} strokeWidth={2.4} />}
+          className="toolbar-filter-status"
           options={Object.keys(transitions).map((s) => ({
             value: s,
             label: statuses[s],
@@ -2816,45 +2845,40 @@ function Orders({
           }}
           label="Delivery type"
           allLabel="All delivery types"
-          width={175}
+          width={188}
+          icon={<Truck size={13} strokeWidth={2.4} />}
+          className="toolbar-filter-delivery"
           options={[
             { value: "campus", label: "VU Qanchi Campus" },
             { value: "lahore", label: "Lahore" },
             { value: "other", label: "Other City" },
           ]}
         />
-        <input
-          type="date"
-          aria-label="From date"
-          value={dates.from}
-          onChange={(e) => {
-            setDates({ ...dates, from: e.target.value });
+        <DateRangePicker
+          from={dates.from}
+          to={dates.to}
+          onChange={(nextDates) => {
+            setDates(nextDates);
             setPage(1);
           }}
         />
-        <input
-          type="date"
-          aria-label="To date"
-          value={dates.to}
-          onChange={(e) => {
-            setDates({ ...dates, to: e.target.value });
-            setPage(1);
-          }}
-        />
+        <div className="toolbar-actions-divider" />
         <button
-          className="btn compact"
+          type="button"
+          className="btn compact toolbar-export-btn"
           onClick={exportOrders}
           disabled={exporting || loading}
           title="Export orders to Excel"
-          style={{ whiteSpace: "nowrap" }}
         >
-          <Download size={15} />
-          {exporting ? "Exporting…" : "Export Orders"}
+          <span className="toolbar-btn-icon-circle">
+            <Download size={13} strokeWidth={2.4} className="toolbar-export-icon" />
+          </span>
+          <span>{exporting ? "Exporting…" : "Export Orders"}</span>
         </button>
         {canUpdate && !payments && (
           <button
             type="button"
-            className="btn compact"
+            className={`btn compact toolbar-batch-btn ${activeFlowStep && filteredCount > 0 ? "active" : ""}`}
             onClick={() => {
               if (activeFlowStep && filteredCount > 0) {
                 setBatchConfirm({
@@ -2880,34 +2904,17 @@ function Orders({
                       ? "No orders found matching current filter"
                       : `Change all ${filteredCount} order(s) from ${activeFlowStep.fromLabel} to ${activeFlowStep.toLabel}`
             }
-            style={{
-              gap: 6,
-              background:
-                activeFlowStep && filteredCount > 0
-                  ? "var(--primary)"
-                  : undefined,
-              color:
-                activeFlowStep && filteredCount > 0
-                  ? "var(--primary-foreground)"
-                  : undefined,
-              border:
-                activeFlowStep && filteredCount > 0
-                  ? "1px solid var(--primary)"
-                  : undefined,
-              fontWeight: 600,
-              opacity: !activeFlowStep || filteredCount === 0 ? 0.6 : 1,
-              cursor:
-                !activeFlowStep || filteredCount === 0
-                  ? "not-allowed"
-                  : "pointer",
-            }}
           >
-            <ArrowRightCircle size={15} />
-            {batchUpdating
-              ? "Updating…"
-              : activeFlowStep
-                ? `Move All to ${activeFlowStep.toLabel} (${filteredCount})`
-                : "Change All Status"}
+            <span className="toolbar-btn-icon-circle">
+              <ArrowRightCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+            </span>
+            <span>
+              {batchUpdating
+                ? "Updating…"
+                : activeFlowStep
+                  ? `Move All to ${activeFlowStep.toLabel} (${filteredCount})`
+                  : "Change All Status"}
+            </span>
           </button>
         )}
       </div>
@@ -3050,18 +3057,19 @@ function Orders({
                     <Status value={o.ocr_status} />
                     <Status value={o.payment_status} />
                   </div>,
-                  <button
-                    type="button"
-                    className="text-link"
+                  <TableActionButton
                     onClick={() => setActiveOrderId(o.id)}
+                    title={`Review payment for order ${o.reference || o.id}`}
+                    icon={<Eye size={13} strokeWidth={2.4} />}
+                    variant="payment"
                   >
                     Review payment
-                  </button>,
+                  </TableActionButton>,
                   ...(isAdmin
                     ? [
                         <button
                           type="button"
-                          className="btn compact danger-button icon-only"
+                          className="btn compact danger-button icon-only order-delete-btn"
                           title="Delete order"
                           onClick={() => setDeletingOrder(o)}
                         >
@@ -3092,22 +3100,23 @@ function Orders({
                     </p>
                   </div>,
                   booksCell,
-                  new Date(o.created_at).toLocaleDateString(),
+                  formatDateDMY(o.created_at),
                   money(o.total),
                   <Status value={o.status} />,
                   <Status value={o.payment_status} />,
-                  <button
-                    type="button"
-                    className="text-link"
+                  <TableActionButton
                     onClick={() => setActiveOrderId(o.id)}
+                    title={`View details for order ${o.reference || o.id}`}
+                    icon={<Eye size={13} strokeWidth={2.4} />}
+                    variant="order"
                   >
                     View order
-                  </button>,
+                  </TableActionButton>,
                   ...(isAdmin
                     ? [
                         <button
                           type="button"
-                          className="btn compact danger-button icon-only"
+                          className="btn compact danger-button icon-only order-delete-btn"
                           title="Delete order"
                           onClick={() => setDeletingOrder(o)}
                         >
@@ -4245,7 +4254,7 @@ function Students({ user }: { user?: User }) {
             s.phone || "—",
             s.city || "—",
             s.orders,
-            s.last_order ? new Date(s.last_order).toLocaleDateString() : "—",
+            s.last_order ? formatDateDMY(s.last_order) : "—",
             ...(isAdmin
               ? [
                   <button

@@ -4043,9 +4043,1245 @@ footer {
   border-left: 4px solid #ef4444 !important;
 }
 
+/* ==========================================================================
+   Professional Date Range Picker & Calendar Styles (Premium Theme Edition)
+   ========================================================================== */
+
+/* Main Toolbar Trigger Button styled in consolidated toolbar section below */
 
 
+.date-range-chevron {
+  color: var(--muted-foreground);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
+.date-range-chevron.open {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
 
+.date-range-clear-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
 
+.date-range-clear-icon:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  transform: scale(1.1);
+}
+
+/* Floating Popover Container */
+.date-range-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 80;
+  width: 348px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  border-radius: 16px;
+  box-shadow:
+    0 20px 48px -10px rgba(15, 35, 65, 0.25),
+    0 8px 16px -6px rgba(15, 35, 65, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: date-popover-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes date-popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Preset Chips */
+.date-range-preset-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 550;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 3%, var(--card));
+  color: var(--foreground);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-range-preset-pill:hover {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.date-range-preset-pill.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+/* Navigation Header */
+.date-range-header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  background: color-mix(in srgb, var(--primary) 5%, var(--muted));
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.date-range-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.date-range-nav-btn:hover {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  transform: scale(1.08);
+}
+
+.date-picker-select {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.date-picker-select:hover,
+.date-picker-select:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.date-range-today-btn {
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  height: 28px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.date-range-today-btn:hover {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+/* Day Buttons */
+.date-range-day-btn {
+  height: 33px;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.date-range-day-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  z-index: 2;
+}
+
+.date-range-day-btn span {
+  pointer-events: none;
+}
+
+/* Selected Summary Card */
+.date-range-summary-card {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+/* Footer Buttons */
+.date-range-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 7px;
+  transition: all 0.15s ease;
+}
+
+.date-range-reset-btn:hover {
+  color: #ef4444 !important;
+  background: color-mix(in srgb, #ef4444 10%, transparent) !important;
+  border-color: color-mix(in srgb, #ef4444 25%, transparent) !important;
+  transform: translateY(-1px);
+}
+
+.date-range-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 550;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 7px 15px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.date-range-cancel-btn:hover {
+  background: color-mix(in srgb, var(--foreground) 8%, var(--muted)) !important;
+  border-color: var(--muted-foreground) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.date-range-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 85%, #0284c7));
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  padding: 7px 18px;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 35%, transparent);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.date-range-apply-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 48%, transparent);
+  filter: brightness(1.06);
+}
+
+.date-range-apply-btn:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Admin Portal Modernized Orders Page Theme Styles
+   ========================================================================== */
+
+/* Portal Header Date Badge - Colorful Radiant Pill */
+.portal-header-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #ede9fe 100%);
+  border: 1.5px solid #bfdbfe;
+  color: #1e40af;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.portal-header-date-badge:hover {
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+  transform: translateY(-1.5px);
+}
+
+.portal-header-date-badge .date-badge-icon {
+  color: #2563eb;
+  transition: transform 0.2s ease;
+}
+
+.portal-header-date-badge:hover .date-badge-icon {
+  transform: scale(1.15) rotate(-5deg);
+}
+
+/* Toolbar Layout Enhancements & Executive Command Bar */
+.toolbar {
+  align-items: center;
+  gap: 10px;
+}
+
+.orders-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1.5px solid #d5e3f2;
+  border-radius: 14px;
+  box-shadow:
+    0 4px 18px -2px rgba(37, 99, 166, 0.08),
+    0 1px 3px rgba(37, 99, 166, 0.04);
+  margin-bottom: 22px;
+}
+
+/* Toolbar Divider between filters and action buttons */
+.toolbar-actions-divider {
+  width: 1px;
+  height: 26px;
+  background: #cbd5e1;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Toolbar Search Box */
+.toolbar-search-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 240px;
+  flex: 1 1 230px;
+  max-width: 350px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid #bfdbfe;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.05);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toolbar-search-box:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.16);
+  transform: translateY(-1px);
+}
+
+.toolbar-search-box:focus-within {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important;
+  transform: translateY(-1px);
+}
+
+.toolbar-search-icon {
+  position: absolute;
+  left: 12px;
+  color: #2563eb;
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+
+.toolbar-search-input {
+  width: 100%;
+  height: 100% !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 0 34px 0 36px !important;
+  font-size: 0.85rem !important;
+  color: var(--foreground) !important;
+}
+
+.toolbar-search-input::placeholder {
+  color: #64748b;
+  opacity: 0.85;
+}
+
+.toolbar-search-clear {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbar-search-clear:hover {
+  background: #ef4444;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+/* Toolbar Select Dropdown Button (MultiChoose) & Date Picker Button Base */
+.toolbar-select-btn,
+.date-range-choice-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  height: 40px !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  font-size: 0.84rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.toolbar-select-btn:active,
+.date-range-choice-btn:active {
+  transform: translateY(0);
+}
+
+/* 1. Status Filter: Indigo / Purple Theme */
+.toolbar-filter-status {
+  background: linear-gradient(180deg, #ffffff 0%, #faf5ff 100%) !important;
+  border: 1.5px solid #ddd6fe !important;
+  color: #4c1d95 !important;
+}
+.toolbar-filter-status .toolbar-select-icon-box {
+  background: #ede9fe !important;
+  color: #7c3aed !important;
+  border: 1px solid #ddd6fe;
+}
+.toolbar-filter-status .toolbar-select-chevron {
+  color: #7c3aed !important;
+}
+.toolbar-filter-status:hover {
+  border-color: #7c3aed !important;
+  background: #f5f3ff !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.2) !important;
+  transform: translateY(-2px);
+}
+.toolbar-filter-status:hover .toolbar-select-icon-box {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+  border-color: #7c3aed !important;
+  transform: scale(1.08);
+}
+.toolbar-filter-status.active {
+  border-color: #7c3aed !important;
+  background: #ede9fe !important;
+  color: #5b21b6 !important;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25) !important;
+}
+.toolbar-filter-status.active .toolbar-select-icon-box {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+.toolbar-filter-status .toolbar-select-badge {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+/* 2. Delivery Type Filter: Emerald / Teal Theme */
+.toolbar-filter-delivery {
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%) !important;
+  border: 1.5px solid #99f6e4 !important;
+  color: #115e59 !important;
+}
+.toolbar-filter-delivery .toolbar-select-icon-box {
+  background: #ccfbf1 !important;
+  color: #0d9488 !important;
+  border: 1px solid #99f6e4;
+}
+.toolbar-filter-delivery .toolbar-select-chevron {
+  color: #0d9488 !important;
+}
+.toolbar-filter-delivery:hover {
+  border-color: #0d9488 !important;
+  background: #f0fdfa !important;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.2) !important;
+  transform: translateY(-2px);
+}
+.toolbar-filter-delivery:hover .toolbar-select-icon-box {
+  background: #0d9488 !important;
+  color: #ffffff !important;
+  border-color: #0d9488 !important;
+  transform: scale(1.08);
+}
+.toolbar-filter-delivery.active {
+  border-color: #0d9488 !important;
+  background: #ccfbf1 !important;
+  color: #0f766e !important;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25) !important;
+}
+.toolbar-filter-delivery.active .toolbar-select-icon-box {
+  background: #0d9488 !important;
+  color: #ffffff !important;
+}
+.toolbar-filter-delivery .toolbar-select-badge {
+  background: #0d9488 !important;
+  color: #ffffff !important;
+}
+
+/* 3. Date Range Filter: Ocean / Sky Blue Theme */
+.date-range-choice-btn {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%) !important;
+  border: 1.5px solid #bae6fd !important;
+  color: #0369a1 !important;
+}
+.date-range-choice-btn .date-range-btn-icon {
+  background: #e0f2fe !important;
+  color: #0284c7 !important;
+  border: 1px solid #bae6fd;
+}
+.date-range-choice-btn .date-range-chevron {
+  color: #0284c7 !important;
+}
+.date-range-choice-btn:hover {
+  border-color: #0284c7 !important;
+  background: #f0f9ff !important;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.2) !important;
+  transform: translateY(-2px);
+}
+.date-range-choice-btn:hover .date-range-btn-icon {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0284c7 !important;
+  transform: scale(1.08);
+}
+.date-range-choice-btn.active {
+  border-color: #0284c7 !important;
+  background: #e0f2fe !important;
+  color: #0369a1 !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
+}
+.date-range-choice-btn.active .date-range-btn-icon {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+/* Leading Icon Boxes for Filters */
+.toolbar-select-icon-box,
+.date-range-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toolbar-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  text-align: left;
+}
+
+.toolbar-select-badge {
+  font-size: 0.72rem;
+  border-radius: 9999px;
+  padding: 1px 7px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.toolbar-select-chevron {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.toolbar-select-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* MultiChoose Popover */
+.toolbar-select-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 70;
+  min-width: 220px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  border-radius: 12px;
+  box-shadow:
+    0 16px 36px -8px rgba(15, 35, 65, 0.22),
+    0 6px 14px -4px rgba(15, 35, 65, 0.1),
+    0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  animation: date-popover-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+.toolbar-select-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--foreground);
+  user-select: none;
+  transition: all 0.12s ease;
+}
+
+.toolbar-select-option:hover {
+  background: color-mix(in srgb, var(--primary) 10%, var(--muted));
+  color: var(--primary);
+  transform: translateX(2px);
+}
+
+.toolbar-select-option.selected {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.toolbar-select-checkbox {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid var(--muted-foreground);
+  background: transparent;
+  display: grid;
+  place-content: center;
+  color: var(--primary-foreground);
+  flex-shrink: 0;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toolbar-select-checkbox.checked {
+  border-color: var(--primary);
+  background: var(--primary);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.toolbar-select-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 2px;
+}
+
+/* Action Buttons Circular Icon Container */
+.toolbar-btn-icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Toolbar Export Button - Vibrant Emerald Excel Theme */
+.toolbar-export-btn {
+  height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: 10px !important;
+  border: 1.5px solid #059669 !important;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  color: #ffffff !important;
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  cursor: pointer !important;
+}
+
+.toolbar-export-btn .toolbar-btn-icon-circle {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.toolbar-export-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+  border-color: #047857 !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+.toolbar-export-btn:hover:not(:disabled) .toolbar-btn-icon-circle {
+  background: rgba(255, 255, 255, 0.35) !important;
+  transform: scale(1.1);
+}
+
+.toolbar-export-btn:hover:not(:disabled) .toolbar-export-icon {
+  transform: translateY(1.5px);
+}
+
+.toolbar-export-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.toolbar-export-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  filter: grayscale(0.5);
+}
+
+.toolbar-export-icon {
+  transition: transform 0.2s ease;
+}
+
+/* Toolbar Batch Action Button (Change All Status) - Vibrant Sapphire Theme */
+.toolbar-batch-btn {
+  height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: 10px !important;
+  font-size: 0.84rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  border: 1.5px dashed #cbd5e1 !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  opacity: 0.75;
+  cursor: not-allowed;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.toolbar-batch-btn .toolbar-btn-icon-circle {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.toolbar-batch-btn.active {
+  opacity: 1 !important;
+  cursor: pointer !important;
+  border: 1.5px solid #1e40af !important;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.38) !important;
+}
+
+.toolbar-batch-btn.active .toolbar-btn-icon-circle {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.toolbar-batch-btn.active:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.52) !important;
+  filter: brightness(1.08);
+}
+
+.toolbar-batch-btn.active:hover:not(:disabled) .toolbar-btn-icon-circle {
+  transform: scale(1.1);
+}
+
+.toolbar-batch-btn.active:hover:not(:disabled) .toolbar-batch-icon {
+  transform: translateX(2.5px);
+}
+
+.toolbar-batch-btn.active:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.toolbar-batch-icon {
+  transition: transform 0.2s ease;
+}
+
+/* ==========================================================================
+   Dark Theme Toolbar Adaptations (.dark .orders-toolbar)
+   Seamless conversion of toolbar search, dropdowns, and buttons for Dark Mode
+   ========================================================================== */
+.dark .orders-toolbar {
+  background: linear-gradient(180deg, #15273b 0%, #102033 100%) !important;
+  border: 1.5px solid #304b66 !important;
+  box-shadow:
+    0 4px 20px -2px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark .toolbar-actions-divider {
+  background: #304b66 !important;
+}
+
+.dark .toolbar-search-box {
+  background: #102033 !important;
+  border: 1.5px solid #304b66 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark .toolbar-search-box:hover {
+  border-color: #60a5fa !important;
+  box-shadow: 0 3px 12px rgba(96, 165, 250, 0.2) !important;
+}
+
+.dark .toolbar-search-box:focus-within {
+  border-color: #96ccff !important;
+  box-shadow: 0 0 0 3px rgba(150, 204, 255, 0.25) !important;
+  background: #14273d !important;
+}
+
+.dark .toolbar-search-icon {
+  color: #96ccff !important;
+}
+
+.dark .toolbar-search-input {
+  color: #edf5ff !important;
+}
+
+.dark .toolbar-search-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.dark .toolbar-search-clear {
+  background: #1c324b !important;
+  color: #94a3b8 !important;
+}
+
+.dark .toolbar-search-clear:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+/* Status Filter Dark Theme */
+.dark .toolbar-filter-status {
+  background: linear-gradient(180deg, rgba(147, 51, 234, 0.16) 0%, rgba(107, 33, 168, 0.24) 100%) !important;
+  border: 1.5px solid rgba(192, 132, 252, 0.35) !important;
+  color: #f3e8ff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark .toolbar-filter-status .toolbar-select-icon-box {
+  background: rgba(168, 85, 247, 0.25) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(192, 132, 252, 0.35) !important;
+}
+
+.dark .toolbar-filter-status .toolbar-select-chevron {
+  color: #c084fc !important;
+}
+
+.dark .toolbar-filter-status:hover {
+  border-color: #c084fc !important;
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.24) 0%, rgba(126, 34, 206, 0.35) 100%) !important;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35) !important;
+}
+
+.dark .toolbar-filter-status:hover .toolbar-select-icon-box {
+  background: #a855f7 !important;
+  color: #ffffff !important;
+  border-color: #c084fc !important;
+}
+
+.dark .toolbar-filter-status.active {
+  border-color: #c084fc !important;
+  background: rgba(147, 51, 234, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* Delivery Filter Dark Theme */
+.dark .toolbar-filter-delivery {
+  background: linear-gradient(180deg, rgba(20, 184, 166, 0.16) 0%, rgba(13, 148, 136, 0.24) 100%) !important;
+  border: 1.5px solid rgba(45, 212, 191, 0.35) !important;
+  color: #ccfbf1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark .toolbar-filter-delivery .toolbar-select-icon-box {
+  background: rgba(20, 184, 166, 0.25) !important;
+  color: #2dd4bf !important;
+  border: 1px solid rgba(45, 212, 191, 0.35) !important;
+}
+
+.dark .toolbar-filter-delivery .toolbar-select-chevron {
+  color: #2dd4bf !important;
+}
+
+.dark .toolbar-filter-delivery:hover {
+  border-color: #2dd4bf !important;
+  background: linear-gradient(180deg, rgba(20, 184, 166, 0.24) 0%, rgba(13, 148, 136, 0.35) 100%) !important;
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.35) !important;
+}
+
+.dark .toolbar-filter-delivery:hover .toolbar-select-icon-box {
+  background: #14b8a6 !important;
+  color: #ffffff !important;
+  border-color: #2dd4bf !important;
+}
+
+.dark .toolbar-filter-delivery.active {
+  border-color: #2dd4bf !important;
+  background: rgba(13, 148, 136, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* Date Range Button Dark Theme */
+.dark .date-range-choice-btn {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.16) 0%, rgba(2, 132, 199, 0.24) 100%) !important;
+  border: 1.5px solid rgba(125, 211, 252, 0.35) !important;
+  color: #e0f2fe !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark .date-range-choice-btn .date-range-btn-icon {
+  background: rgba(56, 189, 248, 0.25) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(125, 211, 252, 0.35) !important;
+}
+
+.dark .date-range-choice-btn .date-range-chevron {
+  color: #38bdf8 !important;
+}
+
+.dark .date-range-choice-btn:hover {
+  border-color: #38bdf8 !important;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.24) 0%, rgba(2, 132, 199, 0.35) 100%) !important;
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35) !important;
+}
+
+.dark .date-range-choice-btn:hover .date-range-btn-icon {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #38bdf8 !important;
+}
+
+.dark .date-range-choice-btn.active {
+  border-color: #38bdf8 !important;
+  background: rgba(2, 132, 199, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* Inactive Batch Button Dark Theme */
+.dark .toolbar-batch-btn:not(.active) {
+  background: #102033 !important;
+  border: 1.5px dashed #304b66 !important;
+  color: #94a3b8 !important;
+}
+
+.dark .toolbar-batch-btn:not(.active) .toolbar-btn-icon-circle {
+  background: #1c324b !important;
+  color: #94a3b8 !important;
+}
+
+/* Portal Header Date Badge Dark Theme */
+.dark .portal-header-date-badge {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.16) 0%, rgba(147, 51, 234, 0.2) 100%) !important;
+  border: 1.5px solid rgba(125, 211, 252, 0.35) !important;
+  color: #e0f2fe !important;
+}
+
+.dark .portal-header-date-badge .date-badge-icon {
+  color: #38bdf8 !important;
+}
+
+/* ==========================================================================
+   Table Action Buttons (View order / Review payment)
+   Light Colorful Jewel Design - Luminous, Gentle & Beautifully Harmonized
+   ========================================================================== */
+.table-action-btn,
+.view-order-btn {
+  height: 32px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  font-size: 0.8rem !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.01ch !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  white-space: nowrap !important;
+  position: relative !important;
+  overflow: hidden !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  line-height: 1 !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1.5px solid #93c5fd !important;
+  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%) !important;
+  color: #0369a1 !important;
+  box-shadow:
+    0 2px 6px rgba(14, 165, 233, 0.15),
+    inset 0 1px 0 #ffffff !important;
+}
+
+/* Icon */
+.table-action-btn .table-action-icon,
+.view-order-btn .view-order-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0284c7;
+  transition: color 0.2s ease, transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.table-action-btn .table-action-icon svg,
+.view-order-btn .view-order-icon svg {
+  width: 13.5px;
+  height: 13.5px;
+}
+
+/* Label */
+.table-action-btn .table-action-label {
+  position: relative;
+  z-index: 1;
+  color: #0369a1;
+  transition: color 0.2s ease;
+}
+
+/* Light Sheen Shimmer */
+.table-action-btn .table-action-shimmer {
+  position: absolute;
+  top: -60%;
+  left: -70%;
+  width: 50%;
+  height: 220%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  transform: rotate(25deg);
+  pointer-events: none;
+  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2;
+}
+
+/* Hover State - Rich Vibrant Azure Bloom */
+.table-action-btn:hover,
+.view-order-btn:hover {
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+  border-color: #0284c7 !important;
+  color: #ffffff !important;
+  transform: translateY(-1.5px) !important;
+  box-shadow:
+    0 4px 14px rgba(14, 165, 233, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.table-action-btn:hover .table-action-icon,
+.view-order-btn:hover .view-order-icon {
+  color: #ffffff !important;
+  transform: scale(1.12);
+}
+
+.table-action-btn:hover .table-action-label {
+  color: #ffffff !important;
+}
+
+.table-action-btn:hover .table-action-shimmer {
+  transform: translateX(400%) rotate(25deg);
+}
+
+/* Active State */
+.table-action-btn:active,
+.view-order-btn:active {
+  transform: translateY(0) !important;
+  background: #0284c7 !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Payment Review Variant - Warm Luminous Amber Pastel */
+.table-action-btn.payment {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+  box-shadow:
+    0 2px 6px rgba(217, 119, 6, 0.15),
+    inset 0 1px 0 #ffffff !important;
+}
+
+.table-action-btn.payment .table-action-icon {
+  color: #d97706;
+}
+
+.table-action-btn.payment .table-action-label {
+  color: #92400e;
+}
+
+.table-action-btn.payment:hover {
+  border-color: #d97706 !important;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+  box-shadow:
+    0 4px 14px rgba(217, 119, 6, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.table-action-btn.payment:hover .table-action-icon {
+  color: #ffffff !important;
+}
+
+.table-action-btn.payment:hover .table-action-label {
+  color: #ffffff !important;
+}
+
+/* ==========================================================================
+   Dark Theme (Default) - Luminous Sky-Cyan / Azure Jewel Button
+   ========================================================================== */
+.dark .table-action-btn,
+.dark .view-order-btn {
+  border: 1.5px solid rgba(125, 211, 252, 0.45) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.16) 0%,
+    rgba(37, 99, 235, 0.28) 100%
+  ) !important;
+  color: #e0f2fe !important;
+  box-shadow:
+    0 2px 10px rgba(14, 165, 233, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+.dark .table-action-btn .table-action-icon,
+.dark .view-order-btn .view-order-icon {
+  color: #38bdf8 !important;
+}
+
+.dark .table-action-btn .table-action-label {
+  color: #e0f2fe !important;
+}
+
+.dark .table-action-btn:hover,
+.dark .view-order-btn:hover {
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+  border-color: #7dd3fc !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 4px 18px rgba(14, 165, 233, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.dark .table-action-btn:hover .table-action-icon,
+.dark .view-order-btn:hover .view-order-icon {
+  color: #ffffff !important;
+}
+
+.dark .table-action-btn:hover .table-action-label {
+  color: #ffffff !important;
+}
+
+.dark .table-action-btn.payment {
+  border: 1.5px solid rgba(252, 211, 77, 0.45) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.18) 0%,
+    rgba(217, 119, 6, 0.26) 100%
+  ) !important;
+  color: #fef3c7 !important;
+  box-shadow:
+    0 2px 10px rgba(245, 158, 11, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+.dark .table-action-btn.payment .table-action-icon {
+  color: #fbbf24 !important;
+}
+
+.dark .table-action-btn.payment .table-action-label {
+  color: #fef3c7 !important;
+}
+
+.dark .table-action-btn.payment:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+  border-color: #fde68a !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 4px 18px rgba(217, 119, 6, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Table Delete Order Button */
+.order-delete-btn {
+  border-radius: 8px !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.order-delete-btn:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--destructive) 25%, transparent) !important;
+}
+
+/* Orders Table Pagination Buttons */
+.pagination .btn {
+  border-radius: 8px !important;
+  font-weight: 550 !important;
+  font-size: 0.82rem !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.pagination .btn:hover:not(:disabled) {
+  border-color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card)) !important;
+  color: var(--primary) !important;
+  transform: translateY(-1px);
+}
 
