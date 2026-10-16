@@ -2203,7 +2203,7 @@ function OrderModalPopup({
                         </strong>
                         <p className="small-text">
                           {isCampus
-                            ? "VU Qanchi campus bookstore counter pickup point for student collection"
+                            ? "VU Qanchi campus bookstore pickup point for student collection"
                             : `Direct route from rider’s current location to student pin: ${o.address}`}
                         </p>
                       </div>
@@ -2622,12 +2622,12 @@ function Orders({
 
       let deliveryPrefix = "Orders";
       if (deliveryTypeList.length === 1) {
-        if (deliveryTypeList[0] === "campus") deliveryPrefix = "VU Qanchi Campus";
+        if (deliveryTypeList[0] === "campus") deliveryPrefix = "VU Qanchi Campus Lahore";
         else if (deliveryTypeList[0] === "lahore") deliveryPrefix = "Lahore";
         else if (deliveryTypeList[0] === "other") deliveryPrefix = "Other City";
       } else if (deliveryTypeList.length > 1) {
         deliveryPrefix = deliveryTypeList
-          .map((t) => (t === "campus" ? "Qanchi" : t === "lahore" ? "Lahore" : "Other City"))
+          .map((t) => (t === "campus" ? "Qanchi Lahore" : t === "lahore" ? "Lahore" : "Other City"))
           .join(" & ");
       }
 
@@ -2639,12 +2639,13 @@ function Orders({
       }
       const filename = `${deliveryPrefix}${statusPart} - ${currentDate}.xlsx`;
       const includeAddress = deliveryTypeList.length === 0 || deliveryTypeList.includes("other");
+      const includeMobile = includeAddress;
 
       try {
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
         await exportOrdersExcel(rows, filename, { includeAddress });
         toast.success(
-          `Exported ${rows.length} order(s)${includeAddress ? " with address" : ""} to ${filename}.`,
+          `Exported ${rows.length} order(s)${includeAddress ? " with address & phone" : ""} to ${filename}.`,
         );
       } catch (excelErr) {
         // Fallback to structured CSV with book items
@@ -2655,6 +2656,7 @@ function Orders({
             "Sr No",
             "Order Number",
             "Student Name",
+            ...(includeMobile ? ["Mobile Number"] : []),
             ...(includeAddress ? ["Address"] : []),
             "Book Code",
             "Book Name",
@@ -2685,6 +2687,7 @@ function Orders({
               idx === 0 ? orderIdx + 1 : "",
               idx === 0 ? o.reference || "—" : "",
               idx === 0 ? o.name || "Student" : "",
+              ...(includeMobile ? [idx === 0 ? o.phone || "—" : ""] : []),
               ...(includeAddress ? [idx === 0 ? fullAddress : ""] : []),
               item.code || "—",
               item.title || "—",
@@ -2694,7 +2697,7 @@ function Orders({
           });
         });
 
-        const prefixCount = includeAddress ? 6 : 5;
+        const prefixCount = (includeMobile ? 1 : 0) + (includeAddress ? 1 : 0) + 5;
         csvRows.push([
           ...Array(prefixCount).fill(""),
           `(Total Books: ${grandTotalBooks})`,
@@ -2849,7 +2852,7 @@ function Orders({
           icon={<Truck size={13} strokeWidth={2.4} />}
           className="toolbar-filter-delivery"
           options={[
-            { value: "campus", label: "VU Qanchi Campus" },
+            { value: "campus", label: "Qanchi Campus" },
             { value: "lahore", label: "Lahore" },
             { value: "other", label: "Other City" },
           ]}
@@ -4097,7 +4100,7 @@ function SettingsPage() {
             </div>
 
             <div className="form-grid three-col" style={{ marginTop: 16 }}>
-              <Field label="VU Qanchi Campus Pickup Fee (Rs.)">
+              <Field label="VU Qanchi Campus Lahore Pickup Fee (Rs.)">
                 <input
                   required
                   type="number"

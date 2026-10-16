@@ -1064,8 +1064,29 @@ function Cart({ data }: { data: Catalog }) {
           <aside className="panel summary">
             <h3>Order estimate</h3>
             <Totals subtotal={subtotal} />
+            <div
+              style={{
+                margin: "12px 0",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                background: "rgba(239, 68, 68, 0.08)",
+                border: "1px solid #ef4444",
+                fontSize: "0.82rem",
+                color: "#ef4444",
+                lineHeight: 1.4,
+                fontWeight: 600,
+                display: "flex",
+                gap: "8px",
+                alignItems: "flex-start",
+              }}
+            >
+              <span style={{ fontSize: "1rem", lineHeight: 1 }}>🚫</span>
+              <span>
+                <strong>Cash on Delivery (COD) is NOT available.</strong> Advance payment is required as all books are custom printed per order.
+              </span>
+            </div>
             <p className="small-text">
-              Select your delivery method (Campus, Lahore, or Other City) during checkout.
+              Select your delivery method (VU Qanchi Campus Lahore, Lahore, or Other City) during checkout.
             </p>
             {invalid ? (
               <div className="notice">
@@ -1108,23 +1129,6 @@ function Totals({
             <span>Grand total</span>
             <strong>{money(subtotal + delivery)}</strong>
           </div>
-          {isBase && (
-            <p
-              style={{
-                margin: "8px 0 0",
-                padding: "6px 10px",
-                borderRadius: "6px",
-                background: "rgba(239, 68, 68, 0.05)",
-                border: "1px solid #ef4444",
-                fontSize: "0.78rem",
-                color: "#dc2626",
-                lineHeight: 1.35,
-                fontWeight: 500,
-              }}
-            >
-              * Base minimum delivery charge. Any extra rider or courier fare difference is payable upon delivery.
-            </p>
-          )}
         </>
       )}
       {typeof delivery !== "number" && (
@@ -1483,6 +1487,8 @@ function Checkout({ data }: { data: Catalog }) {
       setBusy(false);
     }
   };
+
+
   if (!cart.length)
     return (
       <div className="section">
@@ -1568,8 +1574,8 @@ function Checkout({ data }: { data: Catalog }) {
                       setForm({
                         ...form,
                         delivery_type: "campus",
-                        city: "VU Qanchi Campus",
-                        address: "Pickup from VU Qanchi Campus Bookstore Counter",
+                        city: "VU Qanchi Campus Lahore",
+                        address: "VU Qanchi Campus Lahore",
                       });
                     }}
                   >
@@ -1578,8 +1584,8 @@ function Checkout({ data }: { data: Catalog }) {
                       <Building2 size={24} />
                     </div>
                     <div className="delivery-option-info">
-                      <strong>VU Qanchi Campus Pickup</strong>
-                      <span>Only from VU Qanchi Campus Counter</span>
+                      <strong>VU Qanchi Campus Lahore Pickup</strong>
+                      <span>Pickup from VU Qanchi Campus Lahore</span>
                     </div>
                   </button>
 
@@ -1630,38 +1636,73 @@ function Checkout({ data }: { data: Catalog }) {
               </div>
 
               {form.delivery_type === "campus" ? (
-                <div className="campus-pickup-notice">
-                  <div className="notice-icon">
-                    <Building2 size={24} style={{ color: "var(--primary)" }} />
-                  </div>
-                  <div>
-                    <strong>📍 Campus Pickup Only From VU Qanchi Campus ({money(data.settings.delivery_campus ?? 10000)})</strong>
-                    <p style={{ marginTop: 4 }}>
-                      ⚠️ <strong>Please Note:</strong> Campus pickup is available <u>only from the VU Qanchi Campus bookstore counter (Lahore)</u>. No home address required — just show your Order ID at the counter to collect your books.
-                    </p>
-                    <div style={{ marginTop: 10 }}>
-                      <a
-                        href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn compact"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          fontSize: "0.85rem",
-                          background: "var(--primary)",
-                          color: "var(--primary-foreground)",
-                          textDecoration: "none",
-                        }}
-                      >
-                        <MapPin size={15} />
-                        <span>View VU Qanchi Campus on Google Maps</span>
-                        <ExternalLink size={13} />
-                      </a>
+                <>
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: "10px",
+                      background: "rgba(37, 99, 235, 0.08)",
+                      border: "1px solid rgba(37, 99, 235, 0.25)",
+                      marginBottom: 12,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <MapPin size={18} style={{ color: "var(--primary)", flexShrink: 0 }} />
+                      <strong style={{ fontSize: "0.92rem", color: "var(--foreground)" }}>
+                        Pickup Location: VU Qanchi Campus Lahore ({money(data.settings.delivery_campus ?? 10000)})
+                      </strong>
                     </div>
+                    <a
+                      href="https://maps.app.goo.gl/xgXSaNeVCBvSFtb57"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn compact"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: "0.82rem",
+                        background: "var(--primary)",
+                        color: "var(--primary-foreground)",
+                        textDecoration: "none",
+                        padding: "6px 12px",
+                      }}
+                    >
+                      <MapPin size={14} />
+                      <span>View on Google Maps</span>
+                      <ExternalLink size={12} />
+                    </a>
+                  </div>
+
+                {/* Cash on Delivery Notice for Campus Pickup */}
+                <div
+                  style={{
+                    padding: "12px 15px",
+                    borderRadius: "10px",
+                    background: "rgba(239, 68, 68, 0.08)",
+                    border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                    marginBottom: 16,
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ color: "#ef4444", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
+                      Cash on Delivery (COD) is NOT Available
+                    </strong>
+                    <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.45, color: "var(--foreground)" }}>
+                      Advance bank payment is required. All course books are custom printed on-demand per student order.
+                    </p>
                   </div>
                 </div>
+              </>
               ) : form.delivery_type === "lahore" ? (
                 <>
                   <div
@@ -1671,7 +1712,7 @@ function Checkout({ data }: { data: Catalog }) {
                       borderRadius: "10px",
                       background: "rgba(239, 68, 68, 0.06)",
                       border: "2px solid #ef4444",
-                      marginBottom: 16,
+                      marginBottom: 12,
                       fontSize: "0.86rem",
                       lineHeight: 1.5,
                     }}
@@ -1686,6 +1727,30 @@ function Checkout({ data }: { data: Catalog }) {
                           The <strong>{money(data.settings.delivery_lahore)}</strong> charged at checkout is a <strong>minimum base rider fare</strong>. If the actual rider fare (e.g. Bykea, InDrive, Yango) exceeds this base amount depending on distance (e.g. if ride fare is Rs. 400, the remaining Rs. 50 difference), the <strong>remaining excess fare must be paid directly to the rider by the student upon delivery</strong>.
                         </p>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Cash on Delivery Notice */}
+                  <div
+                    style={{
+                      padding: "12px 15px",
+                      borderRadius: "10px",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                      marginBottom: 16,
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ color: "#ef4444", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
+                        Cash on Delivery (COD) is NOT Available
+                      </strong>
+                      <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.45, color: "var(--foreground)" }}>
+                        Advance bank payment is required. All course books are custom printed on-demand per student order.
+                      </p>
                     </div>
                   </div>
 
@@ -1738,7 +1803,7 @@ function Checkout({ data }: { data: Catalog }) {
                       borderRadius: "10px",
                       background: "rgba(239, 68, 68, 0.06)",
                       border: "2px solid #ef4444",
-                      marginBottom: 16,
+                      marginBottom: 12,
                       fontSize: "0.86rem",
                       lineHeight: 1.5,
                     }}
@@ -1753,6 +1818,30 @@ function Checkout({ data }: { data: Catalog }) {
                           The <strong>{money(data.settings.delivery_other)}</strong> charged at checkout is a <strong>minimum base advance courier fee</strong>. If actual courier charges exceed this amount due to parcel weight (multiple heavy books) or distant delivery location (e.g. if courier charges Rs. 800 instead of Rs. 500), the <strong>remaining difference (e.g. Rs. 300) must be paid by the customer upon delivery</strong>.
                         </p>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Cash on Delivery Notice */}
+                  <div
+                    style={{
+                      padding: "12px 15px",
+                      borderRadius: "10px",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                      marginBottom: 16,
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ color: "#ef4444", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
+                        Cash on Delivery (COD) is NOT Available
+                      </strong>
+                      <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.45, color: "var(--foreground)" }}>
+                        Advance bank payment is required. All course books are custom printed on-demand per student order.
+                      </p>
                     </div>
                   </div>
 
@@ -1787,32 +1876,19 @@ function Checkout({ data }: { data: Catalog }) {
                   onChange={(e) => set("instructions", e.target.value)}
                 />
               </Field>
+
+
               <button className="btn primary" disabled={busy || !ready}>
                 {busy ? "Checking prices…" : "Proceed to Payment"}
               </button>
             </form>
           ) : (
             <div className="stack">
-              <h3>Transfer {money(quote!.total)}</h3>
-              <p className="small-text">
-                Your quote is valid for 30 minutes. Stock is reserved after you
-                submit proof.
-              </p>
-              {(form.delivery_type === "lahore" || form.delivery_type === "other") && (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    background: "rgba(239, 68, 68, 0.06)",
-                    border: "2px solid #ef4444",
-                    fontSize: "0.83rem",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  <strong style={{ color: "#dc2626" }}>⚠️ Delivery Notice:</strong> Total includes{" "}
-                  <strong>{money(quote!.delivery)}</strong> minimum base delivery fee. If actual rider or courier charges exceed this amount, the remaining difference must be paid by the student upon delivery.
-                </div>
-              )}
+              <div>
+                <h3 style={{ margin: 0 }}>Transfer {money(quote!.total)}</h3>
+              </div>
+
+              {/* 1. First, Meezan Bank Account details */}
               <div className="bank-card">
                 <span className="eyebrow">{quote!.settings.bank_name}</span>
                 <small>ACCOUNT NUMBER</small>
@@ -1854,6 +1930,8 @@ function Checkout({ data }: { data: Catalog }) {
                 <small style={{ marginTop: 8 }}>ACCOUNT TITLE</small>
                 <b>{quote!.settings.account_title}</b>
               </div>
+
+              {/* 2. Then, Picture Upload field */}
               <ProofUploader
                 path={"proofs?quote=" + quote!.id}
                 max={data.settings.max_upload_mb}
@@ -1891,6 +1969,97 @@ function Checkout({ data }: { data: Catalog }) {
               >
                 Return to delivery details
               </button>
+
+              {/* 3. At the end / bottom, show all the Notes (Cash on Delivery note and Delivery note) */}
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                {/* Cash on Delivery Note */}
+                <div
+                  style={{
+                    padding: "13px 16px",
+                    borderRadius: "10px",
+                    background: "rgba(239, 68, 68, 0.08)",
+                    border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
+                  <div style={{ flex: 1 }}>
+                    <strong
+                      style={{
+                        color: "#ef4444",
+                        display: "block",
+                        marginBottom: 3,
+                        fontSize: "0.88rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Cash on Delivery (COD) Not Available
+                    </strong>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "0.83rem",
+                        lineHeight: 1.45,
+                        color: "var(--foreground)",
+                      }}
+                    >
+                      Full advance bank transfer payment is required. All course books are custom printed on-demand after order confirmation. Orders are sent to the printing press only after payment verification.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Delivery Note (if Lahore or Other City) */}
+                {(quote!.delivery > 0 || form.delivery_type === "lahore" || form.delivery_type === "other") && (
+                  <div
+                    style={{
+                      padding: "13px 16px",
+                      borderRadius: "10px",
+                      background: "rgba(245, 158, 11, 0.08)",
+                      border: "1.5px solid rgba(245, 158, 11, 0.35)",
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <AlertTriangle
+                      size={18}
+                      style={{ color: "#f59e0b", flexShrink: 0, marginTop: 1 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <strong
+                        style={{
+                          color: "#d97706",
+                          display: "block",
+                          marginBottom: 3,
+                          fontSize: "0.88rem",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Delivery Notice: Minimum Base Rate ({money(quote!.delivery)})
+                      </strong>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "0.83rem",
+                          lineHeight: 1.45,
+                          color: "var(--foreground)",
+                        }}
+                      >
+                        Total includes <strong>{money(quote!.delivery)}</strong> minimum base delivery fee. If actual rider or courier charges exceed this amount due to parcel weight or distant location, the remaining difference must be paid upon delivery.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1986,7 +2155,6 @@ export function printOrderReceiptSlip(order: any) {
     order.delivery_type === "campus" ||
     (order.city && String(order.city).toLowerCase().includes("campus")) ||
     (order.address && String(order.address).toLowerCase().includes("campus"));
-  const locationLabel = isPickup ? "Pickup Location (VU Qanchi Campus)" : "Deliver to";
 
   const itemsHtml = (order.items || [])
     .map(
@@ -2012,8 +2180,12 @@ export function printOrderReceiptSlip(order: any) {
           <p>${escapeHtml(order.phone || "")}</p>
         </div>
         <div>
-          <span class="receipt-label">${locationLabel}</span>
-          <p>${escapeHtml(order.address || "")}<br />${escapeHtml(order.city || "")}</p>
+          ${
+            isPickup
+              ? `<p style="font-weight: 600; margin: 0; font-size: 0.95rem;">Pickup Location: VU Qanchi Campus Lahore</p>`
+              : `<span class="receipt-label">Deliver to</span>
+          <p>${escapeHtml(order.address || "")}<br />${escapeHtml(order.city || "")}</p>`
+          }
         </div>
       </div>
     `
@@ -2472,16 +2644,22 @@ export function OrderReceipt({ o }: { o: any }) {
             <p>{o.phone}</p>
           </div>
           <div>
-            <span className="receipt-label">
-              {o.delivery_type === "campus" || (o.city && o.city.toLowerCase().includes("campus"))
-                ? "Pickup Location (VU Qanchi Campus)"
-                : "Deliver to"}
-            </span>
-            <p>
-              {o.address}
-              <br />
-              {o.city}
-            </p>
+            {o.delivery_type === "campus" ||
+            (o.city && o.city.toLowerCase().includes("campus")) ||
+            (o.address && o.address.toLowerCase().includes("campus")) ? (
+              <p style={{ fontWeight: 600, margin: 0, fontSize: "0.95rem" }}>
+                Pickup Location: VU Qanchi Campus Lahore
+              </p>
+            ) : (
+              <>
+                <span className="receipt-label">Deliver to</span>
+                <p>
+                  {o.address}
+                  <br />
+                  {o.city}
+                </p>
+              </>
+            )}
             {(o.delivery_type === "campus" ||
               (o.city && o.city.toLowerCase().includes("campus")) ||
               (o.address && o.address.toLowerCase().includes("campus"))) && (
@@ -2501,7 +2679,7 @@ export function OrderReceipt({ o }: { o: any }) {
                   }}
                 >
                   <MapPin size={14} />
-                  <span>View VU Qanchi Campus on Google Maps</span>
+                  <span>View VU Qanchi Campus Lahore on Google Maps</span>
                   <ExternalLink size={12} />
                 </a>
               </p>
@@ -3291,7 +3469,7 @@ function SupportCallout({ data }: { data: Catalog }) {
                 </a>
               </div>
               <p className="small-muted" style={{ margin: "4px 0 12px 0" }}>
-                Official university course materials fulfillment center. Counter pickup & order dispatches available daily.
+                Official university course materials fulfillment center. Campus pickup & order dispatches available daily.
               </p>
             </div>
             <div className="contact-delivery-rates">
@@ -3301,9 +3479,9 @@ function SupportCallout({ data }: { data: Catalog }) {
                 rel="noopener noreferrer"
                 className="rate-badge"
                 style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
-                title="View VU Qanchi Campus Location on Google Maps"
+                title="View VU Qanchi Campus Lahore Location on Google Maps"
               >
-                <span>🏛️ VU Qanchi Campus Pickup</span>
+                <span>🏛️ VU Qanchi Campus Lahore Pickup</span>
                 <strong>{money(s.delivery_campus ?? 10000)}</strong>
               </a>
               <div className="rate-badge">

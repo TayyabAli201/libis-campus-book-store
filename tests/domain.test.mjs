@@ -14,6 +14,7 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
     {
       reference: 'ORD-101',
       name: 'Ali Khan',
+      phone: '03001234567',
       created_at: '2026-10-10T12:00:00.000Z',
       city: 'Islamabad',
       address: 'House 12, Street 4, F-8/1',
@@ -57,28 +58,33 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
 
   const otherCitySheet = orderSheet(sampleOrders, { includeAddress: true });
   assert.equal(otherCitySheet.length, 4);
-  assert.equal(otherCitySheet[0].length, 8);
+  assert.equal(otherCitySheet[0].length, 9);
   assert.deepEqual(otherCitySheet[0].map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS_WITH_ADDRESS));
-  assert.equal(otherCitySheet[1][3].value, 'House 12, Street 4, F-8/1, Islamabad');
+  assert.equal(otherCitySheet[1][3].value, '03001234567');
   assert.equal(otherCitySheet[1][3].rowSpan, 2);
   assert.equal(otherCitySheet[1][3].fontFamily, 'Lora');
   assert.equal(otherCitySheet[1][3].height, 22.5);
-  assert.equal(otherCitySheet[1][4].value, 'CS101');
-  assert.equal(otherCitySheet[1][6].value, 1);
-  assert.equal(otherCitySheet[1][7].value, 3);
-  assert.equal(otherCitySheet[1][7].rowSpan, 2);
+  assert.equal(otherCitySheet[1][4].value, 'House 12, Street 4, F-8/1, Islamabad');
+  assert.equal(otherCitySheet[1][4].rowSpan, 2);
+  assert.equal(otherCitySheet[1][4].fontFamily, 'Lora');
+  assert.equal(otherCitySheet[1][4].height, 22.5);
+  assert.equal(otherCitySheet[1][5].value, 'CS101');
+  assert.equal(otherCitySheet[1][7].value, 1);
+  assert.equal(otherCitySheet[1][8].value, 3);
+  assert.equal(otherCitySheet[1][8].rowSpan, 2);
   assert.equal(otherCitySheet[2][3], null);
-  assert.equal(otherCitySheet[2][4].value, 'MATH201');
-  assert.equal(otherCitySheet[2][7], null);
+  assert.equal(otherCitySheet[2][4], null);
+  assert.equal(otherCitySheet[2][5].value, 'MATH201');
+  assert.equal(otherCitySheet[2][8], null);
   // Grand total row with address
-  assert.equal(otherCitySheet[3].length, 8);
-  assert.deepEqual(otherCitySheet[3].slice(0, 6), [null, null, null, null, null, null]);
-  assert.equal(otherCitySheet[3][6].value, '(Total Books: 3)');
-  assert.equal(otherCitySheet[3][6].columnSpan, 2);
-  assert.equal(otherCitySheet[3][6].fontFamily, 'Lora');
-  assert.equal(otherCitySheet[3][6].height, 22.5);
-  assert.equal(otherCitySheet[3][6].backgroundColor, '#1F65A8');
-  assert.equal(otherCitySheet[3][7], null);
+  assert.equal(otherCitySheet[3].length, 9);
+  assert.deepEqual(otherCitySheet[3].slice(0, 7), [null, null, null, null, null, null, null]);
+  assert.equal(otherCitySheet[3][7].value, '(Total Books: 3)');
+  assert.equal(otherCitySheet[3][7].columnSpan, 2);
+  assert.equal(otherCitySheet[3][7].fontFamily, 'Lora');
+  assert.equal(otherCitySheet[3][7].height, 22.5);
+  assert.equal(otherCitySheet[3][7].backgroundColor, '#1F65A8');
+  assert.equal(otherCitySheet[3][8], null);
 });
 test('Real migration enforces pricing categories, totals and atomic stock constraints',()=>{const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');db.exec(fs.readFileSync('drizzle/0000_modern_marrow.sql','utf8'));db.prepare('INSERT INTO pricing_categories(id,rate) VALUES(?,?)').run('A',250);assert.throws(()=>db.prepare('INSERT INTO pricing_categories(id,rate) VALUES(?,?)').run('E',700));db.exec("INSERT INTO books(id,code,course_code,course_name,title,author,description,pages,category,created_at) VALUES('b','CS','CS','Computing','Book','Author','Description',100,'A','2026-01-01');INSERT INTO inventory(book_id,stock,reserved) VALUES('b',1,0)");assert.throws(()=>db.exec("UPDATE inventory SET reserved=2 WHERE book_id='b'"));db.exec('BEGIN');db.exec("UPDATE inventory SET reserved=1 WHERE book_id='b'");try{db.exec("INSERT INTO transaction_guards(id,ok) VALUES('g',0)");assert.fail('guard must fail')}catch{db.exec('ROLLBACK');}assert.equal(db.prepare("SELECT reserved FROM inventory WHERE book_id='b'").get().reserved,0);db.close();});
 

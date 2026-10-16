@@ -33,10 +33,14 @@ export const statuses: Record<string, string> = {
 export function getCampusName(o: any): string {
   const directCampus = (o?.campus_name || o?.campus || "").trim();
   if (directCampus) {
+    if (/qanchi/i.test(directCampus)) return "VU Qanchi";
     const cleaned = directCampus.replace(/\s*campus\s*/gi, "").trim();
     if (cleaned) return cleaned;
   }
   const city = (o?.city || "").trim();
+  if (city && /qanchi/i.test(city)) {
+    return "VU Qanchi";
+  }
   if (city && /campus/i.test(city)) {
     const cleaned = city.replace(/\s*campus\s*/gi, "").trim();
     if (cleaned) return cleaned;

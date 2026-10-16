@@ -12,6 +12,7 @@ export const ORDER_EXPORT_COLUMNS_WITH_ADDRESS = [
   "Sr No",
   "Order Number",
   "Student Name",
+  "Mobile Number",
   "Address",
   "Book Code",
   "Book Name",
@@ -21,9 +22,13 @@ export const ORDER_EXPORT_COLUMNS_WITH_ADDRESS = [
 
 export function orderSheet(
   orders: any[],
-  options?: { includeAddress?: boolean },
+  options?: { includeAddress?: boolean; includeMobile?: boolean },
 ) {
   const includeAddress = Boolean(options?.includeAddress);
+  const includeMobile =
+    options?.includeMobile !== undefined
+      ? Boolean(options.includeMobile)
+      : includeAddress;
 
   const ROW_HEIGHT = 22.5;
   const FONT_FAMILY = "Lora";
@@ -32,6 +37,7 @@ export function orderSheet(
     { value: "Sr No", width: 10 },
     { value: "Order Number", width: 24 },
     { value: "Student Name", width: 26 },
+    ...(includeMobile ? [{ value: "Mobile Number", width: 18 }] : []),
     ...(includeAddress ? [{ value: "Address", width: 36 }] : []),
     { value: "Book Code", width: 16 },
     { value: "Book Name", width: 46 },
@@ -84,6 +90,17 @@ export function orderSheet(
         : o.address
       : (o.city || "—");
 
+    const mobileCell = {
+      value: o.phone || "—",
+      rowSpan: N,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
+      align: "center" as const,
+      alignVertical: "center" as const,
+      borderColor: border,
+      borderStyle: "thin" as const,
+    };
+
     const addressCell = {
       value: fullAddress,
       rowSpan: N,
@@ -133,6 +150,7 @@ export function orderSheet(
             borderColor: border,
             borderStyle: "thin" as const,
           },
+          ...(includeMobile ? [mobileCell] : []),
           ...(includeAddress ? [addressCell] : []),
           {
             value: item.code || "—",
@@ -181,6 +199,7 @@ export function orderSheet(
           null,
           null,
           null,
+          ...(includeMobile ? [null] : []),
           ...(includeAddress ? [null] : []),
           {
             value: item.code || "—",
@@ -217,7 +236,7 @@ export function orderSheet(
     });
   });
 
-  const prefixCount = includeAddress ? 6 : 5;
+  const prefixCount = (includeMobile ? 1 : 0) + (includeAddress ? 1 : 0) + 5;
   const grandTotalRow = [
     ...Array(prefixCount).fill(null),
     {
