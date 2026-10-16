@@ -537,6 +537,12 @@ async function handle(req: Request) {
           Math.min(10000, Number(url.searchParams.get("page")) || 1),
         );
         const limitParam = url.searchParams.get("limit");
+        const parsedLimit =
+          limitParam === "all"
+            ? "all"
+            : limitParam && Number(limitParam) > 0
+              ? Number(limitParam)
+              : undefined;
         return ok(
           await listOrders(
             u,
@@ -546,7 +552,7 @@ async function handle(req: Request) {
             url.searchParams.get("to") || "",
             page,
             url.searchParams.get("campus") || "",
-            limitParam === "all" ? "all" : undefined,
+            parsedLimit,
             url.searchParams.get("delivery_type") || "",
           ),
         );

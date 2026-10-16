@@ -466,8 +466,9 @@ export async function listOrders(
     ...args,
   );
   const isAll = limit === "all";
-  const limitClause = isAll ? "LIMIT 10000" : "LIMIT 50 OFFSET ?";
-  const queryArgs = isAll ? [...args] : [...args, (page - 1) * 50];
+  const pageSize = typeof limit === "number" && limit > 0 ? limit : 20;
+  const limitClause = isAll ? "LIMIT 10000" : `LIMIT ${pageSize} OFFSET ?`;
+  const queryArgs = isAll ? [...args] : [...args, (page - 1) * pageSize];
   const rows = await all(
     `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
     ...queryArgs,
@@ -500,7 +501,61 @@ export async function listOrders(
       (r as any).items = itemsByOrder.get(r.id) || [];
     }
   }
-  return { rows, total: total?.n || 0, total_books: total?.total_books || 0, page };
+
+  // Calculate live counts per status for top workflow tabs
+  const tabFilters = [s.sql];
+  const tabArgs: unknown[] = [...s.args];
+  if (campusId) {
+    tabFilters.push("o.campus_id=?");
+    tabArgs.push(campusId);
+  }
+  if (q) {
+    tabFilters.push("(o.reference LIKE ? OR o.name LIKE ? OR o.phone LIKE ?)");
+    tabArgs.push(...Array(3).fill("%" + q.slice(0, 100) + "%"));
+  }
+  if (deliveryType && deliveryType !== "all") {
+    const types = deliveryType
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t && t !== "all");
+    if (types.length === 1) {
+      tabFilters.push("o.delivery_type=?");
+      tabArgs.push(types[0]);
+    } else if (types.length > 1) {
+      const placeholders = types.map(() => "?").join(",");
+      tabFilters.push(`o.delivery_type IN (${placeholders})`);
+      tabArgs.push(...types);
+    }
+  }
+  if (from) {
+    tabFilters.push("o.created_at>=?");
+    tabArgs.push(from);
+  }
+  if (to) {
+    tabFilters.push("o.created_at<?");
+    tabArgs.push(to + "T23:59:59.999Z");
+  }
+  const tabWhere = tabFilters.join(" AND ");
+  const statusGroupRows = await all<{ status: string; cnt: number }>(
+    `SELECT o.status, COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} GROUP BY o.status`,
+    ...tabArgs,
+  );
+  const status_counts: Record<string, number> = {};
+  let allCount = 0;
+  statusGroupRows.forEach((r) => {
+    status_counts[r.status] = r.cnt;
+    allCount += r.cnt;
+  });
+  status_counts["ALL"] = allCount;
+
+  return {
+    rows,
+    total: total?.n || 0,
+    total_books: total?.total_books || 0,
+    page,
+    pageSize,
+    status_counts,
+  };
 }
 export function movementStatements(
   o: any,

@@ -46,6 +46,7 @@ export async function PortalPage({
     redirect("/" + portal + "/login");
   const section = segments[0] || "dashboard";
   if (section === "inventory") redirect("/" + portal + "/books");
+  if (section === "payments") redirect("/" + portal + "/orders?status=PAYMENT_PENDING");
   if (
     ![
       "dashboard",

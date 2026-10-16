@@ -102,7 +102,6 @@ const Charts = dynamic(() => import("./report-charts"), {
 const nav = [
   ["dashboard", "Overview", LayoutDashboard, "reports.read"],
   ["orders", "Orders", ShoppingBag, "orders.read"],
-  ["payments", "Payment verification", ShieldCheck, "admin"],
   ["books", "Books", Library, "books.read"],
   ["pricing", "Pricing management", Coins, "admin"],
   ["campuses", "Campuses", Building2, "admin"],
@@ -910,7 +909,7 @@ function Dashboard({
     {
       label: "Verify Payments",
       description: "Review uploaded receipts",
-      href: "/payments",
+      href: "/orders?status=PAYMENT_PENDING",
       icon: ShieldCheck,
       allowed: isAdmin,
     },
@@ -1089,7 +1088,7 @@ function Dashboard({
                   <p>Payment reviews help your next orders move forward.</p>
                 </div>
                 {isAdmin && (
-                  <a href="/admin/payments" className="text-link">
+                  <a href="/admin/orders?status=PAYMENT_PENDING" className="text-link">
                     Review payments <ArrowUpRight size={16} />
                   </a>
                 )}
@@ -2565,26 +2564,55 @@ const STATUS_ADVANCE_FLOW: Record<
   },
 };
 
+const ORDER_WORKFLOW_TABS = [
+  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [] as string[], color: "all" },
+  { id: "PAYMENT_PENDING", label: "Pending", title: "Pending Payment Verification", icon: "⏳", statuses: ["PAYMENT_PENDING"], urgent: true, color: "pending" },
+  { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready to Print", icon: "📑", statuses: ["CONFIRMED"], color: "confirmed" },
+  { id: "PROCESSING", label: "Printing", title: "Printing / In Press", icon: "🖨️", statuses: ["PROCESSING"], color: "printing" },
+  { id: "READY", label: "Ready", title: "Ready for Dispatch", icon: "📦", statuses: ["READY"], color: "ready" },
+  { id: "SHIPPED", label: "Shipped", title: "Shipped / With Rider", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
+  { id: "DELIVERED", label: "Delivered", title: "Delivered / Completed", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
+  { id: "CANCELLED", label: "Cancelled", title: "Cancelled Orders", icon: "❌", statuses: ["CANCELLED"], color: "cancelled" },
+  { id: "REJECTED", label: "Rejected", title: "Rejected Orders", icon: "🚫", statuses: ["REJECTED"], color: "rejected" },
+  { id: "REFUND_REQUESTED", label: "Refunded", title: "Refund Requested / Processed", icon: "💸", statuses: ["REFUND_REQUESTED"], color: "refunded" },
+];
+
+const ORDER_DELIVERY_CHIPS = [
+  { id: "all", label: "All Delivery Channels", icon: "🌐" },
+  { id: "campus", label: "VU Qanchi Campus Lahore", icon: "🏛️" },
+  { id: "lahore", label: "Lahore (Rider)", icon: "🛵" },
+  { id: "other", label: "Other Cities (Courier)", icon: "📦" },
+];
+
 function Orders({
   base,
-  payments,
+  payments = false,
   user,
 }: {
   base: string;
-  payments: boolean;
+  payments?: boolean;
   user?: User;
 }) {
   const [campus, setCampus] = useState("");
-  useEffect(
-    () => setCampus(new URLSearchParams(location.search).get("campus") || ""),
-    [],
-  );
+  const [statusList, setStatusList] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const param = new URLSearchParams(location.search).get("status");
+      if (param) return [param];
+    }
+    return payments ? ["PAYMENT_PENDING"] : [];
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const campusParam = params.get("campus");
+    if (campusParam) setCampus(campusParam);
+    const statusParam = params.get("status");
+    if (statusParam) setStatusList([statusParam]);
+  }, []);
   const [q, setQ] = useState(""),
-    [statusList, setStatusList] = useState<string[]>(
-      payments ? ["PAYMENT_PENDING"] : [],
-    ),
     [deliveryTypeList, setDeliveryTypeList] = useState<string[]>([]),
     [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(20),
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
     [deletingOrder, setDeletingOrder] = useState<any | null>(null),
@@ -2716,7 +2744,7 @@ function Orders({
 
   const statusParam = statusList.join(",");
   const deliveryTypeParam = deliveryTypeList.join(",");
-  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&page=${page}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
+  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&page=${page}&limit=${pageSize}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
   const { data, error, loading, reload } = useData(path);
 
   useEffect(() => {
@@ -2760,11 +2788,62 @@ function Orders({
     }
   };
 
-  const headers = payments
+  const isTabActive = (tab: (typeof ORDER_WORKFLOW_TABS)[number]) => {
+    if (tab.id === "ALL") {
+      return statusList.length === 0;
+    }
+    return statusList.length === 1 && statusList[0] === tab.statuses[0];
+  };
+
+  const getTabCount = (tab: (typeof ORDER_WORKFLOW_TABS)[number]) => {
+    if (!data?.status_counts) return undefined;
+    if (tab.id === "ALL") {
+      return data.status_counts.ALL ?? data.total ?? 0;
+    }
+    return data.status_counts[tab.statuses[0]] || 0;
+  };
+
+  const totalOrders = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+  const startItem = totalOrders === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, totalOrders);
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [totalPages, page]);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (page <= 4) {
+      return [1, 2, 3, 4, 5, "...", totalPages];
+    }
+    if (page >= totalPages - 3) {
+      return [
+        1,
+        "...",
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+    return [1, "...", page - 1, page, page + 1, "...", totalPages];
+  };
+
+  const isPendingView =
+    payments || (statusList.length === 1 && statusList[0] === "PAYMENT_PENDING");
+
+  const headers = isPendingView
     ? [
         "Order",
-        "Customer",
+        "Student",
         "Books",
+        "Date",
         "Total",
         "OCR amount / difference",
         "Status",
@@ -2785,6 +2864,81 @@ function Orders({
 
   return (
     <>
+      <div className="orders-workflow-tabs-container" role="tablist" aria-label="Order Workflow Stages">
+        {ORDER_WORKFLOW_TABS.map((tab) => {
+          const active = isTabActive(tab);
+          const count = getTabCount(tab);
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={tab.title || tab.label}
+              className={`orders-workflow-tab tab-${tab.color} ${active ? "active" : ""}`}
+              onClick={() => {
+                if (tab.id === "ALL" || isTabActive(tab)) {
+                  setStatusList([]);
+                } else {
+                  setStatusList([...tab.statuses]);
+                }
+                setPage(1);
+              }}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {count !== undefined && (
+                <span
+                  className={`orders-tab-badge ${
+                    tab.urgent && !active && count > 0 ? "urgent" : ""
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="orders-delivery-chips-bar" aria-label="Delivery channel filters">
+        {ORDER_DELIVERY_CHIPS.map((chip) => {
+          const isChipActive =
+            chip.id === "all"
+              ? deliveryTypeList.length === 0
+              : deliveryTypeList.includes(chip.id);
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              className={`orders-delivery-chip ${isChipActive ? "active" : ""}`}
+              onClick={() => {
+                setPage(1);
+                if (chip.id === "all") {
+                  setDeliveryTypeList([]);
+                  return;
+                }
+                if (chip.id === "other") {
+                  // Other City is exclusive: toggling off goes to all, toggling on deselects campus and lahore
+                  setDeliveryTypeList(deliveryTypeList.includes("other") ? [] : ["other"]);
+                  return;
+                }
+                // For "campus" or "lahore": remove "other" first, then toggle this chip while preserving the other local chip
+                const withoutOther = deliveryTypeList.filter((id) => id !== "other");
+                if (withoutOther.includes(chip.id)) {
+                  setDeliveryTypeList(withoutOther.filter((id) => id !== chip.id));
+                } else {
+                  setDeliveryTypeList([...withoutOther, chip.id]);
+                }
+              }}
+            >
+              <span>{chip.icon}</span>
+              <span>{chip.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="toolbar orders-toolbar">
         <div className="toolbar-search-box">
           <Search size={15} className="toolbar-search-icon" />
@@ -2813,50 +2967,6 @@ function Orders({
             </button>
           )}
         </div>
-        <MultiChoose
-          values={statusList}
-          onChange={(v) => {
-            setStatusList(v);
-            setPage(1);
-          }}
-          label="Order status"
-          allLabel="All statuses"
-          width={188}
-          icon={<ListFilter size={13} strokeWidth={2.4} />}
-          className="toolbar-filter-status"
-          options={Object.keys(transitions).map((s) => ({
-            value: s,
-            label: statuses[s],
-          }))}
-        />
-        <MultiChoose
-          values={deliveryTypeList}
-          onChange={(v) => {
-            let next = v;
-            const added = v.filter((x) => !deliveryTypeList.includes(x));
-            if (added.includes("other")) {
-              // Selecting "Other City" automatically excludes VU Qanchi Campus and Lahore
-              next = ["other"];
-            } else if (added.some((x) => x === "campus" || x === "lahore")) {
-              // Selecting VU Qanchi Campus or Lahore automatically excludes Other City
-              next = v.filter((x) => x !== "other");
-            } else if (v.includes("other") && (v.includes("campus") || v.includes("lahore"))) {
-              next = ["other"];
-            }
-            setDeliveryTypeList(next);
-            setPage(1);
-          }}
-          label="Delivery type"
-          allLabel="All delivery types"
-          width={188}
-          icon={<Truck size={13} strokeWidth={2.4} />}
-          className="toolbar-filter-delivery"
-          options={[
-            { value: "campus", label: "Qanchi Campus" },
-            { value: "lahore", label: "Lahore" },
-            { value: "other", label: "Other City" },
-          ]}
-        />
         <DateRangePicker
           from={dates.from}
           to={dates.to}
@@ -2878,7 +2988,7 @@ function Orders({
           </span>
           <span>{exporting ? "Exporting…" : "Export Orders"}</span>
         </button>
-        {canUpdate && !payments && (
+        {canUpdate && (
           <button
             type="button"
             className={`btn compact toolbar-batch-btn ${activeFlowStep && filteredCount > 0 ? "active" : ""}`}
@@ -3022,7 +3132,7 @@ function Orders({
               </div>
             );
 
-            return payments
+            return isPendingView
               ? [
                   refCell,
                   <div>
@@ -3045,18 +3155,21 @@ function Orders({
                     </p>
                   </div>,
                   booksCell,
+                  formatDateDMY(o.created_at),
                   money(o.total),
                   <div>
-                    {o.detected_amount === null
-                      ? "Not detected"
-                      : money(o.detected_amount)}
-                    <p>
+                    <strong style={{ fontSize: "0.85rem" }}>
+                      {o.detected_amount === null
+                        ? "Not detected"
+                        : money(o.detected_amount)}
+                    </strong>
+                    <p className="small-text muted" style={{ margin: "2px 0 0", fontSize: "0.75rem" }}>
                       {o.detected_amount === null
                         ? "Manual review"
-                        : `Difference: ${money(o.detected_amount - o.total)}`}
+                        : `Diff: ${money(o.detected_amount - o.total)}`}
                     </p>
                   </div>,
-                  <div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <Status value={o.ocr_status} />
                     <Status value={o.payment_status} />
                   </div>,
@@ -3131,25 +3244,68 @@ function Orders({
           })}
         />
         {data && (
-          <div className="pagination">
-            <button
-              className="btn compact"
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} · {data.total} orders
-              {data.total_books !== undefined && ` · ${data.total_books} books ordered`}
-            </span>
-            <button
-              className="btn compact"
-              disabled={page * 50 >= data.total}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </button>
+          <div className="orders-pagination-bar">
+            <div className="orders-pagination-info">
+              Showing <strong>{startItem}–{endItem}</strong> of <strong>{totalOrders}</strong> orders
+              {data.total_books !== undefined && (
+                <span> · <strong>{data.total_books}</strong> books</span>
+              )}
+            </div>
+
+            <div className="orders-pagination-controls">
+              <button
+                type="button"
+                className="btn compact"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ‹ Previous
+              </button>
+              <div className="orders-page-numbers">
+                {getPageNumbers().map((p, idx) =>
+                  typeof p === "number" ? (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`btn compact page-number-btn ${p === page ? "active" : ""}`}
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </button>
+                  ) : (
+                    <span key={idx} className="pagination-ellipsis">
+                      …
+                    </span>
+                  ),
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn compact"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next ›
+              </button>
+            </div>
+
+            <div className="orders-page-size-selector">
+              <span>Rows per page:</span>
+              <select
+                className="page-size-select"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                aria-label="Rows per page"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
           </div>
         )}
       </Result>
