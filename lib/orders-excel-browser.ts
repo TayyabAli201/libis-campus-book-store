@@ -3,16 +3,18 @@ import { orderSheet } from "./orders-spreadsheet";
 export async function exportOrdersExcel(
   orders: any[],
   filename = "orders.xlsx",
-  options?: { includeAddress?: boolean; includeMobile?: boolean },
+  options?: { includeAddress?: boolean; includeMobile?: boolean; sheetName?: string },
 ) {
   const includeAddress = Boolean(options?.includeAddress);
   const includeMobile =
     options?.includeMobile !== undefined
       ? Boolean(options.includeMobile)
       : includeAddress;
+  const rawSheet = options?.sheetName || "Orders";
+  const sheetName = rawSheet.replace(/[\\/?*\[\]:]/g, "").slice(0, 31) || "Orders";
   const { default: writeExcelFile } = await import("write-excel-file/browser");
   await writeExcelFile(orderSheet(orders, options), {
-    sheet: "Orders",
+    sheet: sheetName,
     columns: [
       { width: 10 }, // Sr No
       { width: 24 }, // Order Number

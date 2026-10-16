@@ -2579,7 +2579,7 @@ const ORDER_WORKFLOW_TABS = [
 
 const ORDER_DELIVERY_CHIPS = [
   { id: "all", label: "All Delivery Channels", icon: "🌐" },
-  { id: "campus", label: "VU Qanchi Campus Lahore", icon: "🏛️" },
+  { id: "campus", label: "Qanchi Campus", icon: "🏛️" },
   { id: "lahore", label: "Lahore (Rider)", icon: "🛵" },
   { id: "other", label: "Other Cities (Courier)", icon: "📦" },
 ];
@@ -2612,7 +2612,7 @@ function Orders({
   const [q, setQ] = useState(""),
     [deliveryTypeList, setDeliveryTypeList] = useState<string[]>([]),
     [page, setPage] = useState(1),
-    [pageSize, setPageSize] = useState(20),
+    [pageSize, setPageSize] = useState(15),
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
     [deletingOrder, setDeletingOrder] = useState<any | null>(null),
@@ -2649,14 +2649,31 @@ function Orders({
       const currentDate = `${dd}-${mm}-${yyyy}`;
 
       let deliveryPrefix = "Orders";
-      if (deliveryTypeList.length === 1) {
-        if (deliveryTypeList[0] === "campus") deliveryPrefix = "VU Qanchi Campus Lahore";
-        else if (deliveryTypeList[0] === "lahore") deliveryPrefix = "Lahore";
-        else if (deliveryTypeList[0] === "other") deliveryPrefix = "Other City";
+      let sheetName = "Orders";
+      const isCombinedQanchiLahore =
+        deliveryTypeList.length === 2 &&
+        deliveryTypeList.includes("campus") &&
+        deliveryTypeList.includes("lahore");
+
+      if (isCombinedQanchiLahore) {
+        deliveryPrefix = "Qanchi Campus Lahore";
+        sheetName = "Qanchi Campus Lahore";
+      } else if (deliveryTypeList.length === 1) {
+        if (deliveryTypeList[0] === "campus") {
+          deliveryPrefix = "Qanchi Campus";
+          sheetName = "Qanchi Campus";
+        } else if (deliveryTypeList[0] === "lahore") {
+          deliveryPrefix = "Lahore";
+          sheetName = "Lahore";
+        } else if (deliveryTypeList[0] === "other") {
+          deliveryPrefix = "Other City";
+          sheetName = "Other City";
+        }
       } else if (deliveryTypeList.length > 1) {
         deliveryPrefix = deliveryTypeList
-          .map((t) => (t === "campus" ? "Qanchi Lahore" : t === "lahore" ? "Lahore" : "Other City"))
+          .map((t) => (t === "campus" ? "Qanchi Campus" : t === "lahore" ? "Lahore" : "Other City"))
           .join(" & ");
+        sheetName = deliveryPrefix;
       }
 
       let statusPart = "";
@@ -2671,7 +2688,7 @@ function Orders({
 
       try {
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
-        await exportOrdersExcel(rows, filename, { includeAddress });
+        await exportOrdersExcel(rows, filename, { includeAddress, sheetName });
         toast.success(
           `Exported ${rows.length} order(s)${includeAddress ? " with address & phone" : ""} to ${filename}.`,
         );
@@ -3057,13 +3074,13 @@ function Orders({
                 : Bike;
 
             const badgeLabel = isCampus
-              ? "VU Qanchi Campus"
+              ? "Qanchi Campus"
               : isOther
                 ? (o.city ? `${o.city} · Other City` : "Other City")
                 : "Lahore Route";
 
             const badgeTitle = isCampus
-              ? "Open VU Qanchi campus pickup location on Google Maps"
+              ? "Open Qanchi campus pickup location on Google Maps"
               : isOther
                 ? `Open ${o.city || "delivery city"} destination on Google Maps`
                 : "Open Bykea / live rider route navigation to student location";
@@ -3301,6 +3318,7 @@ function Orders({
                 aria-label="Rows per page"
               >
                 <option value={10}>10</option>
+                <option value={15}>15</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>

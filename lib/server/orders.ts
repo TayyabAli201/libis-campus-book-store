@@ -466,7 +466,7 @@ export async function listOrders(
     ...args,
   );
   const isAll = limit === "all";
-  const pageSize = typeof limit === "number" && limit > 0 ? limit : 20;
+  const pageSize = typeof limit === "number" && limit > 0 ? limit : 15;
   const limitClause = isAll ? "LIMIT 10000" : `LIMIT ${pageSize} OFFSET ?`;
   const queryArgs = isAll ? [...args] : [...args, (page - 1) * pageSize];
   const rows = await all(
