@@ -380,17 +380,20 @@ export async function getOrder(
         quantity,
         unit_price,
       })),
-      history: history.map(({ status, created_at, note }) => {
-        const isCourierNote =
-          typeof note === "string" &&
-          (note.startsWith("Shipped via ") ||
-            note.startsWith("Courier tracking details removed"));
-        return {
-          status,
-          created_at,
-          ...(isCourierNote ? { note } : {}),
-        };
-      }),
+      history: history
+        .filter(
+          ({ status }) =>
+            status !== "READY" && status !== "READY_FOR_DISPATCH",
+        )
+        .map(({ status, created_at, note }) => {
+          const isCourierNote =
+            typeof note === "string" && note.startsWith("Shipped via ");
+          return {
+            status,
+            created_at,
+            ...(isCourierNote ? { note } : {}),
+          };
+        }),
       ...(o.payment_status === "NEW_SLIP_REQUESTED" && o.payment_note
         ? { payment_note: o.payment_note }
         : {}),
