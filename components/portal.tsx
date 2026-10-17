@@ -2113,7 +2113,6 @@ function OrderModalPopup({
 
   const admin = user.role === "SUPER_ADMIN";
   const canUpdate = admin || user.permissions.includes("orders.update");
-  const mapUrl = getMapDirectionsUrl(o);
 
   const act = async (action: string, status?: string) => {
     try {
@@ -2147,7 +2146,7 @@ function OrderModalPopup({
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="order-modal-popup-content">
+      <DialogContent className="order-modal-popup-content" showCloseButton={false}>
         <DialogHeader className="order-modal-header">
           <div className="order-modal-title-row">
             <div>
@@ -2185,44 +2184,6 @@ function OrderModalPopup({
         <Result loading={loading} error={error}>
           {o && (
             <div className="order-modal-body stack">
-              {mapUrl && (() => {
-                const isCampus =
-                  o.delivery_type === "campus" ||
-                  (o.city && o.city.toLowerCase().includes("campus")) ||
-                  (o.address && o.address.toLowerCase().includes("campus"));
-                return (
-                  <div className="rider-map-pin-banner">
-                    <div className="banner-left">
-                      <Navigation size={26} className="map-icon-pulse" />
-                      <div>
-                        <strong>
-                          {isCampus
-                            ? "📍 VU Qanchi Campus Pickup Point Location"
-                            : "📍 Lahore Rider Live Route Navigation (InDrive Style)"}
-                        </strong>
-                        <p className="small-text">
-                          {isCampus
-                            ? "VU Qanchi campus bookstore pickup point for student collection"
-                            : `Direct route from rider’s current location to student pin: ${o.address}`}
-                        </p>
-                      </div>
-                    </div>
-                    <a
-                      href={mapUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn primary compact map-btn"
-                    >
-                      <Navigation size={16} />{" "}
-                      {isCampus
-                        ? "Open VU Qanchi Campus on Google Maps"
-                        : "Start InDrive Live Route Navigation"}{" "}
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
-                );
-              })()}
-
               {(() => {
                 const isCampus =
                   o.delivery_type === "campus" ||

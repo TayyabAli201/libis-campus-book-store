@@ -2282,50 +2282,297 @@
   border-radius: 10px;
 }
 
-/* Student tracking courier card */
+/* Student tracking courier card - Prominent Red / Dark Red Alert Theme */
 .courier-tracking-card {
-  padding: 16px 20px;
-  border-radius: 12px;
-  border: 1px solid #93c5fd;
-  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
-  color: #1e3a8a;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  padding: 18px 22px;
+  border-radius: 14px;
+  border: 2px solid #dc2626 !important;
+  background: #fff5f5 !important;
+  color: #7f1d1d !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+  position: relative;
+  overflow: hidden;
 }
 
 :is(.dark *) .courier-tracking-card {
-  border-color: #1e40af;
-  background: linear-gradient(135deg, rgba(30, 58, 138, 0.25) 0%, rgba(6, 78, 59, 0.2) 100%);
-  color: #bfdbfe;
+  border: 2px solid #ef4444 !important;
+  background: color-mix(in srgb, #991b1b 15%, #122238) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35) !important;
+}
+
+.courier-icon-box {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: none !important;
+}
+
+:is(.dark *) .courier-icon-box {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
 .courier-badge {
-  display: inline-block;
-  font-size: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #2563eb;
-  color: #ffffff;
-  margin-bottom: 2px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  text-transform: uppercase;
+  box-shadow: none !important;
+}
+
+:is(.dark *) .courier-badge {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.courier-company-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 750;
+  color: #991b1b !important;
+  padding: 2px 10px;
+  background: #fee2e2 !important;
+  border: 1px solid #fca5a5 !important;
+  border-radius: 6px;
+}
+
+:is(.dark *) .courier-company-pill {
+  color: #fecdd3 !important;
+  background: rgba(239, 68, 68, 0.16) !important;
+  border: 1px solid rgba(248, 113, 113, 0.4) !important;
+}
+
+.courier-notice-heading {
+  margin: 6px 0 0 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #991b1b !important;
+  letter-spacing: -0.01em;
+}
+
+:is(.dark *) .courier-notice-heading {
+  color: #ffffff !important;
+}
+
+/* Tracking code highlight box */
+.courier-tracking-highlight-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0 10px 0;
+  padding: 12px 16px;
+  background: #ffffff !important;
+  border: 1.5px solid #dc2626 !important;
+  border-radius: 10px;
+  box-shadow: none !important;
+}
+
+:is(.dark *) .courier-tracking-highlight-box {
+  background: #0b1524 !important;
+  border: 1.5px solid #ef4444 !important;
+  box-shadow: none !important;
+}
+
+.courier-tracking-code-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.courier-tracking-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #7f1d1d !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+:is(.dark *) .courier-tracking-label {
+  color: #cbd5e1 !important;
 }
 
 .courier-tracking-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.95rem;
-  color: #1d4ed8;
-  letter-spacing: 0.05em;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #991b1b !important;
+  letter-spacing: 0.08em;
+  user-select: all;
 }
 
 :is(.dark *) .courier-tracking-code {
-  color: #93c5fd;
+  color: #ffffff !important;
+}
+
+.courier-actions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Copy tracking button */
+.courier-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #b91c1c !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.courier-copy-btn:hover {
+  background: #b91c1c !important;
+  transform: translateY(-1px);
+}
+
+:is(.dark *) .courier-copy-btn {
+  background: #ef4444 !important;
+  border-color: #f87171 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+:is(.dark *) .courier-copy-btn:hover {
+  background: #dc2626 !important;
+}
+
+.courier-copy-btn.copied {
+  background: #16a34a !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+:is(.dark *) .courier-copy-btn.copied {
+  background: #16a34a !important;
+  border-color: #22c55e !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+/* External Link Button */
+.courier-external-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #fca5a5 !important;
+  background: #ffffff !important;
+  color: #991b1b !important;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+}
+
+.courier-external-link-btn:hover {
+  background: #fee2e2 !important;
+  color: #7f1d1d !important;
+  transform: translateY(-1px);
+}
+
+:is(.dark *) .courier-external-link-btn {
+  background: #15273b !important;
+  border-color: rgba(248, 113, 113, 0.45) !important;
+  color: #fecdd3 !important;
+  box-shadow: none !important;
+}
+
+:is(.dark *) .courier-external-link-btn:hover {
+  background: rgba(239, 68, 68, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.courier-notice-message {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #374151 !important;
+  margin-top: 10px;
+}
+
+:is(.dark *) .courier-notice-message {
+  color: #cbd5e1 !important;
+}
+
+.courier-notice-message strong {
+  color: #991b1b !important;
+  font-weight: 700;
+}
+
+:is(.dark *) .courier-notice-message strong {
+  color: #fca5a5 !important;
+}
+
+.courier-link {
+  color: #991b1b !important;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+:is(.dark *) .courier-link {
+  color: #fca5a5 !important;
+}
+
+.courier-code-inline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #fee2e2 !important;
+  border: 1px solid #fecaca !important;
+  color: #991b1b !important;
+}
+
+:is(.dark *) .courier-code-inline {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border: 1px solid rgba(248, 113, 113, 0.4) !important;
+  color: #ffffff !important;
 }
 
 .courier-timeline-item {
   padding: 10px 14px;
   border-radius: 8px;
-  background: color-mix(in srgb, #2563eb 8%, var(--card));
-  border: 1px solid color-mix(in srgb, #2563eb 25%, var(--border));
+  background: color-mix(in srgb, #dc2626 6%, var(--card));
+  border: 1.5px solid color-mix(in srgb, #dc2626 25%, var(--border));
+}
+
+.courier-timeline-icon {
+  color: #dc2626 !important;
+}
+
+:is(.dark *) .courier-timeline-icon {
+  color: #ef4444 !important;
 }
 
 /* Clickable WhatsApp Phone Link */

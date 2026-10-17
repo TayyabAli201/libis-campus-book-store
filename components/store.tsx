@@ -23,6 +23,7 @@ import {
   Navigation,
   MapPin,
   Crosshair,
+  Check,
   CheckCircle2,
   Mail,
   Clock,
@@ -843,7 +844,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
                 {money(o.total || (o.subtotal || 0) + (o.delivery || 0), o.currency)}
               </strong>
             </div>
-            {!o.tracking_only && <ReceiptButtons order={o} />}
+            {!o.tracking_only && o.status !== "DELIVERED" && <ReceiptButtons order={o} />}
           </div>
         </div>
         {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
@@ -2756,6 +2757,56 @@ export function OrderReceipt({ o }: { o: any }) {
     </article>
   );
 }
+
+function getCourierTrackingUrl(courierName?: string, trackingId?: string): string | null {
+  if (!courierName) return null;
+  const name = courierName.toLowerCase().trim();
+  const id = (trackingId || "").trim();
+  if (name.includes("post") || name.includes("pakistan") || name.includes("ep")) {
+    return "https://ep.gov.pk/";
+  }
+  if (name.includes("tcs")) {
+    return id ? `https://www.tcsexpress.com/tracking?track=${encodeURIComponent(id)}` : "https://www.tcsexpress.com/tracking";
+  }
+  if (name.includes("leopard")) {
+    return id ? `https://www.leopardscourier.com/tracking?track_numbers=${encodeURIComponent(id)}` : "https://www.leopardscourier.com/tracking";
+  }
+  if (name.includes("trax")) {
+    return id ? `https://sonic.pk/tracking?tracking_number=${encodeURIComponent(id)}` : "https://sonic.pk/tracking";
+  }
+  if (name.includes("call") || name.includes("cc")) {
+    return id ? `https://callcourier.com.pk/tracking/?cn=${encodeURIComponent(id)}` : "https://callcourier.com.pk/tracking";
+  }
+  if (name.includes("m&p") || name.includes("m and p") || name.includes("mnp")) {
+    return id ? `https://mulphilog.com/tracking?consignment=${encodeURIComponent(id)}` : "https://mulphilog.com/tracking";
+  }
+  return null;
+}
+
+function CopyTrackingButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className={`courier-copy-btn ${copied ? "copied" : ""}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(code);
+          setCopied(true);
+          toast.success("Tracking number copied to clipboard!");
+          setTimeout(() => setCopied(false), 2000);
+        } catch {
+          toast.info("Tracking #: " + code);
+        }
+      }}
+      title="Copy tracking number to clipboard"
+    >
+      {copied ? <Check size={14} /> : <Copy size={14} />}
+      <span>{copied ? "Copied!" : "Copy Number"}</span>
+    </button>
+  );
+}
+
 function OrderTracking({ data }: { data: Catalog }) {
   const [o, setO] = useState<any>(null),
     [reference, setReference] = useState(""),
@@ -2967,57 +3018,89 @@ function OrderTracking({ data }: { data: Catalog }) {
           {o.courier_name && o.courier_tracking_id && (
             <div
               className="track-details-wrapper no-print"
-              style={{ maxWidth: 720, margin: "16px auto 0" }}
+              style={{ maxWidth: 720, margin: "18px auto 0" }}
             >
-              <div className="courier-tracking-card">
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-                  <div
-                    style={{
-                      background: "#2563eb",
-                      color: "#ffffff",
-                      borderRadius: 10,
-                      padding: 10,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Truck size={24} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 4,
-                      }}
-                    >
-                      <span className="courier-badge">EXTERNAL COURIER DISPATCHED</span>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1d4ed8" }}>
-                        {o.courier_name}
-                      </span>
+              {(() => {
+                const courierUrl = getCourierTrackingUrl(o.courier_name, o.courier_tracking_id);
+                return (
+                  <div className="courier-tracking-card">
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                      <div className="courier-icon-box">
+                        <Truck size={24} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span className="courier-badge">EXTERNAL COURIER DISPATCHED</span>
+                          <span className="courier-company-pill">
+                            {o.courier_name}
+                          </span>
+                        </div>
+                        <h3 className="courier-notice-heading">
+                          Track Your Parcel via {o.courier_name}
+                        </h3>
+                      </div>
                     </div>
-                    <div style={{ fontSize: "1.05rem", fontWeight: 700, margin: "4px 0" }}>
-                      Tracking #:{" "}
-                      <span className="courier-tracking-code">{o.courier_tracking_id}</span>
+
+                    <div className="courier-tracking-highlight-box">
+                      <div className="courier-tracking-code-wrap">
+                        <span className="courier-tracking-label">Tracking Number:</span>
+                        <span className="courier-tracking-code">{o.courier_tracking_id}</span>
+                      </div>
+                      <div className="courier-actions-wrap">
+                        <CopyTrackingButton code={o.courier_tracking_id} />
+                        {courierUrl && (
+                          <a
+                            href={courierUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="courier-external-link-btn"
+                            title={`Open official tracking portal for ${o.courier_name}`}
+                          >
+                            <span>Track Online</span>
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                      </div>
                     </div>
-                    <p style={{ margin: "4px 0 0", fontSize: "0.84rem", opacity: 0.9 }}>
-                      Your parcel has been dispatched via <strong>{o.courier_name}</strong>. You can
-                      track parcel status on {o.courier_name}’s official website using tracking
-                      number <strong className="courier-tracking-code">{o.courier_tracking_id}</strong>.
-                    </p>
+
+                    <div className="courier-notice-message">
+                      <p style={{ margin: 0 }}>
+                        Your parcel has been dispatched from Lahore via <strong>{o.courier_name}</strong>.
+                        Please track your shipment live on{" "}
+                        {courierUrl ? (
+                          <a
+                            href={courierUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="courier-link"
+                          >
+                            {o.courier_name}’s official website
+                          </a>
+                        ) : (
+                          <strong>{o.courier_name}’s official website</strong>
+                        )}{" "}
+                        using tracking number{" "}
+                        <strong className="courier-code-inline">{o.courier_tracking_id}</strong>.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
 
-          <div className="print-only">
-            <OrderReceipt o={o} />
-          </div>
+          {o.status !== "DELIVERED" && (
+            <div className="print-only">
+              <OrderReceipt o={o} />
+            </div>
+          )}
 
           <div className="track-details-wrapper no-print" style={{ maxWidth: 720, margin: "24px auto 0" }}>
             <div className="panel">
@@ -3037,7 +3120,7 @@ function OrderTracking({ data }: { data: Catalog }) {
                   return (
                     <div key={i} className={isCourierEntry ? "courier-timeline-item" : undefined}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        {isCourierEntry && <Truck size={16} style={{ color: "#2563eb" }} />}
+                        {isCourierEntry && <Truck size={16} className="courier-timeline-icon" />}
                         <Status
                           value={h.status}
                           label={
@@ -3053,7 +3136,7 @@ function OrderTracking({ data }: { data: Catalog }) {
                         <p
                           style={
                             isCourierEntry
-                              ? { fontWeight: 600, color: "var(--primary)", marginTop: 6 }
+                              ? { fontWeight: 600, marginTop: 6 }
                               : undefined
                           }
                         >
