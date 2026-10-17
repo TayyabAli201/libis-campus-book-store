@@ -359,7 +359,7 @@
 .book-experience {
   --book-width: 200px;
   --book-height: 278px;
-  --book-depth: 27px;
+  --book-depth: 36px;
   position: relative;
   min-width: 0;
   color: var(--feature-foreground);
@@ -679,6 +679,9 @@
 }
 
 .book-object {
+  --book-width: 200px;
+  --book-height: 278px;
+  --book-depth: 36px;
   --cover-color: #0b2440;
   --cover-ink: #e5c158;
   --cover-border: #d4af3788;
@@ -715,9 +718,13 @@
 .book-face {
   position: absolute;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 .book-front,
 .book-back {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   border-radius: 2px 5px 5px 2px;
@@ -728,6 +735,7 @@
   transform-style: preserve-3d;
   transition: transform 0.9s cubic-bezier(0.22, 0.68, 0.24, 1);
   backface-visibility: visible;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.15);
 }
 .book-open .book-front {
   transform: translateZ(calc(var(--book-depth) / 2)) rotateY(-132deg);
@@ -847,25 +855,31 @@
 }
 .book-back {
   transform: translateZ(calc(var(--book-depth) / -2)) rotateY(180deg);
-  background: var(--cover-color);
-  border: 1px solid var(--cover-border);
-  color: var(--cover-ink);
+  border-radius: 5px 2px 2px 5px;
+  background: linear-gradient(180deg, #163773 0%, #1e40af 50%, #0d1e3d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 30px;
-  padding: 25px;
+  gap: 16px;
+  padding: 20px;
   text-align: center;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
 }
 .book-back > span {
-  font-family: Georgia, serif;
-  font-size: 21px;
-  line-height: 1.5;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #ffffff;
 }
 .book-back > small {
-  font-size: 7px;
-  letter-spacing: 0.2em;
+  font-size: 6.5px;
+  letter-spacing: 0.15em;
+  color: #fbbf24;
+  font-weight: 800;
 }
 .book-spine {
   width: var(--book-depth);
@@ -873,65 +887,244 @@
   left: calc(var(--book-depth) / -2);
   transform: rotateY(-90deg);
   background:
-    linear-gradient(90deg, #0005, transparent 45%, #ffffff16),
-    var(--cover-color);
-  color: var(--cover-ink);
-  border-block: 1px solid var(--cover-border);
+    linear-gradient(90deg, #0007, transparent 40%, rgba(255, 255, 255, 0.15)),
+    linear-gradient(180deg, #163773 0%, #1e40af 50%, #0d1e3d 100%);
+  color: #fbbf24;
+  border-block: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-direction: column;
-  padding: 22px 0;
+  padding: 16px 0;
 }
 .book-spine span {
   writing-mode: vertical-rl;
-  font-size: 9px;
+  font-size: 8px;
+  font-weight: 800;
   letter-spacing: 0.15em;
+  color: #fbbf24;
 }
 .book-spine > span:last-child {
-  font-size: 6px;
+  font-size: 5px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.1em;
+}
+
+/* ==========================================================================
+   AUTHENTIC VIRTUAL UNIVERSITY TEXTBOOK 3D OBJECT STYLES
+   Used by BookObject (Hero Carousel & Single Book Detail Page)
+   ========================================================================== */
+.book-front-art.vu-textbook-front {
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.25), inset -1px 0 0 rgba(0, 0, 0, 0.2) !important;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%) !important;
+  color: #ffffff !important;
+}
+
+.book-front-art.vu-textbook-front::after {
+  display: none !important;
+}
+
+/* 3D BookObject Spine Styling */
+.book-face.book-spine.vu-textbook-spine {
+  border-radius: 0 !important;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  width: var(--book-depth);
+  height: 100%;
+  left: calc(var(--book-depth) / -2);
+  transform: rotateY(-90deg);
+  overflow: hidden;
+  box-shadow: inset 2px 0 4px rgba(255, 255, 255, 0.15), inset -2px 0 3px rgba(0, 0, 0, 0.45);
+}
+
+/* Proportional scaling in 3D Carousel & Detail Scene (200px x 270px) */
+.book-scene .vu-tb-header {
+  height: 42px;
+  padding: 0 16px 0 14px;
+}
+.book-scene .vu-tb-logo-box {
+  width: 44px;
+  border: 1px solid #ffffff;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  background: #ffffff;
+  flex-shrink: 0;
+  display: flex;
+}
+.book-scene .vu-tb-notes {
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 13.5px;
+  color: #ffffff;
+}
+.book-scene .vu-tb-hanging-tab {
+  width: 22px;
+  height: 35px;
+  left: 14px;
+  top: 42px;
+  background: linear-gradient(90deg, #f5af1f 0%, #fbd144 35%, #f5af1f 75%, #df990f 100%);
+  filter: drop-shadow(2px 2px 2.5px rgba(0, 0, 0, 0.45)) drop-shadow(1px 3px 4px rgba(0, 0, 0, 0.28));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  z-index: 5;
+}
+.book-scene .vu-tb-code-bar {
+  height: 25px;
+  padding: 0 16px 0 44px;
+  background: #f5b821;
+}
+.book-scene .vu-tb-code-text {
+  font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #0c2044;
+  letter-spacing: 0.04em;
+}
+.book-scene .vu-tb-title {
+  font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+  font-stretch: condensed;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  padding: 0 8px;
+  text-shadow: 0 1.5px 3px rgba(0, 0, 0, 0.55);
+}
+.book-scene .vu-tb-slogan-bar {
+  height: 26px;
+  background: #f5b821;
+}
+.book-scene .vu-tb-slogan-bar span {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 8.2px;
+  font-style: italic;
+  font-weight: 900;
+  color: #0b1a30;
+}
+.book-scene .vu-tb-footer-bar {
+  height: 28px;
+  background: #172554;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+.book-scene .vu-tb-footer-bar span {
+  font-family: "Arial Narrow", Arial, sans-serif !important;
+  font-size: 8.8px;
+  font-weight: 500; /* Arial Narrow Regular / Not Bold */
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* Spine Elements scaling in 3D Carousel & Detail Scene */
+.book-scene .book-spine.vu-textbook-spine .vu-spine-header {
+  height: 42px;
+  background: linear-gradient(90deg, #132a63 0%, #1e3a8a 100%);
+  border-bottom: 1.5px solid #ffffff;
+}
+.book-scene .book-spine.vu-textbook-spine .vu-spine-ribbon-top {
+  height: 25px;
+  background: #f5b821;
+  border-top: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+}
+.book-scene .book-spine.vu-textbook-spine .vu-spine-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, #112659 0%, #1e40af 60%, #163278 100%);
+}
+.book-scene .book-spine.vu-textbook-spine .vu-spine-code {
+  writing-mode: vertical-rl;
+  font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #fbbf24;
+}
+.book-scene .book-spine.vu-textbook-spine .vu-spine-ribbon-bottom {
+  height: 26px;
+  background: #f5b821;
+  border-top: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+}
+.book-scene .book-spine.vu-textbook-spine .vu-spine-footer {
+  height: 28px;
+  background: linear-gradient(90deg, #0b142e 0%, #172554 100%);
 }
 .book-pages {
+  top: 3px;
+  left: auto !important;
+  right: calc((var(--book-depth) - 4px) / -2 + 3px);
   width: calc(var(--book-depth) - 4px);
-  height: calc(100% - 5px);
-  top: 2.5px;
-  right: calc((var(--book-depth) - 4px) / -2 + 2px);
+  height: calc(100% - 6px);
   transform: rotateY(90deg);
+  backface-visibility: visible !important;
   background: repeating-linear-gradient(
     90deg,
-    #e9e1cf 0px,
-    #e9e1cf 1px,
-    #b9b19c 1px,
-    #e0d7c0 2px
+    #f4efe4 0px,
+    #f4efe4 1.5px,
+    #cfc3ab 2px,
+    #ebe3d3 3px
   );
-}
-.book-top,
-.book-base {
-  width: calc(100% - 3px);
-  height: calc(var(--book-depth) - 4px);
-  left: 1px;
-  background: repeating-linear-gradient(
-    0deg,
-    #e9e1cf 0px,
-    #e9e1cf 1px,
-    #b9b19c 1px,
-    #e0d7c0 2px
-  );
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 -2px 4px rgba(0, 0, 0, 0.15);
 }
 .book-top {
-  top: calc((var(--book-depth) - 4px) / -2 + 2px);
+  left: 2px;
+  top: calc((var(--book-depth) - 4px) / -2 + 3px);
+  bottom: auto !important;
+  width: calc(100% - 5px);
+  height: calc(var(--book-depth) - 4px);
   transform: rotateX(90deg);
+  backface-visibility: visible !important;
+  background: repeating-linear-gradient(
+    0deg,
+    #f4efe4 0px,
+    #f4efe4 1.5px,
+    #cfc3ab 2px,
+    #ebe3d3 3px
+  );
+  box-shadow: inset 2px 0 4px rgba(0, 0, 0, 0.15);
 }
 .book-base {
-  bottom: calc((var(--book-depth) - 4px) / -2 + 2px);
+  left: 2px;
+  top: auto !important;
+  bottom: calc((var(--book-depth) - 4px) / -2 + 3px);
+  width: calc(100% - 5px);
+  height: calc(var(--book-depth) - 4px);
   transform: rotateX(-90deg);
+  backface-visibility: visible !important;
+  background: repeating-linear-gradient(
+    0deg,
+    #f4efe4 0px,
+    #f4efe4 1.5px,
+    #cfc3ab 2px,
+    #ebe3d3 3px
+  );
+  box-shadow: inset 2px 0 4px rgba(0, 0, 0, 0.15);
 }
 .book-inside {
   position: absolute;
   inset: 3px;
   background: #eee6d2;
   color: #455040;
-  transform: translateZ(calc(var(--book-depth) / 2 - 1px));
+  transform: translateZ(calc(var(--book-depth) / 2 - 2px));
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -939,9 +1132,19 @@
   text-align: center;
   backface-visibility: hidden;
   overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s ease 0.65s, visibility 0.25s ease 0.65s;
+}
+.book-open .book-inside {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.3s ease 0.1s, visibility 0.3s ease 0.1s;
 }
 .catalog-book-model .book-inside {
-  display: none;
+  display: none !important;
 }
 .book-inside > span {
   font-size: 6px;
@@ -1035,8 +1238,35 @@
   box-shadow: 0 8px 26px #183b2415;
 }
 .storefront .book-grid {
-  gap: 28px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 42px 20px;
 }
+@media (max-width: 1240px) {
+  .storefront .book-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 38px 18px;
+  }
+}
+@media (max-width: 980px) {
+  .storefront .book-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 34px 16px;
+  }
+}
+@media (max-width: 680px) {
+  .storefront .book-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 30px 14px;
+  }
+}
+@media (max-width: 400px) {
+  .storefront .book-grid {
+    grid-template-columns: 1fr;
+    gap: 26px 16px;
+  }
+}
+
 .storefront .book-card {
   position: relative;
   border: 0;
@@ -1071,122 +1301,719 @@
   mix-blend-mode: soft-light;
 }
 .catalog-book-stage {
-  --book-width: 140px;
-  --book-height: 190px;
-  --book-depth: 18px;
-  height: 280px;
-  display: grid;
-  place-items: center;
+  height: 242px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   position: relative;
-  perspective: 800px;
   overflow: hidden;
   border-radius: inherit;
-  background: radial-gradient(ellipse at 50% 30%, #f2f8ff, #d7e9fa);
+  background:
+    radial-gradient(ellipse at 50% 90%, rgba(37, 99, 166, 0.12) 0%, transparent 65%),
+    radial-gradient(ellipse at 50% 25%, #ffffff 0%, #edf5fc 55%, #dbeafe 100%);
+  border: 1px solid rgba(191, 219, 254, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 3px 12px rgba(37, 99, 166, 0.06);
+  padding: 8px 8px 12px;
+  perspective: 900px;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
-.card-palette-A .catalog-book-stage,
-.card-palette-mahogany .catalog-book-stage {
-  background: radial-gradient(ellipse at 50% 30%, #faf1ee, #ebdcd6);
+
+:is(.dark *) .catalog-book-stage {
+  background:
+    radial-gradient(ellipse at 50% 90%, rgba(147, 197, 253, 0.1) 0%, transparent 65%),
+    radial-gradient(ellipse at 50% 25%, #1e385b 0%, #132742 55%, #0b1728 100%);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 18px rgba(0, 0, 0, 0.4);
 }
-.card-palette-B .catalog-book-stage,
-.card-palette-navy .catalog-book-stage {
-  background: radial-gradient(ellipse at 50% 30%, #eef7ff, #d4e6f8);
+
+/* ==========================================================================
+   AUTHENTIC 3D VIRTUAL UNIVERSITY TEXTBOOK MOCKUP
+   Matches vu_cs101_textbook_cover_1792218959940.jpg EXACTLY
+   ========================================================================== */
+.vu-textbook-3d {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transform-style: preserve-3d;
 }
-.card-palette-C .catalog-book-stage,
-.card-palette-emerald .catalog-book-stage {
-  background: radial-gradient(ellipse at 50% 30%, #f0f8f4, #d5e7de);
+
+/* Dedicated soft 3D floor shadow layer */
+.vu-textbook-3d::after {
+  content: "";
+  position: absolute;
+  width: 136px;
+  height: 200px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-38%, -44%) rotateY(-18deg) rotateX(4deg) rotateZ(-2.5deg);
+  background: rgba(15, 23, 42, 0.32);
+  filter: blur(13px);
+  border-radius: 5px;
+  pointer-events: none;
+  z-index: 0;
+  transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.38s ease, filter 0.38s ease;
 }
-.card-palette-D .catalog-book-stage,
-.card-palette-plum .catalog-book-stage,
-.card-palette-cream .catalog-book-stage {
-  background: radial-gradient(ellipse at 50% 30%, #f9f2f5, #eadbe3);
+
+.book-card:hover .vu-textbook-3d::after,
+.cover-link:hover .vu-textbook-3d::after,
+.catalog-book-stage:hover .vu-textbook-3d::after,
+.vu-textbook-3d:hover::after,
+.cover-link:focus-visible .vu-textbook-3d::after,
+.cover-link:focus-within .vu-textbook-3d::after,
+.cover-link:active .vu-textbook-3d::after,
+.book-card:active .vu-textbook-3d::after,
+.catalog-book-stage:active .vu-textbook-3d::after,
+.vu-textbook-3d.is-straight::after {
+  transform: translate(-50%, -46%) rotateY(0deg) rotateX(0deg) rotateZ(0deg) scale(1.02);
+  background: rgba(15, 23, 42, 0.38);
+  filter: blur(16px);
+}
+
+.vu-textbook-wrapper {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 144px;
+  height: 208px;
+  border-radius: 3px 5px 5px 3px;
+  transform-style: preserve-3d;
+  /* Authentic 3D Book Angle - tilted slightly with a 3D perspective */
+  transform: rotateY(-18deg) rotateX(4deg) rotateZ(-2.5deg) translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
+  outline: 1px solid transparent;
+  z-index: 1;
+  box-shadow: 8px 12px 18px -3px rgba(15, 23, 42, 0.28), 2px 5px 7px rgba(15, 23, 42, 0.12);
+  transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.38s ease;
+}
+
+/* Hover or click: small lift effect and becomes straight */
+.book-card:hover .vu-textbook-wrapper,
+.cover-link:hover .vu-textbook-wrapper,
+.catalog-book-stage:hover .vu-textbook-wrapper,
+.vu-textbook-3d:hover .vu-textbook-wrapper,
+.vu-textbook-wrapper:hover,
+.cover-link:focus-visible .vu-textbook-wrapper,
+.cover-link:focus-within .vu-textbook-wrapper,
+.cover-link:active .vu-textbook-wrapper,
+.book-card:active .vu-textbook-wrapper,
+.catalog-book-stage:active .vu-textbook-wrapper,
+.vu-textbook-wrapper:active,
+.vu-textbook-3d.is-straight .vu-textbook-wrapper,
+.vu-textbook-wrapper.is-straight {
+  transform: translateY(-8px) rotateY(0deg) rotateX(0deg) rotateZ(0deg) scale(1.02) translateZ(0);
+  box-shadow: 0 16px 26px -3px rgba(15, 23, 42, 0.32), 0 4px 10px rgba(15, 23, 42, 0.15);
+}
+
+/* 1. Left Spine (3D Realistic Curve with wrapping stripes) */
+.vu-textbook-spine {
+  width: 13px;
+  flex-shrink: 0;
+  border-radius: 3px 0 0 3px;
+  background:
+    linear-gradient(90deg, #0e1e47 0%, #1e40af 45%, #18337a 80%, #0d1a3d 100%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 1.5px 0 3px rgba(255, 255, 255, 0.15), inset -1.5px 0 3px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+.vu-spine-header {
+  height: 32px;
+  border-bottom: 1.5px solid #ffffff;
+  background: linear-gradient(90deg, #132a63 0%, #1e3a8a 100%);
+}
+
+.vu-spine-ribbon-top {
+  height: 19px;
+  background: #f5b821; /* Solid yellow without gradient */
+  border-top: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+}
+
+.vu-spine-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: linear-gradient(90deg, #112659 0%, #1e40af 60%, #163278 100%);
+}
+
+.vu-spine-code {
+  writing-mode: vertical-rl;
+  font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+  font-size: 6.8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #fbbf24;
+  opacity: 0.95;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.vu-spine-ribbon-bottom {
+  height: 20px;
+  background: #f5b821; /* Solid yellow without gradient */
+  border-top: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+}
+
+.vu-spine-footer {
+  height: 22px;
+  background: linear-gradient(90deg, #0b142e 0%, #172554 100%);
+}
+
+/* 2. Front Cover Main Face */
+.vu-textbook-front {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.25), inset -1px 0 0 rgba(0, 0, 0, 0.2);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* Custom Cover Image inside 3D wrapper */
+.vu-textbook-front.has-custom-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Left Crease Shadow on Front Cover */
+.vu-textbook-front::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.06) 70%, transparent 100%);
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* 3. Right Page Edge Block (White Paper Thickness) */
+.vu-textbook-pages {
+  width: 11px;
+  flex-shrink: 0;
+  border-radius: 0 2px 2px 0;
+  background:
+    linear-gradient(90deg, #d3cbb7 0%, #f6f3eb 15%, #ffffff 40%, #e8e2d4 85%, #cfc7b2 100%);
+  position: relative;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.15), inset 0 -2px 3px rgba(0, 0, 0, 0.2);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+/* Repeating fine paper lines on edge */
+.vu-textbook-pages::after {
+  content: "";
+  position: absolute;
+  inset: 3px 0 3px 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 1.5px,
+    rgba(140, 130, 110, 0.35) 2px,
+    transparent 2.5px
+  );
+  pointer-events: none;
+}
+/* Top & Bottom Hardcover Lip Rim */
+.vu-textbook-pages::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  right: -2px;
+  width: 3px;
+  background: #14285e;
+  border-radius: 0 2px 2px 0;
+}
+
+/* --- Front Cover Internal Elements --- */
+
+/* 1. Top Header (Royal Navy Blue) */
+.vu-tb-header {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px 0 8px;
+  background: #1e3a8a;
+  border-bottom: 1.5px solid #ffffff;
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+.vu-tb-logo-box {
+  flex-shrink: 0;
+  width: 29px;
+  border: 1px solid #ffffff;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  background: #ffffff;
+  display: flex;
+}
+.vu-tb-logo-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.vu-tb-notes {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-style: italic;
+  font-weight: 400; /* Times New Roman without bold */
+  font-size: 9.5px;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* 2. Hanging Bookmark Ribbon Tab Motif */
+.vu-tb-hanging-tab {
+  position: absolute;
+  top: 32px;
+  left: 9px;
+  width: 17px;
+  height: 26px;
+  background: linear-gradient(90deg, #f5af1f 0%, #fbd144 35%, #f5af1f 75%, #df990f 100%);
+  z-index: 5;
+  filter: drop-shadow(1.5px 1.5px 2px rgba(0, 0, 0, 0.45)) drop-shadow(0.5px 2px 3px rgba(0, 0, 0, 0.25));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+}
+
+/* 3. Golden Course Code Ribbon Bar (#f5b821 - Solid Yellow Without Gradient) */
+.vu-tb-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: #f5b821; /* Solid yellow without gradient */
+  height: 19px;
+  padding: 0 10px 0 30px;
+  border-top: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+  position: relative;
+  z-index: 3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+  box-sizing: border-box;
+}
+.vu-tb-code-text {
+  font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0c1d3b;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* 4. Center Main Body (Cobalt / Royal Blue Gradient #1e40af to #1e3a8a) */
+.vu-tb-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
+  position: relative;
+  text-align: center;
+  overflow: hidden;
+}
+
+.vu-tb-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0.10; /* ~8-12% opacity as requested */
+}
+.vu-tb-watermark svg {
+  width: 92%;
+  height: 92%;
+  color: #ffffff;
+}
+
+.vu-tb-title {
+  font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+  font-stretch: condensed;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  margin: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  z-index: 2;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: 0 4px;
+  word-break: break-word;
+}
+
+.vu-tb-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 6px;
+  width: 74%;
+  z-index: 2;
+}
+.vu-tb-line {
+  flex: 1;
+  height: 1.2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+}
+.vu-tb-dots {
+  font-size: 7px;
+  color: #ffffff;
+  opacity: 0.9;
+  letter-spacing: 1px;
+}
+.vu-tb-star {
+  font-size: 8px;
+  color: #ffffff;
+  opacity: 0.95;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+/* 5. Lower Golden Slogan Ribbon Bar (#f5b821 - Solid Yellow Without Gradient) */
+.vu-tb-slogan-bar {
+  background: #f5b821; /* Solid yellow without gradient */
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-top: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.16);
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+}
+.vu-tb-slogan-bar span {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 5.6px;
+  font-style: italic;
+  font-weight: 900;
+  color: #0b1a30;
+  letter-spacing: 0.15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* 6. Footer Bar (Deep Blue/Indigo #172554, Strictly 1 Single Line) */
+.vu-tb-footer-bar {
+  background: #172554;
+  height: 21px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.vu-tb-footer-bar span {
+  font-family: "Arial Narrow", Arial, sans-serif !important;
+  font-size: 6.5px;
+  font-weight: 500; /* Arial Narrow Regular / Not Bold */
+  color: #ffffff;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: block;
+  text-align: center;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .vu-textbook-3d::after {
+    width: 135px;
+    height: 190px;
+  }
+  .vu-textbook-wrapper {
+    width: 145px;
+    height: 198px;
+  }
+  .vu-textbook-spine {
+    width: 12px;
+  }
+  .vu-spine-header {
+    height: 30px;
+  }
+  .vu-spine-ribbon-top {
+    height: 18px;
+  }
+  .vu-spine-ribbon-bottom {
+    height: 19px;
+  }
+  .vu-spine-footer {
+    height: 20px;
+  }
+  .vu-textbook-pages {
+    width: 11px;
+  }
+  .vu-spine-code {
+    font-size: 6px;
+  }
+  .vu-tb-header {
+    height: 30px;
+    padding: 0 24px 0 6px;
+  }
+  .vu-tb-logo-box {
+    width: 28px;
+  }
+  .vu-tb-notes {
+    font-size: 8px;
+  }
+  .vu-tb-hanging-tab {
+    top: 30px;
+    left: 8px;
+    width: 14px;
+    height: 24px;
+    background: linear-gradient(90deg, #f5af1f 0%, #fbd144 35%, #f5af1f 75%, #df990f 100%);
+    filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.45));
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  }
+  .vu-tb-code-bar {
+    height: 18px;
+    padding: 0 8px 0 25px;
+  }
+  .vu-tb-code-text {
+    font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .vu-tb-title {
+    font-family: "Arial Narrow Bold", "Arial Narrow", Arial, sans-serif !important;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .vu-tb-slogan-bar {
+    height: 19px;
+  }
+  .vu-tb-slogan-bar span {
+    font-size: 5.5px;
+  }
+  .vu-tb-footer-bar {
+    height: 20px;
+    padding: 0 4px;
+  }
+  .vu-tb-footer-bar span {
+    font-family: "Arial Narrow", Arial, sans-serif !important;
+    font-size: 5.4px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
 }
 .catalog-book-model {
   width: var(--book-width);
   height: var(--book-height);
-  transform: rotateX(6deg) rotateY(-18deg) rotateZ(-4deg);
+  transform: rotateX(2deg) rotateY(-8deg) rotateZ(-1deg);
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .book-card:hover .catalog-book-model,
 .cover-link:focus-visible .catalog-book-model {
-  transform: translateY(-8px) rotateX(2deg) rotateY(-6deg) rotateZ(-1deg);
+  transform: translateY(-8px) rotateX(0deg) rotateY(-3deg) rotateZ(0deg);
 }
 .catalog-book-shadow {
   position: absolute;
-  width: 130px;
-  height: 15px;
-  bottom: 27px;
+  width: 165px;
+  height: 18px;
+  bottom: 14px;
   border-radius: 50%;
-  background: #203f3445;
-  filter: blur(9px);
-  transform: rotate(-5deg);
+  background: rgba(15, 23, 42, 0.25);
+  filter: blur(10px);
+  transform: rotate(-2deg);
   transition:
     transform 0.6s,
     opacity 0.6s;
 }
 .book-card:hover .catalog-book-shadow {
-  transform: scale(0.8);
-  opacity: 0.6;
+  transform: scale(0.85);
+  opacity: 0.5;
 }
 .catalog-book-model .book-front-art {
-  padding: 17px 15px 14px 19px;
+  padding: 0;
 }
-.catalog-book-model .book-imprint {
-  font-size: 4.5px;
-  gap: 4px;
+.catalog-book-model .vu-cover {
+  padding: 0 !important;
 }
-.catalog-book-model .book-imprint svg {
-  width: 9px;
+.catalog-book-model .vu-cover::after {
+  display: none !important;
 }
-.catalog-book-model .book-cover-name {
-  font-size: 18px;
-  margin-top: 16px;
+.catalog-book-model .book-front-lining {
+  display: none !important;
 }
-.catalog-book-model .book-long-title .book-cover-name {
-  font-size: 14px;
+.catalog-book-model .vu-cover-header {
+  padding: 8px 12px 7px 12px;
 }
-.catalog-book-model .book-line-art i {
-  width: 45px;
-  height: 45px;
+.catalog-book-model .vu-logo-box {
+  padding: 2px 4px;
 }
-.catalog-book-model .book-cover-footer {
-  font-size: 6px;
+.catalog-book-model .vu-svg-emblem {
+  width: 24px;
+  height: 12px;
 }
-.catalog-book-model .book-cover-footer > span:last-child {
-  font-size: 4px;
+.catalog-book-model .vu-logo-sub {
+  font-size: 3.2px;
+}
+.catalog-book-model .vu-lecture-notes {
+  font-size: 9.5px;
+}
+.catalog-book-model .vu-code-ribbon {
+  padding: 4px 12px 4px 0;
+}
+.catalog-book-model .vu-code-badge {
+  font-size: 15px;
+}
+.catalog-book-model .vu-book-title {
+  font-size: 13.5px;
+  line-height: 1.3;
+  padding: 0 4px;
+}
+.catalog-book-model .vu-divider {
+  margin-top: 6px;
+  width: 60%;
+}
+.catalog-book-model .vu-slogan-ribbon {
+  padding: 4px 6px;
+}
+.catalog-book-model .vu-slogan-ribbon span {
+  font-size: 6.2px;
+}
+.catalog-book-model .vu-cover-footer {
+  padding: 6px 4px;
+}
+.catalog-book-model .vu-cover-footer span {
+  font-size: 6.5px;
+  letter-spacing: 0.8px;
 }
 .storefront .cover-badge {
-  top: 13px;
-  right: 13px;
-  padding: 5px 8px;
-  background: #ffffffa8;
-  border: 1px solid #ffffffa8;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  background: rgba(219, 234, 254, 0.75);
+  color: #1e3a8a;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: 5px;
+  box-shadow: 0 1px 4px rgba(30, 58, 138, 0.08);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
+  text-transform: uppercase;
   backdrop-filter: blur(8px);
-  font-size: 0.57rem;
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+.storefront .cover-link:hover .cover-badge {
+  background: rgba(219, 234, 254, 0.95);
+  color: #1d4ed8;
+  border-color: rgba(30, 64, 175, 0.45);
+  box-shadow: 0 3px 10px rgba(30, 64, 175, 0.16);
+  transform: translateY(-1px);
+}
+:is(.dark *) .storefront .cover-badge {
+  background: rgba(15, 28, 48, 0.82);
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.26);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+:is(.dark *) .storefront .cover-link:hover .cover-badge {
+  background: rgba(23, 42, 75, 0.95);
+  color: #bfdbfe;
+  border-color: rgba(147, 197, 253, 0.45);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
 }
 .storefront .book-info {
-  padding: 17px 2px 0;
+  padding: 12px 2px 0;
 }
-.storefront .book-meta {
-  font-size: 0.66rem;
-  margin: 0 0 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+.storefront .book-title-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
 }
-.storefront .book-info h3 {
-  font-family: 'Lora', Georgia, serif;
-  font-size: 1.05rem;
-  font-weight: 500;
-  line-height: 1.35;
+.storefront .book-title-combined {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 550;
+  line-height: 1.34;
+  min-height: 2.68em;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+.storefront .book-title-combined .title-code {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: #2563eb;
+  letter-spacing: 0.02em;
+}
+:is(.dark *) .storefront .book-title-combined .title-code {
+  color: #60a5fa;
+}
+.storefront .book-title-combined .title-sep {
+  color: #94a3b8;
+  font-weight: 400;
+  opacity: 0.75;
+  margin: 0 3px;
+}
+.storefront .book-title-combined .title-name {
+  font-weight: 550;
+  color: var(--foreground);
+  transition: color 0.15s ease;
+}
+.storefront .book-title-link:hover .title-name {
+  color: var(--primary);
 }
 .storefront .book-info .small-text {
   font-size: 0.72rem;
 }
 .storefront .book-bottom {
   padding-top: 0;
-  margin-top: 8px;
+  margin-top: 4px;
   border-top: none;
 }
 .storefront .book-bottom strong {
@@ -1635,49 +2462,54 @@
   .catalog-book-model .book-front-art {
     padding: 12px 11px 10px 14px;
   }
-  .catalog-book-model .book-imprint {
-    font-size: 3.5px;
-    letter-spacing: 0.08em;
+  .catalog-book-model .vu-cover {
+    padding: 0 !important;
   }
-  .catalog-book-model .book-imprint svg {
-    width: 7px;
+  .catalog-book-model .vu-cover::after {
+    display: none !important;
   }
-  .catalog-book-model .book-cover-name {
-    font-size: 14px;
-    margin-top: 12px;
+  .catalog-book-model .vu-cover-header {
+    padding: 5px 6px 4px 8px;
   }
-  .catalog-book-model .book-long-title .book-cover-name {
-    font-size: 11px;
+  .catalog-book-model .vu-svg-emblem {
+    width: 15px;
+    height: 8px;
   }
-  .catalog-book-model .book-line-art i {
-    width: 32px;
-    height: 32px;
+  .catalog-book-model .vu-logo-sub {
+    font-size: 2.3px;
   }
-  .catalog-book-model .book-cover-footer {
+  .catalog-book-model .vu-lecture-notes {
+    font-size: 6px;
+  }
+  .catalog-book-model .vu-code-badge {
+    font-size: 9.5px;
+  }
+  .catalog-book-model .vu-book-title {
+    font-size: 9px;
+  }
+  .catalog-book-model .vu-slogan-ribbon span {
+    font-size: 4.2px;
+  }
+  .catalog-book-model .vu-cover-footer span {
     font-size: 4.5px;
-    margin-top: 6px;
-  }
-  .catalog-book-model .book-cover-footer > span:last-child {
-    font-size: 3px;
-  }
-  .catalog-book-model .book-front-art::after {
-    inset: 5px 5px 5px 9px;
   }
   .catalog-book-shadow {
     width: 93px;
     bottom: 30px;
   }
   .storefront .cover-badge {
-    font-size: 0.45rem;
+    font-size: 0.6rem;
     top: 8px;
     right: 8px;
-    padding: 3px 6px;
+    padding: 3px 8px;
   }
   .storefront .book-info {
     padding-top: 13px;
   }
-  .storefront .book-info h3 {
-    font-size: 0.87rem;
+  .storefront .book-info h3,
+  .storefront .book-title-combined {
+    font-size: 0.82rem;
+    min-height: 2.7em;
   }
   .storefront .book-info .small-text {
     font-size: 0.65rem;
@@ -1686,7 +2518,7 @@
     font-size: 0.93rem;
   }
   .storefront .book-meta {
-    font-size: 0.56rem;
+    font-size: 0.64rem;
   }
   .storefront .steps {
     gap: 30px 20px;

@@ -82,6 +82,7 @@ import {
   BookExperience,
   ImmersiveHero,
   getBookPaletteClass,
+  VUBookCover3D,
 } from "./book-experience";
 import { StoreMotion } from "./store-motion";
 import { receiptDate, receiptPaymentNote } from "@/lib/receipt-format";
@@ -395,10 +396,7 @@ function Cover({ book, small = false }: { book: Book; small?: boolean }) {
   if (!small)
     return (
       <div className="catalog-book-stage">
-        <div className="catalog-book-shadow" />
-        <div className="catalog-book-model">
-          <BookObject book={book} />
-        </div>
+        <VUBookCover3D book={book} />
       </div>
     );
   return book.cover ? (
@@ -439,14 +437,15 @@ function BookCard({ book }: { book: Book }) {
         aria-label={`View ${book.title} (${book.code})`}
       >
         <Cover book={book} />
-        <span className="cover-badge">{book.course_code}</span>
+        <span className="cover-badge">{book.course_code || book.code}</span>
       </a>
       <div className="book-info">
-        <div className="book-meta">
-          <span>{book.pages} pages</span>
-        </div>
-        <a href={"/books/" + book.code.toLowerCase()}>
-          <h3>{book.title}</h3>
+        <a href={"/books/" + book.code.toLowerCase()} className="book-title-link">
+          <h3 className="book-title-combined">
+            <span className="title-code">{book.code || book.course_code}</span>
+            <span className="title-sep"> — </span>
+            <span className="title-name">{book.title}</span>
+          </h3>
         </a>
         <div className="book-bottom">
           <div>
@@ -613,7 +612,7 @@ function CatalogView({
         </div>
       )}
       <div className="book-grid">
-        {(isHome && !query ? matches.slice(0, 12) : matches).map((b) => (
+        {(isHome && !query ? matches.slice(0, 15) : matches).map((b) => (
           <BookCard key={b.id} book={b} />
         ))}
       </div>

@@ -238,8 +238,32 @@ small {
 
 .book-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 42px 20px;
+}
+@media (max-width: 1240px) {
+  .book-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 38px 18px;
+  }
+}
+@media (max-width: 980px) {
+  .book-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 34px 16px;
+  }
+}
+@media (max-width: 680px) {
+  .book-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 30px 14px;
+  }
+}
+@media (max-width: 400px) {
+  .book-grid {
+    grid-template-columns: 1fr;
+    gap: 26px 16px;
+  }
 }
 
 .book-card {
@@ -404,15 +428,25 @@ small {
 
 .cover-badge {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  background: #ffffffdd;
-  color: #263d34;
-  border-radius: 30px;
-  padding: 4px 9px;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  font-weight: 650;
+  top: 8px;
+  right: 8px;
+  background: rgba(219, 234, 254, 0.75);
+  color: #1e3a8a;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 0 1px 4px rgba(30, 58, 138, 0.08);
+}
+:is(.dark *) .cover-badge {
+  background: rgba(15, 28, 48, 0.82);
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.26);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .book-info {
@@ -421,9 +455,9 @@ small {
 
 .book-info h3 {
   font-size: 1.02rem;
-  line-height: 1.4;
-  min-height: 2.8em;
-  margin-bottom: 7px;
+  line-height: 1.34;
+  min-height: 2.65em;
+  margin-bottom: 4px;
 }
 
 .book-meta {
@@ -444,12 +478,13 @@ small {
   color: var(--destructive);
 }
 
-.book-card h3,
+.book-card .book-info h3,
 .book-info h3 {
-  font-family: 'Lora', Georgia, serif;
-  font-size: 1.05rem;
-  font-weight: 500;
-  line-height: 1.35;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 550;
+  line-height: 1.34;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -1935,8 +1970,8 @@ details summary {
   }
 
   .book-info h3 {
-    font-size: 0.87rem;
-    min-height: 3.5em;
+    font-size: 0.82rem;
+    min-height: 2.7em;
   }
 
   .book-meta {

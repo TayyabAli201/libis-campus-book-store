@@ -150,3 +150,6 @@ outputs/
 *.db
 *.sqlite
 *.sqlite3
+
+# Temporary scratch files
+scratch/

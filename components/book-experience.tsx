@@ -57,6 +57,137 @@ export function getBookPaletteClass(book: {
   return palettes[Math.abs(hash) % palettes.length];
 }
 
+export function VUBookCover3D({
+  book,
+  className = "",
+}: {
+  book: { code?: string; title?: string; course_code?: string; cover?: string | null };
+  className?: string;
+}) {
+  const [isStraight, setIsStraight] = useState(false);
+  const code = (book.course_code || book.code || "VU").toUpperCase();
+  const title = book.title || "Course Material";
+  const straightClass = isStraight ? "is-straight" : "";
+
+  if (book.cover) {
+    return (
+      <div
+        className={`vu-textbook-3d ${straightClass} ${className}`}
+        onClick={() => setIsStraight((prev) => !prev)}
+        onMouseEnter={() => setIsStraight(true)}
+        onMouseLeave={() => setIsStraight(false)}
+      >
+        <div className="vu-textbook-wrapper">
+          <div className="vu-textbook-spine" />
+          <div className="vu-textbook-front has-custom-cover">
+            <img src={book.cover} alt={`${title} cover`} loading="lazy" />
+          </div>
+          <div className="vu-textbook-pages" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`vu-textbook-3d ${straightClass} ${className}`}
+      onClick={() => setIsStraight((prev) => !prev)}
+      onMouseEnter={() => setIsStraight(true)}
+      onMouseLeave={() => setIsStraight(false)}
+    >
+      <div className="vu-textbook-wrapper">
+        {/* Left 3D Spine with matching wrapping stripes */}
+        <div className="vu-textbook-spine">
+          <div className="vu-spine-header" />
+          <div className="vu-spine-ribbon-top" />
+          <div className="vu-spine-body">
+            <span className="vu-spine-code">{code}</span>
+          </div>
+          <div className="vu-spine-ribbon-bottom" />
+          <div className="vu-spine-footer" />
+        </div>
+
+        {/* Front Cover Face */}
+        <div className="vu-textbook-front">
+          {/* 1. Header (Royal Blue with VU Badge & Lecture Notes) */}
+          <div className="vu-tb-header">
+            <div className="vu-tb-logo-box">
+              <img
+                src="/vu-logo.jpg"
+                alt="Virtual University"
+                className="vu-tb-logo-img"
+              />
+            </div>
+            <span className="vu-tb-notes">Notes</span>
+          </div>
+
+          {/* 2. Hanging Ribbon Tab with Swallowtail Notch */}
+          <div className="vu-tb-hanging-tab" aria-hidden="true" />
+
+          {/* 3. Golden Course Code Ribbon */}
+          <div className="vu-tb-code-bar">
+            <span className="vu-tb-code-text">{code}</span>
+          </div>
+
+          {/* 4. Center Main Body with Watermark & Title */}
+          <div className="vu-tb-body">
+            <div className="vu-tb-watermark" aria-hidden="true">
+              <svg viewBox="0 0 200 240" fill="none" stroke="currentColor">
+                {/* Open Book - Top Left */}
+                <path d="M 25 35 Q 45 28 65 35 L 65 65 Q 45 58 25 65 Z" strokeWidth="1.6" opacity="0.14" />
+                <path d="M 65 35 Q 85 28 105 35 L 105 65 Q 85 58 65 65 Z" strokeWidth="1.6" opacity="0.14" />
+                {/* Globe - Top Middle */}
+                <circle cx="140" cy="45" r="22" strokeWidth="1.5" opacity="0.13" />
+                <ellipse cx="140" cy="45" rx="9" ry="22" strokeWidth="1.2" opacity="0.11" />
+                <line x1="118" y1="45" x2="162" y2="45" strokeWidth="1.2" opacity="0.11" />
+                {/* Atom Orbits - Top Right */}
+                <ellipse cx="180" cy="50" rx="16" ry="6" transform="rotate(35 180 50)" strokeWidth="1.3" opacity="0.13" />
+                <ellipse cx="180" cy="50" rx="16" ry="6" transform="rotate(-35 180 50)" strokeWidth="1.3" opacity="0.13" />
+                <circle cx="180" cy="50" r="3" fill="currentColor" opacity="0.15" />
+                {/* Slanted Pencil - Mid Right */}
+                <path d="M 175 120 L 160 160 L 155 155 L 170 115 Z" strokeWidth="1.4" opacity="0.13" />
+                <polygon points="160,160 155,155 152,163" strokeWidth="1.2" opacity="0.13" />
+                {/* Graduation Cap - Bottom Right */}
+                <polygon points="150,185 185,198 150,211 115,198" strokeWidth="1.5" opacity="0.14" />
+                <path d="M 130 205 L 130 218 C 130 223 170 223 170 218 L 170 205" strokeWidth="1.4" opacity="0.13" />
+                <line x1="185" y1="198" x2="190" y2="218" strokeWidth="1.2" opacity="0.13" />
+                {/* Globe & Books - Bottom Left */}
+                <circle cx="50" cy="190" r="18" strokeWidth="1.4" opacity="0.13" />
+                <ellipse cx="50" cy="190" rx="7" ry="18" strokeWidth="1.1" opacity="0.11" />
+                <line x1="32" y1="190" x2="68" y2="190" strokeWidth="1.1" opacity="0.11" />
+                <path d="M 30 220 L 70 220 L 70 225 L 30 225 Z" strokeWidth="1.2" opacity="0.13" />
+              </svg>
+            </div>
+
+            <h3 className="vu-tb-title">{title}</h3>
+
+            <div className="vu-tb-divider">
+              <span className="vu-tb-line" />
+              <span className="vu-tb-dots">··</span>
+              <span className="vu-tb-star">✦</span>
+              <span className="vu-tb-dots">··</span>
+              <span className="vu-tb-line" />
+            </div>
+          </div>
+
+          {/* 5. Lower Golden Slogan Ribbon */}
+          <div className="vu-tb-slogan-bar">
+            <span>World Class Education at Your Doorstep</span>
+          </div>
+
+          {/* 6. Deep Midnight Navy Footer Bar */}
+          <div className="vu-tb-footer-bar">
+            <span>VIRTUAL UNIVERSITY OF PAKISTAN</span>
+          </div>
+        </div>
+
+        {/* Right 3D Pages Block */}
+        <div className="vu-textbook-pages" />
+      </div>
+    </div>
+  );
+}
+
 export function BookObject({
   book,
   open = false,
@@ -64,7 +195,9 @@ export function BookObject({
   book: DisplayBook;
   open?: boolean;
 }) {
-  const longTitle = book.title.length > 22;
+  const code = (book.code || "VU").toUpperCase();
+  const title = book.title || "Course Material";
+  const longTitle = title.length > 22;
   const paletteClass = getBookPaletteClass(book);
   return (
     <div
@@ -74,54 +207,109 @@ export function BookObject({
       <div className="book-face book-back">
         <BookOpen />
         <span>
-          Every great idea
+          World Class Education
           <br />
-          starts with a page.
+          at Your Doorstep.
         </span>
-        <small>CAMPUS BOOKSTORE</small>
+        <small>VIRTUAL UNIVERSITY OF PAKISTAN</small>
       </div>
-      <div className="book-face book-spine">
-        <span>{book.code}</span>
-        <span>CAMPUS</span>
+      <div className="book-face book-spine vu-textbook-spine">
+        <div className="vu-spine-header" />
+        <div className="vu-spine-ribbon-top" />
+        <div className="vu-spine-body">
+          <span className="vu-spine-code">{code}</span>
+        </div>
+        <div className="vu-spine-ribbon-bottom" />
+        <div className="vu-spine-footer" />
       </div>
       <div className="book-face book-pages" />
       <div className="book-face book-top" />
       <div className="book-face book-base" />
       <div className="book-inside">
-        <span>YOUR NEXT CHAPTER</span>
+        <span>VIRTUAL UNIVERSITY</span>
         <BookOpen />
-        <strong>{book.title}</strong>
+        <strong>{title}</strong>
         <p>
-          Make room for
-          <br />a little more curiosity.
+          World Class Education
+          <br />at Your Doorstep.
         </p>
-        <small>{book.code} · COURSE MATERIALS</small>
+        <small>{code} · OFFICIAL LECTURE NOTES</small>
       </div>
       <div className="book-face book-front">
-        <div className="book-front-art">
+        <div className="book-front-art vu-textbook-front">
           {book.cover ? (
-            <img src={book.cover} alt="" loading="lazy" />
+            <img src={book.cover} alt={`${title} cover`} loading="lazy" />
           ) : (
             <>
-              <span className="book-imprint">
-                <BookOpen size={13} /> CAMPUS EDITIONS
-              </span>
-              <span className="book-cover-name">{book.title}</span>
-              <div className="book-line-art">
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
+              {/* 1. Header (Royal Blue with VU Badge & Lecture Notes) */}
+              <div className="vu-tb-header">
+                <div className="vu-tb-logo-box">
+                  <img
+                    src="/vu-logo.jpg"
+                    alt="Virtual University"
+                    className="vu-tb-logo-img"
+                  />
+                </div>
+                <span className="vu-tb-notes">Notes</span>
               </div>
-              <div className="book-cover-footer">
-                <span>{book.code}</span>
-                <span>
-                  THE COURSE
-                  <br />
-                  COLLECTION
-                </span>
+
+              {/* 2. Hanging Ribbon Tab with Swallowtail Notch */}
+              <div className="vu-tb-hanging-tab" aria-hidden="true" />
+
+              {/* 3. Golden Course Code Ribbon */}
+              <div className="vu-tb-code-bar">
+                <span className="vu-tb-code-text">{code}</span>
+              </div>
+
+              {/* 4. Center Main Body with Watermark & Title */}
+              <div className="vu-tb-body">
+                <div className="vu-tb-watermark" aria-hidden="true">
+                  <svg viewBox="0 0 200 240" fill="none" stroke="currentColor">
+                    {/* Open Book - Top Left */}
+                    <path d="M 25 35 Q 45 28 65 35 L 65 65 Q 45 58 25 65 Z" strokeWidth="1.6" opacity="0.14" />
+                    <path d="M 65 35 Q 85 28 105 35 L 105 65 Q 85 58 65 65 Z" strokeWidth="1.6" opacity="0.14" />
+                    {/* Globe - Top Middle */}
+                    <circle cx="140" cy="45" r="22" strokeWidth="1.5" opacity="0.13" />
+                    <ellipse cx="140" cy="45" rx="9" ry="22" strokeWidth="1.2" opacity="0.11" />
+                    <line x1="118" y1="45" x2="162" y2="45" strokeWidth="1.2" opacity="0.11" />
+                    {/* Atom Orbits - Top Right */}
+                    <ellipse cx="180" cy="50" rx="16" ry="6" transform="rotate(35 180 50)" strokeWidth="1.3" opacity="0.13" />
+                    <ellipse cx="180" cy="50" rx="16" ry="6" transform="rotate(-35 180 50)" strokeWidth="1.3" opacity="0.13" />
+                    <circle cx="180" cy="50" r="3" fill="currentColor" opacity="0.15" />
+                    {/* Slanted Pencil - Mid Right */}
+                    <path d="M 175 120 L 160 160 L 155 155 L 170 115 Z" strokeWidth="1.4" opacity="0.13" />
+                    <polygon points="160,160 155,155 152,163" strokeWidth="1.2" opacity="0.13" />
+                    {/* Graduation Cap - Bottom Right */}
+                    <polygon points="150,185 185,198 150,211 115,198" strokeWidth="1.5" opacity="0.14" />
+                    <path d="M 130 205 L 130 218 C 130 223 170 223 170 218 L 170 205" strokeWidth="1.4" opacity="0.13" />
+                    <line x1="185" y1="198" x2="190" y2="218" strokeWidth="1.2" opacity="0.13" />
+                    {/* Globe & Books - Bottom Left */}
+                    <circle cx="50" cy="190" r="18" strokeWidth="1.4" opacity="0.13" />
+                    <ellipse cx="50" cy="190" rx="7" ry="18" strokeWidth="1.1" opacity="0.11" />
+                    <line x1="32" y1="190" x2="68" y2="190" strokeWidth="1.1" opacity="0.11" />
+                    <path d="M 30 220 L 70 220 L 70 225 L 30 225 Z" strokeWidth="1.2" opacity="0.13" />
+                  </svg>
+                </div>
+
+                <h3 className="vu-tb-title">{title}</h3>
+
+                <div className="vu-tb-divider">
+                  <span className="vu-tb-line" />
+                  <span className="vu-tb-dots">··</span>
+                  <span className="vu-tb-star">✦</span>
+                  <span className="vu-tb-dots">··</span>
+                  <span className="vu-tb-line" />
+                </div>
+              </div>
+
+              {/* 5. Lower Golden Slogan Ribbon */}
+              <div className="vu-tb-slogan-bar">
+                <span>World Class Education at Your Doorstep</span>
+              </div>
+
+              {/* 6. Deep Midnight Navy Footer Bar */}
+              <div className="vu-tb-footer-bar">
+                <span>VIRTUAL UNIVERSITY OF PAKISTAN</span>
               </div>
             </>
           )}
