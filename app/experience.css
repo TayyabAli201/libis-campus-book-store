@@ -2062,6 +2062,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.order-modal-header-actions .track-receipt-btn-print,
+.order-modal-header-actions .track-receipt-btn-download {
+  padding: 6px 13px;
+  font-size: 0.82rem;
+  border-radius: 8px;
 }
 
 .rider-map-pin-banner {

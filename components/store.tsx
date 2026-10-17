@@ -698,8 +698,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
     { id: "placed", label: "Order Placed", icon: Clock },
     { id: "verified", label: "Payment Verified", icon: ShieldCheck },
     { id: "confirmed", label: "Order Confirmed", icon: CheckCircle2 },
-    { id: "processing", label: "Processing", icon: Layers },
-    { id: "ready", label: "Ready for Dispatch", icon: Package },
+    { id: "processing", label: "Printing", icon: Layers },
     { id: "shipped", label: isCampusPickup ? "Arrived at Campus - Ready for Pickup" : "Shipped", icon: isCampusPickup ? MapPin : Truck },
     { id: "delivered", label: "Delivered", icon: CheckCircle2 },
   ];
@@ -708,10 +707,9 @@ export function OrderTrackerCard({ o }: { o: any }) {
     const s = (o.status || "").toUpperCase();
     const ps = (o.payment_status || "").toUpperCase();
 
-    if (s === "DELIVERED") return 6;
-    if (s === "SHIPPED") return 5;
-    if (s === "READY" || s === "READY_FOR_DISPATCH" || s === "DISPATCHED") return 4;
-    if (s === "PROCESSING" || s === "PRINTING") return 3;
+    if (s === "DELIVERED") return 5;
+    if (s === "SHIPPED") return 4;
+    if (s === "PROCESSING" || s === "PRINTING" || s === "READY" || s === "READY_FOR_DISPATCH" || s === "DISPATCHED") return 3;
     if (s === "CONFIRMED" || s === "APPROVED") return 2;
     if (ps === "VERIFIED" || ps === "PAID" || ps === "VERIFIED_OK") return 1;
     return 0; // Order Placed
@@ -763,14 +761,14 @@ export function OrderTrackerCard({ o }: { o: any }) {
             </div>
           ) : (
             <span
-              className={`track-status-badge ${currentStep === 6
+              className={`track-status-badge ${currentStep === 5
                   ? "status-delivered"
                   : currentStep > 0
                     ? "status-active"
                     : "status-pending"
                 }`}
             >
-              {currentStep === 5 && isCampusPickup
+              {currentStep === 4 && isCampusPickup
                 ? "Arrived at Campus - Ready for Pickup"
                 : (steps[currentStep]?.label || o.payment_status || o.status || "Order Placed")}
             </span>
@@ -3228,8 +3226,8 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
           accent: "amber",
         },
         {
-          title: "Does an amount match confirm my payment?",
-          text: "No. OCR reads visible text only. An administrator must verify the actual payment before your order is processed.",
+          title: "How is my bank payment verified?",
+          text: "Our bookstore administrator verifies the bank transaction against your uploaded payment receipt before your order is approved.",
           icon: ShieldCheck,
           badge: "PAYMENTS",
           accent: "emerald",
@@ -3320,7 +3318,7 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
         },
         {
           title: "Dispatch and tracking",
-          text: "After payment verification, orders move through processing, ready for dispatch, shipped and delivered. Delivery estimates are provided by support; no guaranteed transit time is currently published.",
+          text: "After payment verification, orders move through processing, shipped and delivered. Delivery estimates are provided by support; no guaranteed transit time is currently published.",
           icon: Package,
           badge: "DISPATCH",
           accent: "amber",

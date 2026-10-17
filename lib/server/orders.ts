@@ -695,7 +695,7 @@ export async function changeStatus(
     throw new AppError(409, "This order status transition is not allowed.");
   if (
     u.role !== "SUPER_ADMIN" &&
-    !["PROCESSING", "READY", "SHIPPED", "DELIVERED"].includes(status)
+    !["PROCESSING", "SHIPPED", "DELIVERED"].includes(status)
   )
     throw new AppError(403, "Only Super Admin can cancel or handle refunds.");
   const statements = [
@@ -824,8 +824,8 @@ export async function removeCourierTracking(
 ) {
   const o = await getOrder(req, id, u);
   const at = now();
-  const nextStatus = o.status === "SHIPPED" ? "READY" : o.status;
-  const note = "Courier tracking details removed (order returned to Ready for Dispatch)";
+  const nextStatus = o.status === "SHIPPED" ? "PROCESSING" : o.status;
+  const note = "Courier tracking details removed (order returned to Printing)";
 
   const statements = [
     stmt(
@@ -877,8 +877,7 @@ export async function batchChangeStatus(
   const { fromStatus, toStatus } = params;
   const validTransitions: Record<string, string> = {
     CONFIRMED: "PROCESSING",
-    PROCESSING: "READY",
-    READY: "SHIPPED",
+    PROCESSING: "SHIPPED",
     SHIPPED: "DELIVERED",
   };
 
@@ -891,7 +890,7 @@ export async function batchChangeStatus(
 
   if (
     u.role !== "SUPER_ADMIN" &&
-    !["PROCESSING", "READY", "SHIPPED", "DELIVERED"].includes(toStatus)
+    !["PROCESSING", "SHIPPED", "DELIVERED"].includes(toStatus)
   ) {
     throw new AppError(403, "Only authorized staff can update order statuses.");
   }

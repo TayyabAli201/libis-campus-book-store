@@ -943,20 +943,15 @@ test("Batch order status progression updates filtered orders across the full lif
   const rows1 = sqlite.prepare("SELECT status FROM orders WHERE id IN (?, ?)").all(o1.id, o2.id);
   assert.deepEqual(rows1.map((r) => r.status), ["PROCESSING", "PROCESSING"]);
 
-  // 2. Advance from PROCESSING to READY
-  const res2 = await (await batchRequest({ fromStatus: "PROCESSING", toStatus: "READY" })).json();
+  // 2. Advance from PROCESSING to SHIPPED
+  const res2 = await (await batchRequest({ fromStatus: "PROCESSING", toStatus: "SHIPPED" })).json();
   assert.equal(res2.count, 2);
-  assert.equal(res2.status, "READY");
+  assert.equal(res2.status, "SHIPPED");
 
-  // 3. Advance from READY to SHIPPED
-  const res3 = await (await batchRequest({ fromStatus: "READY", toStatus: "SHIPPED" })).json();
+  // 3. Advance from SHIPPED to DELIVERED
+  const res3 = await (await batchRequest({ fromStatus: "SHIPPED", toStatus: "DELIVERED" })).json();
   assert.equal(res3.count, 2);
-  assert.equal(res3.status, "SHIPPED");
-
-  // 4. Advance from SHIPPED to DELIVERED
-  const res4 = await (await batchRequest({ fromStatus: "SHIPPED", toStatus: "DELIVERED" })).json();
-  assert.equal(res4.count, 2);
-  assert.equal(res4.status, "DELIVERED");
+  assert.equal(res3.status, "DELIVERED");
 
   const finalRows = sqlite.prepare("SELECT status FROM orders WHERE id IN (?, ?)").all(o1.id, o2.id);
   assert.deepEqual(finalRows.map((r) => r.status), ["DELIVERED", "DELIVERED"]);
@@ -1137,13 +1132,13 @@ test("External courier tracking can be attached to Other City orders and tracked
   const removeData = await removeRes.json();
   assert.equal(removeData.ok, true);
   assert.equal(removeData.removed, true);
-  assert.equal(removeData.status, "READY");
+  assert.equal(removeData.status, "PROCESSING");
 
   // Verify database record
   const dbOrderAfterRemove = sqlite
     .prepare("SELECT status, courier_name, courier_tracking_id FROM orders WHERE id=?")
     .get(placed.id);
-  assert.equal(dbOrderAfterRemove.status, "READY");
+  assert.equal(dbOrderAfterRemove.status, "PROCESSING");
   assert.equal(dbOrderAfterRemove.courier_name, null);
   assert.equal(dbOrderAfterRemove.courier_tracking_id, null);
 
@@ -1155,7 +1150,7 @@ test("External courier tracking can be attached to Other City orders and tracked
   const trackAfterRemove = await trackAfterRemoveRes.json();
   assert.equal(trackAfterRemove.courier_name, undefined);
   assert.equal(trackAfterRemove.courier_tracking_id, undefined);
-  assert.equal(trackAfterRemove.status, "READY");
+  assert.equal(trackAfterRemove.status, "PROCESSING");
 });
 
 

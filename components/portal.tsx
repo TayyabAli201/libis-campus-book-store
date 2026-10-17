@@ -2052,7 +2052,7 @@ function CourierTrackingModal({
                   onClick={() => setConfirmRemove(true)}
                   disabled={busy}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                  title="Remove tracking details and return order to Ready for Dispatch"
+                  title="Remove tracking details and return order to Printing"
                 >
                   <Trash2 size={14} />
                   Remove Tracking
@@ -2085,7 +2085,7 @@ function CourierTrackingModal({
           open={confirmRemove}
           onClose={() => setConfirmRemove(false)}
           title={`Remove tracking from ${order.reference}?`}
-          description="Are you sure you want to remove the courier tracking details? If this parcel has not dispatched yet, the order status will be returned to Ready for Dispatch."
+          description="Are you sure you want to remove the courier tracking details? If this parcel has not dispatched yet, the order status will be returned to Printing."
           onConfirm={handleRemove}
         />
       </DialogContent>
@@ -2161,6 +2161,7 @@ function OrderModalPopup({
               )}
             </div>
             <div className="order-modal-header-actions">
+              {o && <ReceiptButtons order={o} />}
               {admin && o && (
                 <button
                   className="btn compact danger-button"
@@ -2325,50 +2326,34 @@ function OrderModalPopup({
                   <div className="print-only">
                     <OrderReceipt o={o} />
                   </div>
-                  <div className="panel no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
-                    <div>
-                      <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
-                      <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or download PDF</p>
-                    </div>
-                    <ReceiptButtons order={o} />
-                  </div>
                 </div>
 
                 <div className="stack no-print">
                   <div className="panel stack">
-                    <h3>Payment verification</h3>
-                    <Status value={o.payment_status} />
-                    <Status value={o.ocr_status} />
-                    <p>{o.ocr_message}</p>
-                    <div>
-                      Order total <strong>{money(o.total)}</strong>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                      <h3 style={{ margin: 0 }}>Payment verification</h3>
+                      <Status value={o.payment_status} />
                     </div>
-                    <div>
-                      Total books ordered{" "}
-                      <strong>
-                        {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
-                        {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
-                      </strong>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Order total to receive:</span>
+                        <strong style={{ fontSize: "1.08rem", color: "var(--foreground)" }}>{money(o.total)}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                        <strong style={{ fontSize: "0.9rem" }}>
+                          {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                          {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                        </strong>
+                      </div>
                     </div>
-                    <div>
-                      Detected amount{" "}
-                      <strong>
-                        {o.detected_amount === null
-                          ? "Unavailable"
-                          : money(o.detected_amount)}
-                      </strong>
-                    </div>
-                    {o.detected_amount !== null && (
-                      <div>
-                        Difference{" "}
-                        <strong>{money(o.detected_amount - o.total)}</strong>
+
+                    {o.payment_note && (
+                      <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
+                        <strong>Note:</strong> {o.payment_note}
                       </div>
                     )}
-                    <p className="small-text">
-                      OCR is an aid only. Confirm the bank transaction before
-                      approving payment.
-                    </p>
-                    {o.payment_note && <p>{o.payment_note}</p>}
                     {canUpdate && (
                       <Field label="Reason or note">
                         <textarea
@@ -2422,13 +2407,13 @@ function OrderModalPopup({
                           ...transitions[o.status]
                             .filter(
                               (s) =>
-                                admin ||
-                                [
-                                  "PROCESSING",
-                                  "READY",
-                                  "SHIPPED",
-                                  "DELIVERED",
-                                ].includes(s),
+                                s !== "READY" &&
+                                (admin ||
+                                  [
+                                    "PROCESSING",
+                                    "SHIPPED",
+                                    "DELIVERED",
+                                  ].includes(s)),
                             )
                             .map((s) => ({ value: s, label: statuses[s] })),
                         ]}
@@ -2505,18 +2490,13 @@ const STATUS_ADVANCE_FLOW: Record<
 > = {
   CONFIRMED: {
     to: "PROCESSING",
-    toLabel: "Processing",
+    toLabel: "Printing",
     fromLabel: "Order Confirmed",
   },
   PROCESSING: {
-    to: "READY",
-    toLabel: "Ready for Dispatch",
-    fromLabel: "Processing",
-  },
-  READY: {
     to: "SHIPPED",
     toLabel: "Shipped",
-    fromLabel: "Ready for Dispatch",
+    fromLabel: "Printing",
   },
   SHIPPED: {
     to: "DELIVERED",
@@ -2530,7 +2510,6 @@ const ORDER_WORKFLOW_TABS = [
   { id: "PAYMENT_PENDING", label: "Pending", title: "Pending Payment Verification", icon: "⏳", statuses: ["PAYMENT_PENDING"], urgent: true, color: "pending" },
   { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready to Print", icon: "📑", statuses: ["CONFIRMED"], color: "confirmed" },
   { id: "PROCESSING", label: "Printing", title: "Printing / In Press", icon: "🖨️", statuses: ["PROCESSING"], color: "printing" },
-  { id: "READY", label: "Ready", title: "Ready for Dispatch", icon: "📦", statuses: ["READY"], color: "ready" },
   { id: "SHIPPED", label: "Shipped", title: "Shipped / With Rider", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
   { id: "DELIVERED", label: "Delivered", title: "Delivered / Completed", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
   { id: "CANCELLED", label: "Cancelled", title: "Cancelled Orders", icon: "❌", statuses: ["CANCELLED"], color: "cancelled" },
@@ -2823,8 +2802,7 @@ function Orders({
         "Books",
         "Date",
         "Total",
-        "OCR amount / difference",
-        "Status",
+        "Payment",
         "Review",
         ...(isAdmin ? ["Actions"] : []),
       ]
@@ -2986,7 +2964,7 @@ function Orders({
             }
             title={
               statusList.length === 0
-                ? "Select a status filter (Order Confirmed, Processing, Ready for Dispatch, or Shipped) to enable status change"
+                ? "Select a status filter (Order Confirmed, Processing / Printing, or Shipped) to enable status change"
                 : statusList.length > 1
                   ? "Select a single status filter to change status"
                   : !activeFlowStep
@@ -3135,22 +3113,7 @@ function Orders({
                   booksCell,
                   formatDateDMY(o.created_at),
                   money(o.total),
-                  <div>
-                    <strong style={{ fontSize: "0.85rem" }}>
-                      {o.detected_amount === null
-                        ? "Not detected"
-                        : money(o.detected_amount)}
-                    </strong>
-                    <p className="small-text muted" style={{ margin: "2px 0 0", fontSize: "0.75rem" }}>
-                      {o.detected_amount === null
-                        ? "Manual review"
-                        : `Diff: ${money(o.detected_amount - o.total)}`}
-                    </p>
-                  </div>,
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <Status value={o.ocr_status} />
-                    <Status value={o.payment_status} />
-                  </div>,
+                  <Status value={o.payment_status} />,
                   <TableActionButton
                     onClick={() => setActiveOrderId(o.id)}
                     title={`Review payment for order ${o.reference || o.id}`}
@@ -3478,50 +3441,30 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             </div>
             <div className="stack no-print">
               <div className="panel stack">
-                <h3>Payment verification</h3>
-                <Status value={o.payment_status} />
-                <Status value={o.ocr_status} />
-                <p>{o.ocr_message}</p>
-                <div>
-                  Order total <strong>{money(o.total)}</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                  <h3 style={{ margin: 0 }}>Payment verification</h3>
+                  <Status value={o.payment_status} />
                 </div>
-                <div>
-                  Total books ordered{" "}
-                  <strong>
-                    {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
-                    {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
-                  </strong>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Order total to receive:</span>
+                    <strong style={{ fontSize: "1.08rem", color: "var(--foreground)" }}>{money(o.total)}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                    <strong style={{ fontSize: "0.9rem" }}>
+                      {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                      {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                    </strong>
+                  </div>
                 </div>
-                <div>
-                  Detected amount{" "}
-                  <strong>
-                    {o.detected_amount === null
-                      ? "Unavailable"
-                      : money(o.detected_amount)}
-                  </strong>
-                </div>
-                {o.detected_amount !== null && (
-                  <div>
-                    Difference{" "}
-                    <strong>{money(o.detected_amount - o.total)}</strong>
+
+                {o.payment_note && (
+                  <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
+                    <strong>Note:</strong> {o.payment_note}
                   </div>
                 )}
-                {admin && (
-                  <a
-                    className="btn"
-                    href={"/api/proofs/" + o.slip_id}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Download size={16} />
-                    View / download payment slip
-                  </a>
-                )}
-                <p className="small-text">
-                  OCR is an aid only. Confirm the bank transaction before
-                  approving payment.
-                </p>
-                {o.payment_note && <p>{o.payment_note}</p>}
                 {canUpdate && (
                   <Field label="Reason or note">
                     <textarea
@@ -3575,13 +3518,13 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       ...transitions[o.status]
                         .filter(
                           (s) =>
-                            admin ||
-                            [
-                              "PROCESSING",
-                              "READY",
-                              "SHIPPED",
-                              "DELIVERED",
-                            ].includes(s),
+                            s !== "READY" &&
+                            (admin ||
+                              [
+                                "PROCESSING",
+                                "SHIPPED",
+                                "DELIVERED",
+                              ].includes(s)),
                         )
                         .map((s) => ({ value: s, label: statuses[s] })),
                     ]}
