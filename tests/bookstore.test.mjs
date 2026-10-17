@@ -1151,6 +1151,28 @@ test("External courier tracking can be attached to Other City orders and tracked
   assert.equal(trackAfterRemove.courier_name, undefined);
   assert.equal(trackAfterRemove.courier_tracking_id, undefined);
   assert.equal(trackAfterRemove.status, "PROCESSING");
+
+  // 8. Other City order without tracking cannot be moved to SHIPPED
+  sqlite.prepare("UPDATE orders SET delivery_type='other', city='Faisalabad' WHERE id=?").run(placed.id);
+  const changeRes = await postCourier(placed.id, {
+    action: "status",
+    status: "SHIPPED",
+    note: "Trying to dispatch without tracking",
+  });
+  assert.equal(changeRes.status, 400);
+  const changeData = await changeRes.json();
+  assert.equal(changeData.error, "Please Add Tracking Details");
+
+  // 9. Lahore or Campus order CAN be moved to SHIPPED without courier tracking number
+  sqlite.prepare("UPDATE orders SET delivery_type='lahore', city='Lahore' WHERE id=?").run(placed.id);
+  const currentOrder = sqlite.prepare("SELECT version FROM orders WHERE id=?").get(placed.id);
+  const lahoreChangeRes = await postCourier(placed.id, {
+    action: "status",
+    status: "SHIPPED",
+    note: "Lahore rider dispatch",
+    version: currentOrder.version,
+  });
+  assert.equal(lahoreChangeRes.status, 200);
 });
 
 

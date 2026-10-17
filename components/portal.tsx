@@ -92,6 +92,7 @@ import {
   transitions,
   permissions,
   getWhatsAppUrl,
+  isOtherCityOrder,
   type User,
   type Book,
   type StoreSettings,
@@ -2418,16 +2419,56 @@ function OrderModalPopup({
                             .map((s) => ({ value: s, label: statuses[s] })),
                         ]}
                       />
+                      {isOtherCityOrder(o) &&
+                        ["SHIPPED", "DELIVERED"].includes(next) &&
+                        !o.courier_tracking_id?.trim() && (
+                          <div
+                            className="notice warning-text"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 8,
+                              padding: "8px 12px",
+                              borderRadius: 6,
+                              background: "rgba(239, 68, 68, 0.08)",
+                              border: "1.5px solid #ef4444",
+                              color: "#dc2626",
+                              fontSize: "0.82rem",
+                              fontWeight: 600,
+                              margin: "6px 0",
+                            }}
+                          >
+                            <span>⚠️ Please Add Tracking Details</span>
+                            <button
+                              type="button"
+                              className="btn compact primary"
+                              style={{ fontSize: "0.75rem", padding: "3px 8px" }}
+                              onClick={() => setCourierModalOpen(true)}
+                            >
+                              Add Tracking Now
+                            </button>
+                          </div>
+                        )}
                       <button
                         className="btn primary"
                         disabled={!next || next === "none"}
-                        onClick={() =>
+                        onClick={() => {
+                          if (
+                            isOtherCityOrder(o) &&
+                            ["SHIPPED", "DELIVERED"].includes(next) &&
+                            !o.courier_tracking_id?.trim()
+                          ) {
+                            toast.error("Please Add Tracking Details");
+                            setCourierModalOpen(true);
+                            return;
+                          }
                           setDecision({
                             action: "status",
                             status: next,
                             label: statuses[next],
-                          })
-                        }
+                          });
+                        }}
                       >
                         Update Status
                       </button>
@@ -2718,6 +2759,18 @@ function Orders({
 
   const handleBatchStatusChange = async () => {
     if (!activeFlowStep) return;
+    if (["SHIPPED", "DELIVERED"].includes(activeFlowStep.to)) {
+      const invalidOrder = (data?.rows || []).find(
+        (ord: any) =>
+          isOtherCityOrder(ord) &&
+          (!ord.courier_tracking_id || !ord.courier_tracking_id.trim()),
+      );
+      if (invalidOrder) {
+        toast.error("Please Add Tracking Details");
+        setBatchConfirm(null);
+        return;
+      }
+    }
     setBatchUpdating(true);
     try {
       const res = await api("manage/orders/batch-status", {
@@ -2950,6 +3003,17 @@ function Orders({
             className={`btn compact toolbar-batch-btn ${activeFlowStep && filteredCount > 0 ? "active" : ""}`}
             onClick={() => {
               if (activeFlowStep && filteredCount > 0) {
+                if (["SHIPPED", "DELIVERED"].includes(activeFlowStep.to)) {
+                  const invalidOrder = (data?.rows || []).find(
+                    (ord: any) =>
+                      isOtherCityOrder(ord) &&
+                      (!ord.courier_tracking_id || !ord.courier_tracking_id.trim()),
+                  );
+                  if (invalidOrder) {
+                    toast.error("Please Add Tracking Details");
+                    return;
+                  }
+                }
                 setBatchConfirm({
                   fromStatus: statusList[0],
                   toStatus: activeFlowStep.to,
@@ -3529,16 +3593,56 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         .map((s) => ({ value: s, label: statuses[s] })),
                     ]}
                   />
+                  {isOtherCityOrder(o) &&
+                    ["SHIPPED", "DELIVERED"].includes(next) &&
+                    !o.courier_tracking_id?.trim() && (
+                      <div
+                        className="notice warning-text"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          padding: "8px 12px",
+                          borderRadius: 6,
+                          background: "rgba(239, 68, 68, 0.08)",
+                          border: "1.5px solid #ef4444",
+                          color: "#dc2626",
+                          fontSize: "0.82rem",
+                          fontWeight: 600,
+                          margin: "6px 0",
+                        }}
+                      >
+                        <span>⚠️ Please Add Tracking Details</span>
+                        <button
+                          type="button"
+                          className="btn compact primary"
+                          style={{ fontSize: "0.75rem", padding: "3px 8px" }}
+                          onClick={() => setCourierModalOpen(true)}
+                        >
+                          Add Tracking Now
+                        </button>
+                      </div>
+                    )}
                   <button
                     className="btn primary"
                     disabled={!next || next === "none"}
-                    onClick={() =>
+                    onClick={() => {
+                      if (
+                        isOtherCityOrder(o) &&
+                        ["SHIPPED", "DELIVERED"].includes(next) &&
+                        !o.courier_tracking_id?.trim()
+                      ) {
+                        toast.error("Please Add Tracking Details");
+                        setCourierModalOpen(true);
+                        return;
+                      }
                       setDecision({
                         action: "status",
                         status: next,
                         label: statuses[next],
-                      })
-                    }
+                      });
+                    }}
                   >
                     Update Status
                   </button>

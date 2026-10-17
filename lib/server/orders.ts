@@ -6,6 +6,7 @@ import {
   type User,
   type Book,
   STUDENT_CATEGORY,
+  isOtherCityOrder,
 } from "../contracts";
 import {
   all,
@@ -698,6 +699,11 @@ export async function changeStatus(
     !["PROCESSING", "SHIPPED", "DELIVERED"].includes(status)
   )
     throw new AppError(403, "Only Super Admin can cancel or handle refunds.");
+  if (["SHIPPED", "DELIVERED"].includes(status) && isOtherCityOrder(o)) {
+    if (!o.courier_tracking_id || !o.courier_tracking_id.trim()) {
+      throw new AppError(400, "Please Add Tracking Details");
+    }
+  }
   const statements = [
     guard(
       "EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)",
@@ -937,13 +943,33 @@ export async function batchChangeStatus(
   }
 
   const where = filters.join(" AND ");
-  const orders = await all<{ id: string; status: string; version: number }>(
-    `SELECT o.id, o.status, o.version FROM orders o WHERE ${where} LIMIT 1000`,
+  const orders = await all<{
+    id: string;
+    status: string;
+    version: number;
+    reference: string;
+    delivery_type: string;
+    city: string;
+    address: string;
+    courier_tracking_id: string | null;
+  }>(
+    `SELECT o.id, o.status, o.version, o.reference, o.delivery_type, o.city, o.address, o.courier_tracking_id FROM orders o WHERE ${where} LIMIT 1000`,
     ...args,
   );
 
   if (!orders.length) {
     return { count: 0, status: toStatus };
+  }
+
+  if (["SHIPPED", "DELIVERED"].includes(toStatus)) {
+    const invalidOtherCity = orders.find(
+      (ord) =>
+        isOtherCityOrder(ord) &&
+        (!ord.courier_tracking_id || !ord.courier_tracking_id.trim()),
+    );
+    if (invalidOtherCity) {
+      throw new AppError(400, "Please Add Tracking Details");
+    }
   }
 
   const at = now();

@@ -51,20 +51,35 @@ export function getCampusName(o: any): string {
   return "VU Qanchi";
 }
 
+export function isCampusOrder(o: any): boolean {
+  if (!o) return false;
+  return (
+    o.delivery_type === "campus" ||
+    Boolean(o.city && String(o.city).toLowerCase().includes("campus")) ||
+    Boolean(o.address && String(o.address).toLowerCase().includes("campus"))
+  );
+}
+
+export function isLahoreOrder(o: any): boolean {
+  if (!o || isCampusOrder(o)) return false;
+  return (
+    o.delivery_type === "lahore" ||
+    o.delivery_type === "lahore_home" ||
+    Boolean(o.city && String(o.city).toLowerCase().includes("lahore"))
+  );
+}
+
+export function isOtherCityOrder(o: any): boolean {
+  if (!o) return false;
+  return !isCampusOrder(o) && !isLahoreOrder(o);
+}
+
 export function getOrderWhatsAppMessage(o: any): string {
   const studentName = (o?.name || "Student").trim();
   const status = (o?.status || "").toUpperCase();
 
-  const isCampus =
-    o?.delivery_type === "campus" ||
-    (o?.city && o.city.toLowerCase().includes("campus")) ||
-    (o?.address && o.address.toLowerCase().includes("campus"));
-
-  const isLahore =
-    !isCampus &&
-    (o?.delivery_type === "lahore" ||
-      o?.delivery_type === "lahore_home" ||
-      (o?.city && o.city.toLowerCase().includes("lahore")));
+  const isCampus = isCampusOrder(o);
+  const isLahore = isLahoreOrder(o);
 
   // 1. Confirmed (For all types)
   if (status === "CONFIRMED") {
