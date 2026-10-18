@@ -1692,6 +1692,15 @@ test("Vendor Printing Rules: Admin assigns vendor -> defaults to Printing Queue;
   const dbBatch2 = sqlite.prepare("SELECT vendor_printed_at FROM orders WHERE id=?").get(ord2.id);
   assert.ok(dbBatch1.vendor_printed_at);
   assert.ok(dbBatch2.vendor_printed_at);
+
+  // 9. Test Mark All Printed with allInQueue: true in 1 click
+  const unmarkAllRes = await batchVendorPrint(testReq, vendorUser, { allInQueue: true, printed: false });
+  assert.equal(unmarkAllRes.ok, true);
+  assert.equal(unmarkAllRes.count >= 2, true);
+
+  const markAllRes = await batchVendorPrint(testReq, vendorUser, { allInQueue: true, printed: true });
+  assert.equal(markAllRes.ok, true);
+  assert.equal(markAllRes.count >= 2, true);
 });
 
 test("Order Export: generates Sheet 1 (detailed orders) and Sheet 2 (consolidated book quantity summary) for Qanchi Campus & Lahore", async () => {

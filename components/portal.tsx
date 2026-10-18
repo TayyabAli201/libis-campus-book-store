@@ -3768,15 +3768,28 @@ function Orders({
     }
   };
 
-  const handleBatchVendorPrint = async (ids: string[], markAsPrinted = true) => {
-    if (!ids.length) return;
+  const handleBatchVendorPrint = async (
+    ids: string[] = [],
+    markAsPrinted = true,
+    allInQueue = false,
+  ) => {
+    if (!ids.length && !allInQueue) return;
     setBatchPrinting(true);
     try {
       const res = await api("manage/orders/batch-vendor-print", {
-        orderIds: ids,
+        orderIds: ids.length > 0 ? ids : undefined,
+        allInQueue,
         printed: markAsPrinted,
+        deliveryType: deliveryTypeList.join(","),
+        campusId: campus,
+        q,
       });
-      toast.success(res.message || `Updated print status for ${res.count ?? ids.length} order(s).`);
+      toast.success(
+        res.message ||
+          (markAsPrinted
+            ? `Marked ${res.count ?? ids.length} order(s) as printed ✓`
+            : `Unmarked print status for ${res.count ?? ids.length} order(s).`),
+      );
       window.dispatchEvent(new Event("orders-updated"));
       await reload();
     } catch (err) {
@@ -4367,9 +4380,8 @@ function Orders({
           );
         })()}
         {isVendor && activeTab === "PROCESSING" && (() => {
-          const unprintedOrders = currentRows.filter((r: any) => !r.vendor_printed_at);
-          const unprintedCount = unprintedOrders.length;
-          const isEnabled = unprintedCount > 0 && !batchPrinting && !loading;
+          const queueTotal = data?.total ?? currentRows.length;
+          const isEnabled = queueTotal > 0 && !batchPrinting && !loading;
 
           return (
             <button
@@ -4377,16 +4389,16 @@ function Orders({
               className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
               disabled={!isEnabled}
               onClick={() => {
-                if (!unprintedOrders.length) {
-                  toast.info("All visible orders are already marked as printed.");
+                if (queueTotal === 0) {
+                  toast.info("No orders in printing queue.");
                   return;
                 }
-                handleBatchVendorPrint(unprintedOrders.map((r: any) => r.id), true);
+                handleBatchVendorPrint([], true, true);
               }}
               title={
-                unprintedCount > 0
-                  ? "Mark all orders in current queue as printed"
-                  : "No unprinted orders in current queue"
+                queueTotal > 0
+                  ? `Mark all ${queueTotal} order(s) in printing queue as printed`
+                  : "No orders in printing queue"
               }
             >
               <span className="toolbar-btn-icon-circle">
@@ -4395,7 +4407,7 @@ function Orders({
               <span>
                 {batchPrinting
                   ? "Updating…"
-                  : `Mark All in Queue as Printed (${unprintedCount})`}
+                  : `Mark All Printed ${queueTotal > 0 ? `(${queueTotal})` : ""}`}
               </span>
             </button>
           );
@@ -4436,19 +4448,24 @@ function Orders({
               );
             })()}
             {(() => {
-              const printedOrders = currentRows.filter((r: any) => r.vendor_printed_at);
-              const printedCount = printedOrders.length;
-              const isEnabled = printedCount > 0 && !batchPrinting && !loading;
+              const printedTotal = data?.total ?? currentRows.length;
+              const isEnabled = printedTotal > 0 && !batchPrinting && !loading;
 
               return (
                 <button
                   type="button"
                   className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
                   disabled={!isEnabled}
-                  onClick={() => handleBatchVendorPrint(printedOrders.map((r: any) => r.id), false)}
+                  onClick={() => {
+                    if (printedTotal === 0) {
+                      toast.info("No printed orders to unmark.");
+                      return;
+                    }
+                    handleBatchVendorPrint([], false, true);
+                  }}
                   title={
-                    printedCount > 0
-                      ? "Unmark all printed orders (send back to Printing Queue)"
+                    printedTotal > 0
+                      ? `Unmark all ${printedTotal} printed order(s) (send back to Printing Queue)`
                       : "No printed orders to unmark"
                   }
                 >
@@ -4456,7 +4473,7 @@ function Orders({
                     <RotateCcw size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
                   </span>
                   <span>
-                    {batchPrinting ? "Updating…" : `Unmark All Printed (${printedCount})`}
+                    {batchPrinting ? "Updating…" : `Unmark All Printed (${printedTotal})`}
                   </span>
                 </button>
               );
@@ -4678,12 +4695,6 @@ function Orders({
                   0,
                 ) || 0),
             );
-            const booksSummary = (o.items || [])
-              .map(
-                (it: any) =>
-                  `${it.code || it.title || "Book"}${it.quantity > 1 ? ` (×${it.quantity})` : ""}`,
-              )
-              .join(", ");
             const booksTooltip =
               (o.items || []).length > 0
                 ? (o.items || [])
@@ -4699,70 +4710,28 @@ function Orders({
                 style={{
                   display: "inline-flex",
                   flexDirection: "column",
-                  gap: 2,
                   cursor: (o.items || []).length > 0 ? "help" : "default",
+                  whiteSpace: "nowrap",
                 }}
                 title={booksTooltip}
               >
-                <div style={{ whiteSpace: "nowrap" }}>
+                <div>
                   <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
                   <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
                     {booksCount === 1 ? "book" : "books"}
                   </span>
                 </div>
-                {booksSummary && (
-                  <span
-                    style={{
-                      fontSize: "0.72rem",
-                      color: "var(--muted-foreground)",
-                      maxWidth: 140,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      display: "block",
-                    }}
-                    title={booksTooltip}
-                  >
-                    {booksSummary}
-                  </span>
-                )}
               </div>
             );
 
             if (isVendor) {
               const vendorBooksCell = (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      flexDirection: "column",
-                      gap: 2,
-                      cursor: (o.items || []).length > 0 ? "help" : "default",
-                    }}
-                    title={booksTooltip}
-                  >
-                    <div style={{ whiteSpace: "nowrap" }}>
-                      <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
-                      <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
-                        {booksCount === 1 ? "book" : "books"}
-                      </span>
-                    </div>
-                    {booksSummary && (
-                      <span
-                        style={{
-                          fontSize: "0.72rem",
-                          color: "var(--muted-foreground)",
-                          maxWidth: 140,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          display: "block",
-                        }}
-                        title={booksTooltip}
-                      >
-                        {booksSummary}
-                      </span>
-                    )}
+                  <div style={{ whiteSpace: "nowrap" }} title={`${booksCount} book(s)`}>
+                    <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
+                    <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
+                      {booksCount === 1 ? "book" : "books"}
+                    </span>
                   </div>
                   {o.status === "PROCESSING" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>

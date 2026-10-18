@@ -571,11 +571,15 @@ async function handle(req: Request) {
         const body = await json(req);
         const parsed = z
           .object({
-            orderIds: z.array(z.string()).min(1),
+            orderIds: z.array(z.string()).optional(),
+            allInQueue: z.boolean().optional(),
             printed: z.boolean().default(true),
+            deliveryType: z.string().optional(),
+            campusId: z.string().optional(),
+            q: z.string().optional(),
           })
           .parse(body);
-        return ok(await batchVendorPrint(req, u, parsed.orderIds, parsed.printed));
+        return ok(await batchVendorPrint(req, u, parsed));
       }
       if (id === "batch-vendor-dispatch-office" && method === "POST") {
         const body = await json(req);

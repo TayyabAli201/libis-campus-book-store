@@ -999,27 +999,91 @@ export async function vendorDispatchOffice(
 export async function batchVendorPrint(
   req: Request,
   u: User,
-  orderIds: string[],
-  printed = true,
+  paramsOrIds:
+    | string[]
+    | {
+        orderIds?: string[];
+        allInQueue?: boolean;
+        printed?: boolean;
+        deliveryType?: string;
+        campusId?: string;
+        q?: string;
+      },
+  legacyPrinted = true,
 ) {
-  if (!orderIds || !orderIds.length) {
-    throw new AppError(400, "Please select at least one order.");
-  }
   if (u.role !== "VENDOR") {
     throw new AppError(403, "Batch print marking is reserved for vendors only.");
   }
+  const isParamsObj = !Array.isArray(paramsOrIds) && typeof paramsOrIds === "object";
+  const printed = isParamsObj ? paramsOrIds.printed !== false : legacyPrinted !== false;
+  const orderIds = isParamsObj ? paramsOrIds.orderIds : paramsOrIds;
+  const allInQueue = isParamsObj ? !!paramsOrIds.allInQueue : false;
+
   const isPrinted = printed !== false;
   const printTime = isPrinted ? now() : null;
   const s = scope(u);
-  const placeholders = orderIds.map(() => "?").join(",");
-  const ordersToUpdate = await all<any>(
-    `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
-    ...orderIds,
-    ...s.args,
-  );
-  if (!ordersToUpdate.length) {
-    throw new AppError(404, "No eligible orders found.");
+
+  let ordersToUpdate: any[] = [];
+
+  if (orderIds && orderIds.length > 0) {
+    const placeholders = orderIds.map(() => "?").join(",");
+    ordersToUpdate = await all<any>(
+      `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+      ...orderIds,
+      ...s.args,
+    );
+  } else if (allInQueue) {
+    const filters = [s.sql, "o.status = 'PROCESSING'"];
+    const args: unknown[] = [...s.args];
+
+    if (isPrinted) {
+      filters.push("o.vendor_printed_at IS NULL");
+    } else {
+      filters.push("o.vendor_printed_at IS NOT NULL");
+    }
+
+    if (isParamsObj && paramsOrIds.deliveryType && paramsOrIds.deliveryType !== "all") {
+      const types = paramsOrIds.deliveryType
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t && t !== "all");
+      if (types.length === 1) {
+        filters.push("o.delivery_type=?");
+        args.push(types[0]);
+      } else if (types.length > 1) {
+        const placeholders = types.map(() => "?").join(",");
+        filters.push(`o.delivery_type IN (${placeholders})`);
+        args.push(...types);
+      }
+    }
+    if (isParamsObj && paramsOrIds.campusId) {
+      filters.push("o.campus_id=?");
+      args.push(paramsOrIds.campusId);
+    }
+    if (isParamsObj && paramsOrIds.q) {
+      filters.push("(o.reference LIKE ? OR o.name LIKE ? OR o.phone LIKE ?)");
+      args.push(...Array(3).fill("%" + paramsOrIds.q.slice(0, 100) + "%"));
+    }
+
+    ordersToUpdate = await all<any>(
+      `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE ${filters.join(" AND ")}`,
+      ...args,
+    );
+  } else {
+    throw new AppError(400, "Please select at least one order or choose all in queue.");
   }
+
+  if (!ordersToUpdate.length) {
+    return {
+      ok: true,
+      count: 0,
+      vendor_printed_at: printTime,
+      message: isPrinted
+        ? "All matching orders are already marked as printed."
+        : "No printed orders found to unmark.",
+    };
+  }
+
   const statements: any[] = [];
   for (const o of ordersToUpdate) {
     if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
