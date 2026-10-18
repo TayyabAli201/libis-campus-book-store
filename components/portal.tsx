@@ -4554,125 +4554,91 @@ function Orders({
                 ? `Open ${o.city || "delivery city"} destination on Google Maps`
                 : "Open Bykea / live rider route navigation to student location";
 
+            const badgeContent = isCampus ? (
+              <span className="campus-static-pill">
+                <BadgeIcon size={11} /> {badgeLabel}
+              </span>
+            ) : isOther ? (
+              <span className="other-static-pill">
+                <BadgeIcon size={11} /> {badgeLabel}
+              </span>
+            ) : mapUrl ? (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`map-pin-pill ${badgeClass}`}
+                onClick={(e) => e.stopPropagation()}
+                title={badgeTitle}
+              >
+                <BadgeIcon size={12} /> {badgeLabel}
+              </a>
+            ) : null;
+
+            const vendorBadgeContent = isAdmin && (
+              o.vendor_name ? (
+                <span
+                  className="vendor-badge-pill"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: "0.72rem",
+                    fontWeight: 600,
+                    padding: "2px 7px",
+                    borderRadius: 9999,
+                    background: "rgba(139, 92, 246, 0.12)",
+                    color: "#7c3aed",
+                    border: "1px solid #c4b5fd",
+                    width: "fit-content",
+                  }}
+                  title={`Assigned to ${o.vendor_name}${o.vendor_phone ? ` (${o.vendor_phone})` : ""}`}
+                >
+                  <Factory size={11} /> {o.vendor_name}
+                </span>
+              ) : ["CONFIRMED", "PROCESSING"].includes(o.status) ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAssigningOrder(o);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: "0.72rem",
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 9999,
+                    background: "rgba(59, 130, 246, 0.1)",
+                    color: "#2563eb",
+                    border: "1px solid #93c5fd",
+                    cursor: "pointer",
+                  }}
+                  title="Send this order to a printing vendor"
+                >
+                  <Send size={10} /> Send to Vendor
+                </button>
+              ) : null
+            );
+
             const refCell = (
               <div>
                 <strong>{o.reference}</strong>
-                {isCampus ? (
-                  <div>
-                    <span className="campus-static-pill">
-                      <BadgeIcon size={11} /> {badgeLabel}
-                    </span>
+                {(badgeContent || vendorBadgeContent) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 5,
+                      alignItems: "center",
+                      marginTop: 3,
+                    }}
+                  >
+                    {badgeContent}
+                    {vendorBadgeContent}
                   </div>
-                ) : isOther ? (
-                  <div>
-                    <span className="other-static-pill">
-                      <BadgeIcon size={11} /> {badgeLabel}
-                    </span>
-                  </div>
-                ) : mapUrl ? (
-                  <div>
-                    <a
-                      href={mapUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`map-pin-pill ${badgeClass}`}
-                      onClick={(e) => e.stopPropagation()}
-                      title={badgeTitle}
-                    >
-                      <BadgeIcon size={12} /> {badgeLabel}
-                    </a>
-                  </div>
-                ) : null}
-                {/* Admin Vendor badge / Quick send */}
-                {isAdmin && (
-                  o.vendor_name ? (
-                    <div style={{ marginTop: 3, display: "flex", flexDirection: "column", gap: 3 }}>
-                      <span
-                        className="vendor-badge-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 7px",
-                          borderRadius: 9999,
-                          background: "rgba(139, 92, 246, 0.12)",
-                          color: "#7c3aed",
-                          border: "1px solid #c4b5fd",
-                          width: "fit-content",
-                        }}
-                        title={`Assigned to ${o.vendor_name}${o.vendor_phone ? ` (${o.vendor_phone})` : ""}`}
-                      >
-                        <Factory size={11} /> {o.vendor_name}
-                      </span>
-                      {o.vendor_dispatched_at ? (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: "0.70rem",
-                            fontWeight: 600,
-                            padding: "2px 7px",
-                            borderRadius: 9999,
-                            background: "rgba(37, 99, 235, 0.12)",
-                            color: "#1d4ed8",
-                            border: "1px solid #93c5fd",
-                            width: "fit-content",
-                          }}
-                          title={`Vendor dispatched this order to the Bookstore Office on ${formatDateDMY(o.vendor_dispatched_at)}`}
-                        >
-                          <Building2 size={10} /> Dispatched to Office
-                        </span>
-                      ) : o.vendor_printed_at ? (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: "0.70rem",
-                            fontWeight: 600,
-                            padding: "2px 7px",
-                            borderRadius: 9999,
-                            background: "rgba(22, 163, 74, 0.12)",
-                            color: "#15803d",
-                            border: "1px solid #86efac",
-                            width: "fit-content",
-                          }}
-                          title={`Vendor marked books as printed on ${formatDateDMY(o.vendor_printed_at)}`}
-                        >
-                          <CheckCircle2 size={10} /> Printed by Vendor
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : ["CONFIRMED", "PROCESSING"].includes(o.status) ? (
-                    <div style={{ marginTop: 3 }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAssigningOrder(o);
-                        }}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          background: "rgba(59, 130, 246, 0.1)",
-                          color: "#2563eb",
-                          border: "1px solid #93c5fd",
-                          cursor: "pointer",
-                        }}
-                        title="Send this order to a printing vendor"
-                      >
-                        <Send size={10} /> Send to Vendor
-                      </button>
-                    </div>
-                  ) : null
                 )}
                 {isOther && !isVendor && (
                   <div style={{ marginTop: 4 }}>
@@ -4712,23 +4678,91 @@ function Orders({
                   0,
                 ) || 0),
             );
+            const booksSummary = (o.items || [])
+              .map(
+                (it: any) =>
+                  `${it.code || it.title || "Book"}${it.quantity > 1 ? ` (×${it.quantity})` : ""}`,
+              )
+              .join(", ");
+            const booksTooltip =
+              (o.items || []).length > 0
+                ? (o.items || [])
+                    .map(
+                      (it: any) =>
+                        `• ${it.code ? `[${it.code}] ` : ""}${it.title || "Book"}${it.quantity > 1 ? ` × ${it.quantity}` : ""}`,
+                    )
+                    .join("\n")
+                : `${booksCount} book(s) ordered`;
+
             const booksCell = (
-              <div style={{ whiteSpace: "nowrap" }} title={`${booksCount} book(s) ordered by student`}>
-                <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
-                <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
-                  {booksCount === 1 ? "book" : "books"}
-                </span>
+              <div
+                style={{
+                  display: "inline-flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  cursor: (o.items || []).length > 0 ? "help" : "default",
+                }}
+                title={booksTooltip}
+              >
+                <div style={{ whiteSpace: "nowrap" }}>
+                  <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
+                  <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
+                    {booksCount === 1 ? "book" : "books"}
+                  </span>
+                </div>
+                {booksSummary && (
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      color: "var(--muted-foreground)",
+                      maxWidth: 140,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      display: "block",
+                    }}
+                    title={booksTooltip}
+                  >
+                    {booksSummary}
+                  </span>
+                )}
               </div>
             );
 
             if (isVendor) {
               const vendorBooksCell = (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div style={{ whiteSpace: "nowrap" }} title={`${booksCount} book(s) ordered by student`}>
-                    <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
-                    <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
-                      {booksCount === 1 ? "book" : "books"}
-                    </span>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      flexDirection: "column",
+                      gap: 2,
+                      cursor: (o.items || []).length > 0 ? "help" : "default",
+                    }}
+                    title={booksTooltip}
+                  >
+                    <div style={{ whiteSpace: "nowrap" }}>
+                      <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
+                      <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
+                        {booksCount === 1 ? "book" : "books"}
+                      </span>
+                    </div>
+                    {booksSummary && (
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          color: "var(--muted-foreground)",
+                          maxWidth: 140,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          display: "block",
+                        }}
+                        title={booksTooltip}
+                      >
+                        {booksSummary}
+                      </span>
+                    )}
                   </div>
                   {o.status === "PROCESSING" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
