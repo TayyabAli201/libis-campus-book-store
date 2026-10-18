@@ -59,6 +59,7 @@ import {
   updateVendor,
   deleteVendor,
   assignOrderToVendor,
+  batchAssignOrdersToVendor,
 } from "@/lib/server/vendors";
 import { upload } from "@/lib/server/uploads";
 import { bootstrap } from "@/lib/server/seed";
@@ -595,6 +596,25 @@ async function handle(req: Request) {
           })
           .parse(body);
         return ok(await batchSetPrintingQueue(req, u, parsed.orderIds, parsed.inQueue));
+      }
+      if (id === "batch-assign-vendor" && method === "POST") {
+        const body = await json(req);
+        const parsed = z
+          .object({
+            orderIds: z.array(z.string()).min(1),
+            vendorId: z.string().min(1),
+            notes: z.string().optional().default(""),
+          })
+          .parse(body);
+        return ok(
+          await batchAssignOrdersToVendor(
+            req,
+            u,
+            parsed.orderIds,
+            parsed.vendorId,
+            parsed.notes,
+          ),
+        );
       }
       if (method === "GET") {
         if (id) return ok(await getOrder(req, id, u));

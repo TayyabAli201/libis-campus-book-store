@@ -2947,9 +2947,77 @@
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   margin-top: 4px;
 }
-.map-pin-pill:hover {
+a.map-pin-pill:hover {
   background: var(--primary);
   color: white;
+}
+
+/* Static Non-Clickable Campus Pill (Single Color, No Hover Effect) */
+.campus-static-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: color-mix(in srgb, #2563eb 12%, transparent);
+  color: #1d4ed8;
+  border: 1px solid color-mix(in srgb, #2563eb 32%, transparent);
+  margin-top: 4px;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  transition: none !important;
+}
+.campus-static-pill:hover {
+  background: color-mix(in srgb, #2563eb 12%, transparent) !important;
+  color: #1d4ed8 !important;
+  border-color: color-mix(in srgb, #2563eb 32%, transparent) !important;
+}
+:is(.dark *) .campus-static-pill {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #93c5fd;
+  border-color: color-mix(in srgb, #3b82f6 38%, transparent);
+}
+:is(.dark *) .campus-static-pill:hover {
+  background: color-mix(in srgb, #3b82f6 18%, transparent) !important;
+  color: #93c5fd !important;
+  border-color: color-mix(in srgb, #3b82f6 38%, transparent) !important;
+}
+
+/* Static Non-Clickable Other City Pill (Courier Shipping, No Map Link, No Hover Effect) */
+.other-static-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  color: #b45309;
+  border: 1px solid color-mix(in srgb, #d97706 32%, transparent);
+  margin-top: 4px;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  transition: none !important;
+}
+.other-static-pill:hover {
+  background: color-mix(in srgb, #d97706 12%, transparent) !important;
+  color: #b45309 !important;
+  border-color: color-mix(in srgb, #d97706 32%, transparent) !important;
+}
+:is(.dark *) .other-static-pill {
+  background: color-mix(in srgb, #fbbf24 16%, transparent);
+  color: #fde68a;
+  border-color: color-mix(in srgb, #fbbf24 35%, transparent);
+}
+:is(.dark *) .other-static-pill:hover {
+  background: color-mix(in srgb, #fbbf24 16%, transparent) !important;
+  color: #fde68a !important;
+  border-color: color-mix(in srgb, #fbbf24 35%, transparent) !important;
 }
 
 /* Category Variant 1: VU Qanchi Campus (University Blue Shade) */
@@ -2958,7 +3026,7 @@
   color: #1d4ed8;
   border-color: color-mix(in srgb, #2563eb 32%, transparent);
 }
-.map-pin-pill.campus-badge:hover {
+a.map-pin-pill.campus-badge:hover {
   background: #2563eb;
   color: #ffffff;
 }
@@ -2967,7 +3035,7 @@
   color: #93c5fd;
   border-color: color-mix(in srgb, #3b82f6 38%, transparent);
 }
-:is(.dark *) .map-pin-pill.campus-badge:hover {
+:is(.dark *) a.map-pin-pill.campus-badge:hover {
   background: #2563eb;
   color: #ffffff;
 }
@@ -2978,7 +3046,7 @@
   color: #b91c1c;
   border-color: color-mix(in srgb, #dc2626 32%, transparent);
 }
-.map-pin-pill.lahore-badge:hover {
+a.map-pin-pill.lahore-badge:hover {
   background: #dc2626;
   color: #ffffff;
 }
@@ -2987,7 +3055,7 @@
   color: #fca5a5;
   border-color: color-mix(in srgb, #ef4444 38%, transparent);
 }
-:is(.dark *) .map-pin-pill.lahore-badge:hover {
+:is(.dark *) a.map-pin-pill.lahore-badge:hover {
   background: #dc2626;
   color: #ffffff;
 }
@@ -2998,7 +3066,7 @@
   color: #b45309;
   border-color: color-mix(in srgb, #d97706 32%, transparent);
 }
-.map-pin-pill.other-badge:hover {
+a.map-pin-pill.other-badge:hover {
   background: #d97706;
   color: #ffffff;
 }
@@ -3007,7 +3075,7 @@
   color: #fde68a;
   border-color: color-mix(in srgb, #fbbf24 35%, transparent);
 }
-:is(.dark *) .map-pin-pill.other-badge:hover {
+:is(.dark *) a.map-pin-pill.other-badge:hover {
   background: #f59e0b;
   color: #ffffff;
 }
@@ -6015,6 +6083,25 @@ footer {
   transition: transform 0.2s ease;
 }
 
+.toolbar-batch-btn:disabled,
+.toolbar-batch-btn[disabled] {
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+  background: #f8fafc !important;
+  border: 1.5px dashed #cbd5e1 !important;
+  color: #94a3b8 !important;
+}
+
+.toolbar-batch-btn:disabled .toolbar-btn-icon-circle,
+.toolbar-batch-btn[disabled] .toolbar-btn-icon-circle {
+  background: #e2e8f0 !important;
+  color: #94a3b8 !important;
+}
+
 /* ==========================================================================
    Dark Theme Toolbar Adaptations (.dark .orders-toolbar)
    Seamless conversion of toolbar search, dropdowns, and buttons for Dark Mode
@@ -6178,14 +6265,19 @@ footer {
   color: #ffffff !important;
 }
 
-/* Inactive Batch Button Dark Theme */
-.dark .toolbar-batch-btn:not(.active) {
+/* Inactive & Disabled Batch Button Dark Theme */
+.dark .toolbar-batch-btn:not(.active),
+.dark .toolbar-batch-btn:disabled,
+.dark .toolbar-batch-btn[disabled] {
   background: #102033 !important;
   border: 1.5px dashed #304b66 !important;
   color: #94a3b8 !important;
+  opacity: 0.65 !important;
 }
 
-.dark .toolbar-batch-btn:not(.active) .toolbar-btn-icon-circle {
+.dark .toolbar-batch-btn:not(.active) .toolbar-btn-icon-circle,
+.dark .toolbar-batch-btn:disabled .toolbar-btn-icon-circle,
+.dark .toolbar-batch-btn[disabled] .toolbar-btn-icon-circle {
   background: #1c324b !important;
   color: #94a3b8 !important;
 }

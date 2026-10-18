@@ -2371,6 +2371,246 @@ function AssignVendorModal({
   );
 }
 
+function BulkAssignVendorModal({
+  orders,
+  onClose,
+  onAssigned,
+}: {
+  orders: any[];
+  onClose: () => void;
+  onAssigned: () => void;
+}) {
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(true);
+  const [selectedVendorId, setSelectedVendorId] = useState("");
+  const [vendorNotes, setVendorNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [assignedResult, setAssignedResult] = useState<any | null>(null);
+
+  useEffect(() => {
+    api("manage/vendors")
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data?.vendors || []);
+        setVendors(list);
+        if (list.length > 0) {
+          const firstActive = list.find((v: any) => v.active);
+          if (firstActive) setSelectedVendorId(firstActive.id);
+        }
+      })
+      .catch((err) => toast.error(errorText(err)))
+      .finally(() => setLoadingVendors(false));
+  }, []);
+
+  const totalBooks = orders.reduce((sum: number, o: any) => {
+    const books = Number(
+      o.total_books ??
+        (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 1),
+    );
+    return sum + books;
+  }, 0);
+
+  const campusLahoreCount = orders.filter((o) => isCampusOrder(o) || isLahoreOrder(o)).length;
+  const otherCityCount = orders.filter((o) => isOtherCityOrder(o)).length;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVendorId) {
+      toast.error("Please select a printing vendor.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const orderIds = orders.map((o) => o.id);
+      const res = await api("manage/orders/batch-assign-vendor", {
+        orderIds,
+        vendorId: selectedVendorId,
+        notes: vendorNotes.trim(),
+      });
+      toast.success(res.message || `Successfully sent ${res.count ?? orders.length} orders to vendor!`);
+      window.dispatchEvent(new Event("orders-updated"));
+      setAssignedResult(res);
+      onAssigned();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent style={{ maxWidth: 540 }}>
+        <DialogHeader>
+          <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Factory size={20} style={{ color: "var(--primary)" }} />
+            Send {orders.length} Verified Order{orders.length === 1 ? "" : "s"} to Vendor
+          </DialogTitle>
+          <DialogDescription>
+            Bulk push <strong>{orders.length} orders</strong> ({totalBooks} books total) directly into the vendor printing queue.
+          </DialogDescription>
+        </DialogHeader>
+
+        {assignedResult ? (
+          <div className="stack" style={{ gap: 16, marginTop: 8 }}>
+            <div
+              style={{
+                padding: "14px 16px",
+                borderRadius: 8,
+                background: "rgba(16, 185, 129, 0.12)",
+                border: "1px solid #10b981",
+                color: "#065f46",
+                fontSize: "0.9rem",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                <CheckCircle2 size={18} /> Batch Pushed to {assignedResult.vendor?.name || "Vendor"}!
+              </div>
+              <div>
+                All <strong>{assignedResult.count ?? orders.length} order(s)</strong> have moved to <strong>Printing Queue</strong>. The vendor has been notified and can start printing immediately.
+              </div>
+            </div>
+
+            <button type="button" className="btn full primary" onClick={onClose}>
+              Done / Close
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="stack" style={{ gap: 14, marginTop: 6 }}>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid #10b981",
+                fontSize: "0.83rem",
+                lineHeight: 1.45,
+              }}
+            >
+              <div style={{ fontWeight: 600, color: "#065f46", marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
+                <CheckCircle2 size={14} /> Verified Student Orders Only
+              </div>
+              <div style={{ color: "#047857" }}>
+                {campusLahoreCount > 0 && (
+                  <span>🏛️ <strong>{campusLahoreCount}</strong> Campus / Lahore order(s) (Vendor delivers printed batch to Bookstore Office). </span>
+                )}
+                {otherCityCount > 0 && (
+                  <span>🚚 <strong>{otherCityCount}</strong> Other City order(s) (Vendor books courier parcel & attaches tracking).</span>
+                )}
+              </div>
+            </div>
+
+            <div
+              style={{
+                maxHeight: 140,
+                overflowY: "auto",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                padding: "8px 12px",
+                background: "var(--muted, #f8fafc)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              {orders.map((o) => (
+                <div
+                  key={o.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "0.80rem",
+                    borderBottom: "1px solid var(--border)",
+                    paddingBottom: 4,
+                  }}
+                >
+                  <div>
+                    <strong>{o.reference}</strong> · {o.name}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ color: "var(--muted-foreground)" }}>
+                      {o.total_books || 1} book(s)
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.70rem",
+                        padding: "1px 6px",
+                        borderRadius: 4,
+                        background: "rgba(37, 99, 235, 0.1)",
+                        color: "#1d4ed8",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {isCampusOrder(o) ? "Qanchi Campus" : isOtherCityOrder(o) ? (o.city || "Other City") : "Lahore Route"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Field label="Select Printing Vendor">
+              {loadingVendors ? (
+                <div style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Loading vendors…</div>
+              ) : vendors.length === 0 ? (
+                <div style={{ color: "#ef4444", fontSize: "0.85rem" }}>
+                  No vendors found. Please add a vendor in <a href="/admin/vendors" className="text-link">Vendors section</a> first.
+                </div>
+              ) : (
+                <select
+                  value={selectedVendorId}
+                  onChange={(e) => setSelectedVendorId(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "var(--card)",
+                  }}
+                >
+                  <option value="" disabled>-- Select Vendor --</option>
+                  {vendors
+                    .filter((v) => v.active)
+                    .map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.phone}) — {v.printing_orders_count || 0} currently in printing
+                      </option>
+                    ))}
+                </select>
+              )}
+            </Field>
+
+            <Field label="Printing Instructions / Notes (Optional)">
+              <textarea
+                rows={2}
+                value={vendorNotes}
+                onChange={(e) => setVendorNotes(e.target.value)}
+                placeholder="e.g. Urgent batch print, deliver together to Bookstore Office"
+                style={{ fontSize: "0.88rem" }}
+              />
+            </Field>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+              <button type="button" className="btn compact" onClick={onClose} disabled={busy}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn primary compact"
+                disabled={busy || !selectedVendorId || vendors.length === 0}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Send size={14} />
+                {busy ? "Sending to Vendor…" : `Send ${orders.length} Order(s) to Vendor`}
+              </button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function OrderModalPopup({
   id,
   user,
@@ -2567,9 +2807,9 @@ function OrderModalPopup({
                 );
               })()}
 
-              {/* Vendor Assignment Banner / Action */}
+              {/* Vendor Assignment Banner / Action (Super Admin / Staff only - vendors do not see this) */}
               {o && (() => {
-                if (o.vendor_name) {
+                if (!isVendor && o.vendor_name) {
                   return (
                     <div
                       className="vendor-assigned-banner"
@@ -2686,8 +2926,8 @@ function OrderModalPopup({
                 return null;
               })()}
 
-              {/* Printing Queue Management Card */}
-              {canUpdate && ["CONFIRMED", "PROCESSING"].includes(o.status) && (
+              {/* Vendor Printing Queue Card (Vendor only - interactive) */}
+              {isVendor && o.status === "PROCESSING" && (
                 <div
                   className="printing-queue-banner"
                   style={{
@@ -2697,18 +2937,12 @@ function OrderModalPopup({
                     gap: 12,
                     padding: "12px 16px",
                     borderRadius: 8,
-                    background:
-                      o.status === "PROCESSING"
-                        ? o.vendor_printed_at
-                          ? "rgba(22, 163, 74, 0.08)"
-                          : "rgba(245, 158, 11, 0.08)"
-                        : "var(--muted)",
-                    border:
-                      o.status === "PROCESSING"
-                        ? o.vendor_printed_at
-                          ? "1px solid #86efac"
-                          : "1px solid #fde68a"
-                        : "1px dashed var(--border)",
+                    background: o.vendor_printed_at
+                      ? "rgba(22, 163, 74, 0.08)"
+                      : "rgba(245, 158, 11, 0.08)",
+                    border: o.vendor_printed_at
+                      ? "1px solid #86efac"
+                      : "1px solid #fde68a",
                     margin: "2px 0 10px",
                     flexWrap: "wrap",
                   }}
@@ -2719,12 +2953,7 @@ function OrderModalPopup({
                         width: 34,
                         height: 34,
                         borderRadius: 8,
-                        background:
-                          o.status === "PROCESSING"
-                            ? o.vendor_printed_at
-                              ? "#16a34a"
-                              : "#d97706"
-                            : "var(--primary)",
+                        background: o.vendor_printed_at ? "#16a34a" : "#d97706",
                         color: "#fff",
                         display: "flex",
                         alignItems: "center",
@@ -2736,117 +2965,134 @@ function OrderModalPopup({
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <strong style={{ fontSize: "0.92rem" }}>Printing Queue Management</strong>
+                        <strong style={{ fontSize: "0.92rem" }}>Printing Queue</strong>
                         <span
                           className="mono-pill"
                           style={{
                             fontSize: "0.72rem",
                             fontWeight: 600,
-                            background:
-                              o.status === "PROCESSING"
-                                ? o.vendor_printed_at
-                                  ? "rgba(22, 163, 74, 0.15)"
-                                  : "rgba(245, 158, 11, 0.15)"
-                                : "var(--card)",
-                            color:
-                              o.status === "PROCESSING"
-                                ? o.vendor_printed_at
-                                  ? "#15803d"
-                                  : "#b45309"
-                                : "var(--muted-foreground)",
+                            background: o.vendor_printed_at ? "rgba(22, 163, 74, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                            color: o.vendor_printed_at ? "#15803d" : "#b45309",
                           }}
                         >
-                          {o.status === "PROCESSING"
-                            ? o.vendor_printed_at
-                              ? "Printed / Ready"
-                              : "In Printing Queue"
-                            : "Order Confirmed"}
+                          {o.vendor_printed_at ? "Printed ✓" : "In Printing Queue"}
                         </span>
                       </div>
                       <p className="small-text muted" style={{ margin: "2px 0 0" }}>
-                        {o.status === "CONFIRMED"
-                          ? "This order is confirmed and ready to be queued for printing."
-                          : o.vendor_printed_at
-                            ? `Marked as printed (${formatDateDMY(o.vendor_printed_at)}). Ready for dispatch or pickup.`
-                            : "Order is in the active printing queue waiting for printing."}
+                        {o.vendor_printed_at
+                          ? `Marked as printed (${formatDateDMY(o.vendor_printed_at)}). Ready for dispatch or pickup.`
+                          : "Order is in the active printing queue waiting for printing."}
                       </p>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    {o.status === "CONFIRMED" ? (
-                      <button
-                        type="button"
-                        className="btn primary compact"
-                        disabled={busy}
-                        onClick={async () => {
-                          setBusy(true);
-                          try {
-                            await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: true });
-                            toast.success("Order added to Printing Queue ✓");
-                            window.dispatchEvent(new Event("orders-updated"));
-                            await reload();
-                          } catch (e) {
-                            toast.error(errorText(e));
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                      >
-                        <Printer size={14} /> Add to Printing Queue
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              await api(`manage/orders/${o.id}`, {
-                                action: "vendor_print",
-                                printed: !o.vendor_printed_at,
-                              });
-                              toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
-                              window.dispatchEvent(new Event("orders-updated"));
-                              await reload();
-                            } catch (e) {
-                              toast.error(errorText(e));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                        >
-                          {o.vendor_printed_at ? <RotateCcw size={13} /> : <CheckCircle2 size={14} />}
-                          {o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn compact"
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: false });
-                              toast.success("Order removed from Printing Queue (reverted to Confirmed) ✓");
-                              window.dispatchEvent(new Event("orders-updated"));
-                              await reload();
-                            } catch (e) {
-                              toast.error(errorText(e));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--destructive)" }}
-                          title="Remove from Printing Queue and send back to Confirmed status"
-                        >
-                          <XCircle size={13} /> Remove from Queue
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await api(`manage/orders/${o.id}`, {
+                            action: "vendor_print",
+                            printed: !o.vendor_printed_at,
+                          });
+                          toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
+                          window.dispatchEvent(new Event("orders-updated"));
+                          await reload();
+                        } catch (e) {
+                          toast.error(errorText(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      {o.vendor_printed_at ? <RotateCcw size={13} /> : <CheckCircle2 size={14} />}
+                      {o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
+                    </button>
                   </div>
+                </div>
+              )}
+
+              {/* Super Admin Printing Status Banner (Read-only, no buttons) */}
+              {!isVendor && o.status === "PROCESSING" && (
+                <div
+                  className="printing-queue-banner"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 16px",
+                    borderRadius: 8,
+                    background: o.vendor_printed_at
+                      ? "rgba(22, 163, 74, 0.08)"
+                      : "rgba(245, 158, 11, 0.08)",
+                    border: o.vendor_printed_at
+                      ? "1px solid #86efac"
+                      : "1px solid #fde68a",
+                    margin: "2px 0 10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        background: o.vendor_printed_at ? "#16a34a" : "#d97706",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Printer size={18} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: "0.92rem" }}>Vendor Printing Status</strong>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            background: o.vendor_printed_at ? "rgba(22, 163, 74, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                            color: o.vendor_printed_at ? "#15803d" : "#b45309",
+                          }}
+                        >
+                          {o.vendor_printed_at ? "Printed by Vendor ✓" : "In Vendor Printing Queue"}
+                        </span>
+                      </div>
+                      <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                        {o.vendor_printed_at
+                          ? `Books printed by vendor (${formatDateDMY(o.vendor_printed_at)}).`
+                          : "Order is in the vendor's active printing queue waiting to be printed."}
+                        {o.vendor_name ? ` Assigned to: ${o.vendor_name}.` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  {o.vendor_dispatched_at && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        padding: "3px 9px",
+                        borderRadius: 9999,
+                        background: "rgba(37, 99, 235, 0.12)",
+                        color: "#1d4ed8",
+                        border: "1px solid #93c5fd",
+                      }}
+                    >
+                      <Building2 size={12} /> Dispatched to Office
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -3321,16 +3567,6 @@ const STATUS_ADVANCE_FLOW: Record<
   string,
   { to: string; toLabel: string; fromLabel: string }
 > = {
-  CONFIRMED: {
-    to: "PROCESSING",
-    toLabel: "Printing",
-    fromLabel: "Order Confirmed",
-  },
-  PROCESSING: {
-    to: "SHIPPED",
-    toLabel: "Shipped",
-    fromLabel: "Printing",
-  },
   SHIPPED: {
     to: "DELIVERED",
     toLabel: "Delivered",
@@ -3405,7 +3641,6 @@ function Orders({
     return payments ? "PAYMENT_PENDING" : "ALL";
   });
   const [printedFilter, setPrintedFilter] = useState<string>(() => (isVendor ? "0" : ""));
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [statusList, setStatusList] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       const param = new URLSearchParams(location.search).get("status");
@@ -3453,6 +3688,7 @@ function Orders({
     [exporting, setExporting] = useState(false),
     [editingCourierOrder, setEditingCourierOrder] = useState<any | null>(null),
     [assigningOrder, setAssigningOrder] = useState<any | null>(null),
+    [bulkAssigningOrders, setBulkAssigningOrders] = useState<any[] | null>(null),
     [printingBusyId, setPrintingBusyId] = useState<string | null>(null),
     [dispatchOfficeOrder, setDispatchOfficeOrder] = useState<any | null>(null),
     [dispatchingOffice, setDispatchingOffice] = useState(false);
@@ -3504,7 +3740,6 @@ function Orders({
         inQueue,
       });
       toast.success(res.message || (inQueue ? `Added ${ids.length} order(s) to Printing Queue` : `Removed ${ids.length} order(s) from Printing Queue`));
-      setSelectedOrderIds([]);
       window.dispatchEvent(new Event("orders-updated"));
       await reload();
     } catch (err) {
@@ -3542,7 +3777,6 @@ function Orders({
         printed: markAsPrinted,
       });
       toast.success(res.message || `Updated print status for ${res.count ?? ids.length} order(s).`);
-      setSelectedOrderIds([]);
       window.dispatchEvent(new Event("orders-updated"));
       await reload();
     } catch (err) {
@@ -3559,8 +3793,7 @@ function Orders({
       const res = await api("manage/orders/batch-vendor-dispatch-office", {
         orderIds: ids,
       });
-      toast.success(res.message || `Dispatched ${res.count ?? ids.length} order(s) to Bookstore Office.`);
-      setSelectedOrderIds([]);
+      toast.success(res.message || `Dispatched ${res.count ?? ids.length} order(s) to Qanchi Campus.`);
       window.dispatchEvent(new Event("orders-updated"));
       await reload();
     } catch (err) {
@@ -3842,36 +4075,30 @@ function Orders({
     payments || (statusList.length === 1 && statusList[0] === "PAYMENT_PENDING");
 
   const currentRows = data?.rows || [];
-  const allCurrentSelected =
-    currentRows.length > 0 &&
-    currentRows.every((r: any) => selectedOrderIds.includes(r.id));
-  const someCurrentSelected =
-    currentRows.some((r: any) => selectedOrderIds.includes(r.id)) && !allCurrentSelected;
 
-  const selectAllCheckbox = (
-    <input
-      type="checkbox"
-      checked={allCurrentSelected}
-      ref={(el) => {
-        if (el) el.indeterminate = someCurrentSelected;
-      }}
-      onChange={(e) => {
-        if (e.target.checked) {
-          const currentIds = currentRows.map((r: any) => r.id);
-          setSelectedOrderIds((prev) => Array.from(new Set([...prev, ...currentIds])));
-        } else {
-          const currentIds = new Set(currentRows.map((r: any) => r.id));
-          setSelectedOrderIds((prev) => prev.filter((id) => !currentIds.has(id)));
-        }
-      }}
-      aria-label="Select all orders"
-      style={{ cursor: "pointer", width: 16, height: 16 }}
-    />
+  const verifiedOrdersInView = currentRows.filter(
+    (o: any) => o.payment_status === "VERIFIED",
   );
+  const verifiedUnassignedOrders = verifiedOrdersInView.filter(
+    (o: any) => !o.vendor_name,
+  );
+
+  const handleOpenBulkAssignVendor = () => {
+    const targetOrders =
+      verifiedUnassignedOrders.length > 0
+        ? verifiedUnassignedOrders
+        : verifiedOrdersInView;
+    if (targetOrders.length === 0) {
+      toast.info(
+        "No verified orders found to send to vendor. Only orders with verified payment can be sent.",
+      );
+      return;
+    }
+    setBulkAssigningOrders(targetOrders);
+  };
 
   const headers = isVendor
     ? [
-        selectAllCheckbox,
         "Order",
         "Student",
         "Books",
@@ -3882,7 +4109,6 @@ function Orders({
       ]
     : isPendingView
       ? [
-          selectAllCheckbox,
           "Order",
           "Student",
           "Books",
@@ -3893,7 +4119,6 @@ function Orders({
           ...(isAdmin ? ["Actions"] : []),
         ]
       : [
-          selectAllCheckbox,
           "Order",
           "Student",
           "Books",
@@ -3962,7 +4187,6 @@ function Orders({
               title={tab.title || tab.label}
               className={`orders-workflow-tab tab-${tab.color} ${active ? "active" : ""}`}
               onClick={() => {
-                setSelectedOrderIds([]);
                 setPage(1);
                 setActiveTab(tab.id);
                 if (tab.id === "PROCESSING") {
@@ -4065,104 +4289,6 @@ function Orders({
             })}
       </div>
 
-      {selectedOrderIds.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 16px",
-            borderRadius: 8,
-            background: "color-mix(in srgb, var(--primary) 12%, var(--card))",
-            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
-            margin: "0 0 14px",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <CheckCircle2 size={18} color="var(--primary)" />
-            <strong style={{ fontSize: "0.9rem" }}>
-              {selectedOrderIds.length} order{selectedOrderIds.length === 1 ? "" : "s"} selected
-            </strong>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {(activeTab === "CONFIRMED" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "CONFIRMED")) && (
-              <button
-                type="button"
-                className="btn compact primary"
-                disabled={batchQueueUpdating}
-                onClick={() => handleBatchSetPrintingQueue(selectedOrderIds, true)}
-                style={{ fontSize: "0.82rem", gap: 6 }}
-                title="Add selected orders to Printing Queue"
-              >
-                <Printer size={14} /> Add Selected to Printing Queue
-              </button>
-            )}
-
-            {(activeTab === "PROCESSING" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "PROCESSING" && !r.vendor_printed_at)) && (
-              <button
-                type="button"
-                className="btn compact primary"
-                disabled={batchPrinting}
-                onClick={() => handleBatchVendorPrint(selectedOrderIds, true)}
-                style={{ fontSize: "0.82rem", gap: 6 }}
-                title="Mark selected orders as Printed"
-              >
-                <CheckCircle2 size={14} /> Mark Selected as Printed
-              </button>
-            )}
-
-            {(activeTab === "PRINTED" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "PROCESSING" && r.vendor_printed_at)) && (
-              <button
-                type="button"
-                className="btn compact"
-                disabled={batchPrinting}
-                onClick={() => handleBatchVendorPrint(selectedOrderIds, false)}
-                style={{ fontSize: "0.82rem", gap: 6 }}
-                title="Unmark printed status and move back to Printing Queue"
-              >
-                <RotateCcw size={14} /> Unmark Selected Printed
-              </button>
-            )}
-
-            {(activeTab === "PROCESSING" || activeTab === "PRINTED" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "PROCESSING")) && (
-              <button
-                type="button"
-                className="btn compact"
-                disabled={batchQueueUpdating}
-                onClick={() => handleBatchSetPrintingQueue(selectedOrderIds, false)}
-                style={{ fontSize: "0.82rem", gap: 6, color: "var(--destructive)" }}
-                title="Remove selected orders from Printing Queue (reverts them to Confirmed status)"
-              >
-                <XCircle size={14} /> Remove Selected from Queue
-              </button>
-            )}
-
-            {isVendor && activeTab === "PRINTED" && (
-              <button
-                type="button"
-                className="btn compact"
-                disabled={batchDispatching}
-                onClick={() => handleBatchVendorDispatchOffice(selectedOrderIds)}
-                style={{ fontSize: "0.82rem", gap: 6, background: "#2563eb", color: "#fff" }}
-              >
-                <Building2 size={14} /> Send Selected to Bookstore Office
-              </button>
-            )}
-
-            <button
-              type="button"
-              className="btn compact"
-              onClick={() => setSelectedOrderIds([])}
-              style={{ fontSize: "0.82rem" }}
-            >
-              Clear Selection
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="toolbar orders-toolbar">
         <div className="toolbar-search-box">
           <Search size={15} className="toolbar-search-icon" />
@@ -4212,94 +4338,132 @@ function Orders({
           </span>
           <span>{exporting ? "Exporting…" : "Export Orders"}</span>
         </button>
-        {activeTab === "CONFIRMED" && canUpdate && (
-          <button
-            type="button"
-            className="btn compact toolbar-batch-btn active"
-            disabled={batchQueueUpdating || loading || currentRows.length === 0}
-            onClick={() => handleBatchSetPrintingQueue(currentRows.map((r: any) => r.id), true)}
-            title="Add all confirmed orders on this page to Printing Queue"
-          >
-            <span className="toolbar-btn-icon-circle">
-              <Printer size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
-            </span>
-            <span>
-              {batchQueueUpdating ? "Updating…" : `Add All to Printing Queue (${filteredCount})`}
-            </span>
-          </button>
-        )}
-        {activeTab === "PROCESSING" && (
-          <>
+        {isAdmin && !isVendor && activeTab === "CONFIRMED" && (() => {
+          const sendToVendorCount =
+            verifiedUnassignedOrders.length > 0
+              ? verifiedUnassignedOrders.length
+              : verifiedOrdersInView.length;
+          const isEnabled = sendToVendorCount > 0 && !loading;
+
+          return (
             <button
               type="button"
-              className="btn compact toolbar-batch-btn active"
-              disabled={batchPrinting || loading || currentRows.length === 0}
+              className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
+              onClick={handleOpenBulkAssignVendor}
+              disabled={!isEnabled}
+              title={
+                sendToVendorCount > 0
+                  ? `Bulk send ${sendToVendorCount} verified order(s) in current view to a printing vendor`
+                  : "No confirmed verified orders available to send to vendor"
+              }
+            >
+              <span className="toolbar-btn-icon-circle">
+                <Send size={13} strokeWidth={2.4} className="toolbar-batch-icon" />
+              </span>
+              <span>
+                Send to Vendor {sendToVendorCount > 0 ? `(${sendToVendorCount})` : ""}
+              </span>
+            </button>
+          );
+        })()}
+        {isVendor && activeTab === "PROCESSING" && (() => {
+          const unprintedOrders = currentRows.filter((r: any) => !r.vendor_printed_at);
+          const unprintedCount = unprintedOrders.length;
+          const isEnabled = unprintedCount > 0 && !batchPrinting && !loading;
+
+          return (
+            <button
+              type="button"
+              className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
+              disabled={!isEnabled}
               onClick={() => {
-                const ids = currentRows.filter((r: any) => !r.vendor_printed_at).map((r: any) => r.id);
-                if (!ids.length) {
+                if (!unprintedOrders.length) {
                   toast.info("All visible orders are already marked as printed.");
                   return;
                 }
-                handleBatchVendorPrint(ids, true);
+                handleBatchVendorPrint(unprintedOrders.map((r: any) => r.id), true);
               }}
-              title="Mark all orders in current queue as printed"
+              title={
+                unprintedCount > 0
+                  ? "Mark all orders in current queue as printed"
+                  : "No unprinted orders in current queue"
+              }
             >
               <span className="toolbar-btn-icon-circle">
                 <CheckCircle2 size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
               </span>
               <span>
-                {batchPrinting ? "Updating…" : `Mark All in Queue as Printed (${currentRows.length})`}
+                {batchPrinting
+                  ? "Updating…"
+                  : `Mark All in Queue as Printed (${unprintedCount})`}
               </span>
             </button>
-            <button
-              type="button"
-              className="btn compact toolbar-batch-btn"
-              disabled={batchQueueUpdating || loading || currentRows.length === 0}
-              onClick={() => handleBatchSetPrintingQueue(currentRows.map((r: any) => r.id), false)}
-              title="Remove all visible orders from Printing Queue (reverts them to Confirmed)"
-            >
-              <span className="toolbar-btn-icon-circle">
-                <XCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
-              </span>
-              <span>
-                {batchQueueUpdating ? "Updating…" : `Remove All from Queue (${currentRows.length})`}
-              </span>
-            </button>
-          </>
-        )}
-        {activeTab === "PRINTED" && (
+          );
+        })()}
+        {isVendor && activeTab === "PRINTED" && (
           <>
-            <button
-              type="button"
-              className="btn compact toolbar-batch-btn active"
-              disabled={batchPrinting || loading || currentRows.length === 0}
-              onClick={() => handleBatchVendorPrint(currentRows.map((r: any) => r.id), false)}
-              title="Unmark all printed orders (send back to Printing Queue)"
-            >
-              <span className="toolbar-btn-icon-circle">
-                <RotateCcw size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
-              </span>
-              <span>
-                {batchPrinting ? "Updating…" : `Unmark All Printed (${currentRows.length})`}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="btn compact toolbar-batch-btn"
-              disabled={batchQueueUpdating || loading || currentRows.length === 0}
-              onClick={() => handleBatchSetPrintingQueue(currentRows.map((r: any) => r.id), false)}
-              title="Remove all visible orders from Printing Queue (reverts them to Confirmed)"
-            >
-              <span className="toolbar-btn-icon-circle">
-                <XCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
-              </span>
-              <span>
-                {batchQueueUpdating ? "Updating…" : `Remove All from Queue (${currentRows.length})`}
-              </span>
-            </button>
+            {(() => {
+              const isCampusLahoreSelected =
+                deliveryTypeList.includes("campus") || deliveryTypeList.includes("lahore");
+              if (!isCampusLahoreSelected) return null;
+
+              const dispatchableIds = currentRows
+                .filter((r: any) => (isCampusOrder(r) || isLahoreOrder(r)) && !r.vendor_dispatched_at)
+                .map((r: any) => r.id);
+              const isEnabled = dispatchableIds.length > 0 && !batchDispatching && !loading;
+
+              return (
+                <button
+                  type="button"
+                  className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
+                  disabled={!isEnabled}
+                  onClick={() => handleBatchVendorDispatchOffice(dispatchableIds)}
+                  title={
+                    dispatchableIds.length > 0
+                      ? "Dispatch all printed orders to Qanchi Campus"
+                      : "No printed orders pending dispatch to Qanchi Campus"
+                  }
+                >
+                  <span className="toolbar-btn-icon-circle">
+                    <Building2 size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+                  </span>
+                  <span>
+                    {batchDispatching
+                      ? "Dispatching…"
+                      : `Send All to Qanchi Campus (${dispatchableIds.length})`}
+                  </span>
+                </button>
+              );
+            })()}
+            {(() => {
+              const printedOrders = currentRows.filter((r: any) => r.vendor_printed_at);
+              const printedCount = printedOrders.length;
+              const isEnabled = printedCount > 0 && !batchPrinting && !loading;
+
+              return (
+                <button
+                  type="button"
+                  className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
+                  disabled={!isEnabled}
+                  onClick={() => handleBatchVendorPrint(printedOrders.map((r: any) => r.id), false)}
+                  title={
+                    printedCount > 0
+                      ? "Unmark all printed orders (send back to Printing Queue)"
+                      : "No printed orders to unmark"
+                  }
+                >
+                  <span className="toolbar-btn-icon-circle">
+                    <RotateCcw size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+                  </span>
+                  <span>
+                    {batchPrinting ? "Updating…" : `Unmark All Printed (${printedCount})`}
+                  </span>
+                </button>
+              );
+            })()}
           </>
         )}
-        {!["PROCESSING", "PRINTED", "CONFIRMED"].includes(activeTab) && !isVendor && canUpdate && (
+        {!["PROCESSING", "PRINTED"].includes(activeTab) && !isVendor && canUpdate && (
           <button
             type="button"
             className={`btn compact toolbar-batch-btn ${activeFlowStep && filteredCount > 0 ? "active" : ""}`}
@@ -4393,7 +4557,19 @@ function Orders({
             const refCell = (
               <div>
                 <strong>{o.reference}</strong>
-                {mapUrl && (
+                {isCampus ? (
+                  <div>
+                    <span className="campus-static-pill">
+                      <BadgeIcon size={11} /> {badgeLabel}
+                    </span>
+                  </div>
+                ) : isOther ? (
+                  <div>
+                    <span className="other-static-pill">
+                      <BadgeIcon size={11} /> {badgeLabel}
+                    </span>
+                  </div>
+                ) : mapUrl ? (
                   <div>
                     <a
                       href={mapUrl}
@@ -4406,7 +4582,7 @@ function Orders({
                       <BadgeIcon size={12} /> {badgeLabel}
                     </a>
                   </div>
-                )}
+                ) : null}
                 {/* Admin Vendor badge / Quick send */}
                 {isAdmin && (
                   o.vendor_name ? (
@@ -4545,24 +4721,6 @@ function Orders({
               </div>
             );
 
-            const isSelected = selectedOrderIds.includes(o.id);
-            const selectCheckbox = (
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  if (e.target.checked) {
-                    setSelectedOrderIds((prev) => [...prev, o.id]);
-                  } else {
-                    setSelectedOrderIds((prev) => prev.filter((id) => id !== o.id));
-                  }
-                }}
-                aria-label={`Select order ${o.reference}`}
-                style={{ cursor: "pointer", width: 16, height: 16 }}
-              />
-            );
-
             if (isVendor) {
               const vendorBooksCell = (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -4633,7 +4791,6 @@ function Orders({
               );
 
               return [
-                selectCheckbox,
                 refCell,
                 <div>
                   <strong>{o.name}</strong>
@@ -4785,88 +4942,68 @@ function Orders({
                 <Status value={o.status} />
                 {o.status === "PROCESSING" && (
                   <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleVendorPrint(o, !o.vendor_printed_at);
-                      }}
-                      disabled={printingBusyId === o.id}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 9999,
-                        cursor: "pointer",
-                        background: o.vendor_printed_at ? "rgba(22, 163, 74, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                        color: o.vendor_printed_at ? "#15803d" : "#b45309",
-                        border: o.vendor_printed_at ? "1px solid #86efac" : "1px solid #fde68a",
-                        width: "fit-content",
-                      }}
-                      title={o.vendor_printed_at ? "Unmark as printed (move back to Printing Queue)" : "Mark order as printed"}
-                    >
-                      {o.vendor_printed_at ? <RotateCcw size={11} /> : <CheckCircle2 size={11} />}
-                      {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSetPrintingQueue(o, false);
-                      }}
-                      disabled={queueBusyId === o.id}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 3,
-                        fontSize: "0.70rem",
-                        fontWeight: 500,
-                        padding: "1px 5px",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                        background: "none",
-                        color: "var(--muted-foreground)",
-                        border: "1px dashed var(--border)",
-                        width: "fit-content",
-                      }}
-                      title="Remove from Printing Queue (reverts order to Confirmed)"
-                    >
-                      <XCircle size={10} />
-                      {queueBusyId === o.id ? "Reverting…" : "Remove from Queue"}
-                    </button>
-                  </div>
-                )}
-                {o.status === "CONFIRMED" && canUpdate && (
-                  <div style={{ marginTop: 4 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSetPrintingQueue(o, true);
-                      }}
-                      disabled={queueBusyId === o.id}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 9999,
-                        cursor: "pointer",
-                        background: "rgba(245, 158, 11, 0.12)",
-                        color: "#b45309",
-                        border: "1px solid #fde68a",
-                        width: "fit-content",
-                      }}
-                      title="Move order into Printing Queue"
-                    >
-                      <Printer size={11} />
-                      {queueBusyId === o.id ? "Adding…" : "Add to Printing Queue"}
-                    </button>
+                    {o.vendor_printed_at ? (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "rgba(22, 163, 74, 0.15)",
+                          color: "#15803d",
+                          border: "1px solid #86efac",
+                          width: "fit-content",
+                        }}
+                        title={`Printed by vendor on ${formatDateDMY(o.vendor_printed_at)}`}
+                      >
+                        <CheckCircle2 size={11} /> Printed
+                      </span>
+                    ) : (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                          width: "fit-content",
+                        }}
+                        title="In vendor printing queue"
+                      >
+                        <Clock size={11} /> In Printing Queue
+                      </span>
+                    )}
+                    {o.vendor_dispatched_at && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.70rem",
+                          fontWeight: 600,
+                          padding: "2px 7px",
+                          borderRadius: 9999,
+                          background: "rgba(37, 99, 235, 0.12)",
+                          color: "#1d4ed8",
+                          border: "1px solid #93c5fd",
+                          width: "fit-content",
+                        }}
+                        title={`Vendor dispatched this order to the Bookstore Office on ${formatDateDMY(o.vendor_dispatched_at)}`}
+                      >
+                        <Building2 size={10} /> Dispatched to Office
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -4874,7 +5011,6 @@ function Orders({
 
             return isPendingView
               ? [
-                  selectCheckbox,
                   refCell,
                   <div>
                     {o.name}
@@ -4921,7 +5057,6 @@ function Orders({
                     : []),
                 ]
               : [
-                  selectCheckbox,
                   refCell,
                   <div>
                     {o.name}
@@ -5088,6 +5223,14 @@ function Orders({
         />
       )}
 
+      {bulkAssigningOrders && (
+        <BulkAssignVendorModal
+          orders={bulkAssigningOrders}
+          onClose={() => setBulkAssigningOrders(null)}
+          onAssigned={reload}
+        />
+      )}
+
       <Confirm
         open={!!dispatchOfficeOrder}
         onClose={() => setDispatchOfficeOrder(null)}
@@ -5231,9 +5374,9 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             );
           })()}
 
-          {/* Vendor Assignment Banner / Action */}
+          {/* Vendor Assignment Banner / Action (Super Admin / Staff only - vendors do not see this) */}
           {o && (() => {
-            if (o.vendor_name) {
+            if (!isVendor && o.vendor_name) {
               return (
                 <div
                   className="vendor-assigned-banner no-print"

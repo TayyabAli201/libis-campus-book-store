@@ -65,6 +65,7 @@ const {
   updateVendor,
   deleteVendor,
   assignOrderToVendor,
+  batchAssignOrdersToVendor,
 } = await import("../lib/server/vendors.ts");
 const {
   getVendorWhatsAppMessage,
@@ -1575,7 +1576,7 @@ test("Vendor queue decrement on print, batch printing, and Other City direct del
   assert.equal(adminDeliverOrd2.status, "DELIVERED");
 });
 
-test("Printing Queue Management: Add to Queue, Mark Printed, Unmark Printed, Remove from Queue, and Batch Operations", async (t) => {
+test("Vendor Printing Rules: Admin assigns vendor -> defaults to Printing Queue; Admin cannot mark print; Vendor marks/unmarks print and batch prints", async (t) => {
   const sqlite = database(t);
   const testReq = new Request("http://127.0.0.1:5173/api/test");
   const adminUser = {
@@ -1585,6 +1586,23 @@ test("Printing Queue Management: Add to Queue, Mark Printed, Unmark Printed, Rem
     role: "SUPER_ADMIN",
     campus_id: null,
     permissions: ["orders.update", "orders.manage"],
+  };
+
+  // 1. Create a vendor partner
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Test Printing Press",
+    phone: "03001122334",
+    email: "testpress@example.com",
+    password: "Password123!",
+  });
+  const vendorUser = {
+    id: vRes.vendor.user_id,
+    name: vRes.vendor.name,
+    email: vRes.vendor.email,
+    role: "VENDOR",
+    vendor_id: vRes.vendor.id,
+    campus_id: null,
+    permissions: ["orders.read"],
   };
 
   const { id: bookId } = await saveBook(bookInput("PQTEST-01"), adminUser, request);
@@ -1613,80 +1631,67 @@ test("Printing Queue Management: Add to Queue, Mark Printed, Unmark Printed, Rem
   };
 
   const ord1 = await createConfirmedOrder("Queue Student 1", "Lahore", "campus");
-  const ord2 = await createConfirmedOrder("Queue Student 2", "Rawalpindi", "other");
+  const ord2 = await createConfirmedOrder("Queue Student 2", "Lahore", "lahore");
 
-  // 1. Initially both orders are in CONFIRMED
-  const initDb1 = sqlite.prepare("SELECT status, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  // 2. Initially both orders are in CONFIRMED without vendor
+  const initDb1 = sqlite.prepare("SELECT status, vendor_id, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
   assert.equal(initDb1.status, "CONFIRMED");
+  assert.equal(initDb1.vendor_id, null);
   assert.equal(initDb1.vendor_printed_at, null);
 
-  // 2. Add single order to Printing Queue: CONFIRMED -> PROCESSING
-  const qRes1 = await setPrintingQueue(testReq, adminUser, ord1.id, true);
-  assert.equal(qRes1.ok, true);
-  assert.equal(qRes1.status, "PROCESSING");
-  assert.equal(qRes1.in_queue, true);
+  // 3. Super Admin assigns order to vendor -> defaults to PROCESSING (Printing Queue) with vendor_printed_at = null
+  const assignRes = await assignOrderToVendor(testReq, adminUser, ord1.id, vRes.vendor.id, "Urgent print");
+  assert.equal(assignRes.ok, true);
+  assert.equal(assignRes.status, "PROCESSING");
 
-  const dbAfterAdd = sqlite.prepare("SELECT status, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
-  assert.equal(dbAfterAdd.status, "PROCESSING");
-  assert.equal(dbAfterAdd.vendor_printed_at, null);
+  const dbAfterAssign = sqlite.prepare("SELECT status, vendor_id, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(dbAfterAssign.status, "PROCESSING");
+  assert.equal(dbAfterAssign.vendor_id, vRes.vendor.id);
+  assert.equal(dbAfterAssign.vendor_printed_at, null, "Vendor printed status is null by default in printing queue");
 
-  // Verify listOrders with printed="0" includes ord1
-  const unprintedList = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
-  assert.ok(unprintedList.rows.some((r) => r.id === ord1.id), "ord1 appears in Printing Queue");
+  // 4. Super Admin CANNOT mark order as printed (reserved for vendor)
+  await assert.rejects(
+    () => vendorPrint(testReq, adminUser, ord1.id, true),
+    /reserved for vendors only/
+  );
+  await assert.rejects(
+    () => batchVendorPrint(testReq, adminUser, [ord1.id], true),
+    /reserved for vendors only/
+  );
 
-  // Verify listOrders with printed="1" does NOT include ord1
-  const printedListBefore = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "1");
-  assert.ok(!printedListBefore.rows.some((r) => r.id === ord1.id), "ord1 is not yet printed");
-
-  // 3. Mark as Printed
-  const printRes = await vendorPrint(testReq, adminUser, ord1.id, true);
+  // 5. Vendor CAN mark order as printed
+  const printRes = await vendorPrint(testReq, vendorUser, ord1.id, true);
   assert.equal(printRes.ok, true);
   assert.ok(printRes.vendor_printed_at);
 
-  // Now ord1 is in printed list, and removed from unprinted queue
-  const unprintedListAfterPrint = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
-  assert.ok(!unprintedListAfterPrint.rows.some((r) => r.id === ord1.id), "ord1 no longer in unprinted queue");
+  const dbAfterPrint = sqlite.prepare("SELECT vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  assert.ok(dbAfterPrint.vendor_printed_at);
 
-  const printedListAfterPrint = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "1");
-  assert.ok(printedListAfterPrint.rows.some((r) => r.id === ord1.id), "ord1 appears in Printed / Ready list");
+  // 6. Super Admin can see order in listOrders printed / ready list
+  const printedList = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "1");
+  assert.ok(printedList.rows.some((r) => r.id === ord1.id), "ord1 appears in Printed / Ready list for Super Admin");
 
-  // 4. Unmark Printed -> moves back into Printing Queue
-  const unmarkPrintRes = await vendorPrint(testReq, adminUser, ord1.id, false);
-  assert.equal(unmarkPrintRes.ok, true);
-  assert.equal(unmarkPrintRes.vendor_printed_at, null);
+  // 7. Vendor can unmark printed status (moves order back into vendor printing queue)
+  const unprintRes = await vendorPrint(testReq, vendorUser, ord1.id, false);
+  assert.equal(unprintRes.ok, true);
+  assert.equal(unprintRes.vendor_printed_at, null);
 
-  const unprintedListAfterUnmark = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
-  assert.ok(unprintedListAfterUnmark.rows.some((r) => r.id === ord1.id), "ord1 is back in unprinted queue");
+  const dbAfterUnprint = sqlite.prepare("SELECT vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(dbAfterUnprint.vendor_printed_at, null);
 
-  // 5. Remove from Printing Queue: reverts PROCESSING -> CONFIRMED
-  const removeQRes = await setPrintingQueue(testReq, adminUser, ord1.id, false);
-  assert.equal(removeQRes.ok, true);
-  assert.equal(removeQRes.status, "CONFIRMED");
-  assert.equal(removeQRes.in_queue, false);
+  const unprintedList = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
+  assert.ok(unprintedList.rows.some((r) => r.id === ord1.id), "ord1 is back in Printing Queue for Super Admin");
 
-  const dbAfterRemove = sqlite.prepare("SELECT status, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
-  assert.equal(dbAfterRemove.status, "CONFIRMED");
-  assert.equal(dbAfterRemove.vendor_printed_at, null);
+  // 8. Assign ord2 and batch mark both as printed by vendor
+  await assignOrderToVendor(testReq, adminUser, ord2.id, vRes.vendor.id, "Batch order");
+  const batchRes = await batchVendorPrint(testReq, vendorUser, [ord1.id, ord2.id], true);
+  assert.equal(batchRes.ok, true);
+  assert.equal(batchRes.count, 2);
 
-  // 6. Batch operations: Add ord1 and ord2 to Printing Queue
-  const batchAddRes = await batchSetPrintingQueue(testReq, adminUser, [ord1.id, ord2.id], true);
-  assert.equal(batchAddRes.ok, true);
-  assert.equal(batchAddRes.count, 2);
-
-  const dbBatch1 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord1.id);
-  const dbBatch2 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord2.id);
-  assert.equal(dbBatch1.status, "PROCESSING");
-  assert.equal(dbBatch2.status, "PROCESSING");
-
-  // Batch remove from Printing Queue
-  const batchRemoveRes = await batchSetPrintingQueue(testReq, adminUser, [ord1.id, ord2.id], false);
-  assert.equal(batchRemoveRes.ok, true);
-  assert.equal(batchRemoveRes.count, 2);
-
-  const dbBatchRemove1 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord1.id);
-  const dbBatchRemove2 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord2.id);
-  assert.equal(dbBatchRemove1.status, "CONFIRMED");
-  assert.equal(dbBatchRemove2.status, "CONFIRMED");
+  const dbBatch1 = sqlite.prepare("SELECT vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  const dbBatch2 = sqlite.prepare("SELECT vendor_printed_at FROM orders WHERE id=?").get(ord2.id);
+  assert.ok(dbBatch1.vendor_printed_at);
+  assert.ok(dbBatch2.vendor_printed_at);
 });
 
 test("Order Export: generates Sheet 1 (detailed orders) and Sheet 2 (consolidated book quantity summary) for Qanchi Campus & Lahore", async () => {
@@ -1841,6 +1846,95 @@ test("Order Export: generates Sheet 1 (detailed orders) and Sheet 2 (consolidate
   // Returns single sheet rows directly
   assert.equal(otherCitySheets[0][0], "Sr No");
   assert.equal(otherCitySheets[0][1], "Order Number");
+});
+
+test("Super Admin Bulk Send to Vendor: assigns verified orders in batch, rejects unverified orders, and moves to printing queue", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/test");
+  const adminUser = { id: "admin", email: "qa@example.invalid", role: "SUPER_ADMIN" };
+  const regularUser = { id: "vendor1", email: "vendor@example.invalid", role: "VENDOR" };
+
+  const { id: bookId } = await saveBook(bookInput("BULK-01"), adminUser, request);
+
+  // 1. Create a vendor
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Premier Print House",
+    phone: "03007788990",
+    email: "premier@example.com",
+    password: "securePassword123",
+  });
+  assert.equal(vRes.ok, true);
+
+  // Helper to place orders
+  const placeOrder = async (name, city, deliveryType) => {
+    const orderCart = { ...cart(bookId, 2), name, city, delivery_type: deliveryType };
+    const q = await quote(request, orderCart);
+    const slip = crypto.randomUUID();
+    sqlite
+      .prepare(
+        "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+      )
+      .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+    const placed = await submitOrder(request, q.id, slip);
+    return placed;
+  };
+
+  const ord1 = await placeOrder("Student Verified 1", "Lahore", "campus");
+  const ord2 = await placeOrder("Student Verified 2", "Islamabad", "other");
+  const ord3Unverified = await placeOrder("Student Unverified 3", "Karachi", "other");
+
+  // Verify payment for ord1 and ord2 (moves to CONFIRMED and VERIFIED)
+  const o1 = await getOrder(request, ord1.id, adminUser);
+  await decidePayment(request, adminUser, ord1.id, "approve", "Approved payment 1", o1.version);
+
+  const o2 = await getOrder(request, ord2.id, adminUser);
+  await decidePayment(request, adminUser, ord2.id, "approve", "Approved payment 2", o2.version);
+
+  // ord3 remains PAYMENT_PENDING with unverified payment
+  const db3Before = sqlite.prepare("SELECT status FROM payments WHERE order_id=?").get(ord3Unverified.id);
+  assert.equal(db3Before.status, "PENDING");
+
+  // 2. Non-admin cannot batch assign orders to vendor (403)
+  await assert.rejects(
+    () => batchAssignOrdersToVendor(testReq, regularUser, [ord1.id, ord2.id], vRes.vendor.id),
+    /Only Super Admin can assign orders to vendors/,
+  );
+
+  // 3. Super Admin batch assigns all 3 orders: only verified ones (ord1 and ord2) must be assigned
+  const bulkRes = await batchAssignOrdersToVendor(
+    testReq,
+    adminUser,
+    [ord1.id, ord2.id, ord3Unverified.id],
+    vRes.vendor.id,
+    "Urgent semester print run",
+  );
+
+  assert.equal(bulkRes.ok, true);
+  assert.equal(bulkRes.count, 2, "Only 2 verified orders should be assigned; unverified is skipped");
+
+  // Verify ord1 in database
+  const db1 = sqlite.prepare("SELECT status, vendor_id, vendor_printed_at, vendor_notes FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(db1.status, "PROCESSING");
+  assert.equal(db1.vendor_id, vRes.vendor.id);
+  assert.equal(db1.vendor_printed_at, null, "Order is in Printing Queue by default");
+  assert.equal(db1.vendor_notes, "Urgent semester print run");
+
+  // Verify ord2 in database
+  const db2 = sqlite.prepare("SELECT status, vendor_id, vendor_printed_at FROM orders WHERE id=?").get(ord2.id);
+  assert.equal(db2.status, "PROCESSING");
+  assert.equal(db2.vendor_id, vRes.vendor.id);
+  assert.equal(db2.vendor_printed_at, null);
+
+  // Verify ord3 was NOT assigned to vendor (unverified payment protection)
+  const db3After = sqlite.prepare("SELECT status, vendor_id FROM orders WHERE id=?").get(ord3Unverified.id);
+  assert.equal(db3After.vendor_id, null, "Unverified order must NOT be sent to vendor");
+  assert.notEqual(db3After.status, "PROCESSING");
+
+  // Verify single assignOrderToVendor also rejects unverified order
+  await assert.rejects(
+    () => assignOrderToVendor(testReq, adminUser, ord3Unverified.id, vRes.vendor.id),
+    /Only orders with verified payment can be sent to a vendor/,
+  );
 });
 
 

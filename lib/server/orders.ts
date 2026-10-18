@@ -920,8 +920,11 @@ export async function vendorPrint(
   id: string,
   printed = true,
 ) {
+  if (u.role !== "VENDOR") {
+    throw new AppError(403, "Marking print status is reserved for vendors only.");
+  }
   const o = await getOrder(req, id, u);
-  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+  if (o.vendor_id !== (u.vendor_id || u.id)) {
     throw new AppError(403, "You can only update print status for your assigned orders.");
   }
   const isPrinted = printed !== false;
@@ -1001,6 +1004,9 @@ export async function batchVendorPrint(
 ) {
   if (!orderIds || !orderIds.length) {
     throw new AppError(400, "Please select at least one order.");
+  }
+  if (u.role !== "VENDOR") {
+    throw new AppError(403, "Batch print marking is reserved for vendors only.");
   }
   const isPrinted = printed !== false;
   const printTime = isPrinted ? now() : null;

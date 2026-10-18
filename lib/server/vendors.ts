@@ -251,9 +251,15 @@ export async function assignOrderToVendor(
     throw new AppError(403, "Only Super Admin can assign orders to vendors.");
   }
 
-  const order = await one<any>("SELECT * FROM orders WHERE id = ?", orderId);
+  const order = await one<any>(
+    "SELECT o.*, p.status AS payment_status FROM orders o LEFT JOIN payments p ON p.order_id = o.id WHERE o.id = ?",
+    orderId,
+  );
   if (!order) {
     throw new AppError(404, "Order not found.");
+  }
+  if (order.payment_status !== "VERIFIED") {
+    throw new AppError(400, "Only orders with verified payment can be sent to a vendor.");
   }
 
   const vendor = await one<any>(
@@ -272,10 +278,13 @@ export async function assignOrderToVendor(
   order.items = items;
   order.total_books = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
 
-  // Status transition: If CONFIRMED, advance to PROCESSING (Printing).
-  // If already PROCESSING or higher, keep status as is.
+  // Status transition: When assigning/sending to vendor, default into PROCESSING (Printing Queue).
   let nextStatus = order.status;
-  if (order.status === "CONFIRMED") {
+  if (
+    order.status === "CONFIRMED" ||
+    order.status === "PAYMENT_PENDING" ||
+    order.status === "PENDING"
+  ) {
     nextStatus = "PROCESSING";
   }
 
@@ -284,7 +293,7 @@ export async function assignOrderToVendor(
 
   const statements = [
     stmt(
-      `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, updated_at = ?, version = version + 1 WHERE id = ?`,
+      `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, vendor_printed_at = NULL, vendor_dispatched_at = NULL, updated_at = ?, version = version + 1 WHERE id = ?`,
       vendor.id,
       at,
       notes || null,
@@ -348,5 +357,128 @@ export async function assignOrderToVendor(
     whatsapp_message: waMsg,
     whatsappUrl: waUrl,
     whatsappMessage: waMsg,
+  };
+}
+
+export async function batchAssignOrdersToVendor(
+  req: Request,
+  u: User,
+  orderIds: string[],
+  vendorId: string,
+  notes?: string,
+): Promise<{
+  ok: boolean;
+  count: number;
+  vendor: Vendor;
+  message: string;
+}> {
+  if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Only Super Admin can assign orders to vendors.");
+  }
+  if (!orderIds || !orderIds.length) {
+    throw new AppError(400, "No orders specified.");
+  }
+
+  const vendor = await one<any>(
+    "SELECT * FROM vendors WHERE id = ? AND active = 1",
+    vendorId,
+  );
+  if (!vendor) {
+    throw new AppError(404, "Active vendor not found.");
+  }
+
+  const at = now();
+  const statements: any[] = [];
+  let assignedCount = 0;
+
+  for (const id of orderIds) {
+    const order = await one<any>(
+      "SELECT o.*, p.status AS payment_status FROM orders o LEFT JOIN payments p ON p.order_id = o.id WHERE o.id = ?",
+      id,
+    );
+    if (!order) continue;
+    // Strict requirement: Only orders whose payment is verified can be assigned/sent to vendor
+    if (order.payment_status !== "VERIFIED") {
+      continue;
+    }
+
+    let nextStatus = order.status;
+    if (
+      order.status === "CONFIRMED" ||
+      order.status === "PAYMENT_PENDING" ||
+      order.status === "PENDING"
+    ) {
+      nextStatus = "PROCESSING";
+    }
+
+    const noteText = `Batch assigned to vendor: ${vendor.name}${notes ? ` - Note: ${notes}` : ""}`;
+
+    statements.push(
+      stmt(
+        `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, vendor_printed_at = NULL, vendor_dispatched_at = NULL, updated_at = ?, version = version + 1 WHERE id = ?`,
+        vendor.id,
+        at,
+        notes || null,
+        nextStatus,
+        at,
+        order.id,
+      ),
+      stmt(
+        `INSERT INTO order_history(id, order_id, status, note, actor, internal, created_at)
+         VALUES(?, ?, ?, ?, ?, 0, ?)`,
+        uid(),
+        order.id,
+        nextStatus,
+        noteText,
+        u.email,
+        at,
+      ),
+      auditStmt(
+        u.email,
+        "BATCH_ASSIGN_ORDER_TO_VENDOR",
+        order.id,
+        { vendor_id: order.vendor_id, status: order.status },
+        { vendor_id: vendor.id, status: nextStatus, vendor_name: vendor.name },
+        req,
+      ),
+    );
+    assignedCount++;
+
+    const items = await all<any>(
+      "SELECT code, title, pages, quantity FROM order_items WHERE order_id = ?",
+      order.id,
+    );
+    try {
+      sendVendorOrderAssignedEmail({
+        vendor,
+        order: { ...order, status: nextStatus },
+        items,
+        origin: new URL(req.url).origin,
+      }).catch((err) => {
+        console.error("Failed to send vendor order email:", err);
+      });
+    } catch (err) {
+      console.error("Failed to trigger vendor email:", err);
+    }
+  }
+
+  if (statements.length > 0) {
+    await batch(statements);
+  }
+
+  return {
+    ok: true,
+    count: assignedCount,
+    vendor: {
+      id: vendor.id,
+      user_id: vendor.user_id,
+      name: vendor.name,
+      phone: vendor.phone,
+      email: vendor.email,
+      address: vendor.address || null,
+      active: true,
+      created_at: vendor.created_at,
+    },
+    message: `Successfully sent ${assignedCount} verified order(s) to ${vendor.name}.`,
   };
 }
