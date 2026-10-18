@@ -1701,6 +1701,18 @@ test("Vendor Printing Rules: Admin assigns vendor -> defaults to Printing Queue;
   const markAllRes = await batchVendorPrint(testReq, vendorUser, { allInQueue: true, printed: true });
   assert.equal(markAllRes.ok, true);
   assert.equal(markAllRes.count >= 2, true);
+
+  // 10. Test "Send All to Qanchi Campus" with allEligible: true in 1 click across all pages
+  const dispatchAllRes = await batchVendorDispatchOffice(testReq, vendorUser, { allEligible: true });
+  assert.equal(dispatchAllRes.ok, true);
+  assert.equal(dispatchAllRes.count >= 2, true);
+
+  const dbDispatched1 = sqlite.prepare("SELECT status, vendor_dispatched_at FROM orders WHERE id=?").get(ord1.id);
+  const dbDispatched2 = sqlite.prepare("SELECT status, vendor_dispatched_at FROM orders WHERE id=?").get(ord2.id);
+  assert.equal(dbDispatched1.status, "SHIPPED");
+  assert.ok(dbDispatched1.vendor_dispatched_at);
+  assert.equal(dbDispatched2.status, "SHIPPED");
+  assert.ok(dbDispatched2.vendor_dispatched_at);
 });
 
 test("Order Export: generates Sheet 1 (detailed orders) and Sheet 2 (consolidated book quantity summary) for Qanchi Campus & Lahore", async () => {

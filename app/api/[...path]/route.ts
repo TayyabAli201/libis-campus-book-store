@@ -586,11 +586,12 @@ async function handle(req: Request) {
         const body = await json(req);
         const parsed = z
           .object({
-            orderIds: z.array(z.string()).min(1),
+            orderIds: z.array(z.string()).optional(),
+            allEligible: z.boolean().optional(),
             note: z.string().optional().default(""),
           })
           .parse(body);
-        return ok(await batchVendorDispatchOffice(req, u, parsed.orderIds, parsed.note));
+        return ok(await batchVendorDispatchOffice(req, u, parsed));
       }
       if (id === "batch-printing-queue" && method === "POST") {
         const body = await json(req);

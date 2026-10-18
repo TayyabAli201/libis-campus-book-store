@@ -1126,19 +1126,38 @@ export async function batchVendorPrint(
 export async function batchVendorDispatchOffice(
   req: Request,
   u: User,
-  orderIds: string[],
-  note = "",
+  paramsOrIds:
+    | string[]
+    | {
+        orderIds?: string[];
+        allEligible?: boolean;
+        note?: string;
+      },
+  legacyNote = "",
 ) {
-  if (!orderIds || !orderIds.length) {
-    throw new AppError(400, "Please select at least one order.");
+  const isObj = !Array.isArray(paramsOrIds) && typeof paramsOrIds === "object";
+  const orderIds = isObj ? paramsOrIds.orderIds : paramsOrIds;
+  const allEligible = isObj ? Boolean(paramsOrIds.allEligible) : false;
+  const note = isObj ? paramsOrIds.note || "" : legacyNote;
+
+  if ((!orderIds || !orderIds.length) && !allEligible) {
+    throw new AppError(400, "Please select at least one order or choose all eligible.");
   }
   const s = scope(u);
-  const placeholders = orderIds.map(() => "?").join(",");
-  const ordersToUpdate = await all<any>(
-    `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at, o.vendor_dispatched_at, o.delivery_type, o.city, o.address FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
-    ...orderIds,
-    ...s.args,
-  );
+  let ordersToUpdate: any[] = [];
+  if (orderIds && orderIds.length > 0) {
+    const placeholders = orderIds.map(() => "?").join(",");
+    ordersToUpdate = await all<any>(
+      `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at, o.vendor_dispatched_at, o.delivery_type, o.city, o.address FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+      ...orderIds,
+      ...s.args,
+    );
+  } else if (allEligible) {
+    ordersToUpdate = await all<any>(
+      `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at, o.vendor_dispatched_at, o.delivery_type, o.city, o.address FROM orders o WHERE ${s.sql} AND o.status='PROCESSING' AND o.vendor_dispatched_at IS NULL`,
+      ...s.args,
+    );
+  }
   if (!ordersToUpdate.length) {
     throw new AppError(404, "No eligible orders found.");
   }

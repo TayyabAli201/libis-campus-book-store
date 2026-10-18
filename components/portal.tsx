@@ -126,6 +126,19 @@ const nav = [
   ["profile", "My profile", UserRound, "profile"],
 ] as const;
 
+export function notifyOrdersUpdated() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("orders-updated"));
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("bookstore-orders-sync");
+        bc.postMessage("updated");
+        bc.close();
+      }
+    } catch {}
+  }
+}
+
 export function BrandText({ name = "Campus Bookstore" }: { name?: string }) {
   const parts = (name || "Campus Bookstore").trim().split(/\s+/);
   if (parts.length > 1) {
@@ -552,12 +565,24 @@ export function Portal({
     window.addEventListener("focus", refresh);
     window.addEventListener("orders-updated", refresh);
     document.addEventListener("visibilitychange", refresh);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        bc = new BroadcastChannel("bookstore-orders-sync");
+        bc.onmessage = () => {
+          void refresh();
+        };
+      }
+    } catch {}
+
     return () => {
       disposed = true;
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("orders-updated", refresh);
       document.removeEventListener("visibilitychange", refresh);
+      bc?.close();
     };
   }, [isAdmin, user.must_change]);
   return (
@@ -1982,7 +2007,7 @@ function CourierTrackingModal({
           ? "Courier tracking saved & order marked as Delivered ✓"
           : "Courier tracking details saved successfully!",
       );
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       onSaved();
       onClose();
     } catch (err) {
@@ -1999,7 +2024,7 @@ function CourierTrackingModal({
         action: "remove_courier",
       });
       toast.success("Courier tracking details removed.");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       onSaved();
       onClose();
     } catch (err) {
@@ -2217,7 +2242,7 @@ function AssignVendorModal({
         notes: vendorNotes.trim(),
       });
       toast.success(res.message || "Order sent to vendor successfully!");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       setAssignedResult(res);
       onAssigned();
     } catch (err) {
@@ -2427,7 +2452,7 @@ function BulkAssignVendorModal({
         notes: vendorNotes.trim(),
       });
       toast.success(res.message || `Successfully sent ${res.count ?? orders.length} orders to vendor!`);
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       setAssignedResult(res);
       onAssigned();
     } catch (err) {
@@ -2646,7 +2671,7 @@ function OrderModalPopup({
       setNote("");
       setNext("");
       toast.success("Order updated.");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (e) {
       toast.error(errorText(e));
@@ -2657,7 +2682,7 @@ function OrderModalPopup({
     try {
       await api("manage/orders/" + id, {}, "DELETE");
       toast.success("Order deleted successfully.");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       onDeleted();
       onClose();
     } catch (e) {
@@ -2998,7 +3023,7 @@ function OrderModalPopup({
                             printed: !o.vendor_printed_at,
                           });
                           toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
-                          window.dispatchEvent(new Event("orders-updated"));
+                          notifyOrdersUpdated();
                           await reload();
                         } catch (e) {
                           toast.error(errorText(e));
@@ -3238,7 +3263,7 @@ function OrderModalPopup({
                                     note: "Marked as delivered by vendor",
                                   });
                                   toast.success("Order marked as Delivered ✓");
-                                  window.dispatchEvent(new Event("orders-updated"));
+                                  notifyOrdersUpdated();
                                   await reload();
                                 } catch (e) {
                                   toast.error(errorText(e));
@@ -3612,9 +3637,9 @@ const ORDER_DELIVERY_CHIPS = [
 const VENDOR_WORKFLOW_TABS: WorkflowTab[] = [
   { id: "PROCESSING", label: "Printing Queue", title: "Orders Currently In Printing Queue", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
   { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", icon: "📦", statuses: ["PROCESSING"], color: "confirmed" },
-  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
   { id: "SHIPPED", label: "Shipped", title: "Orders Shipped / Handed Over", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
   { id: "DELIVERED", label: "Delivered", title: "Completed Orders", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
+  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
 ];
 
 const VENDOR_DELIVERY_CHIPS = [
@@ -3707,7 +3732,7 @@ function Orders({
         printed: markAsPrinted,
       });
       toast.success(markAsPrinted ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -3728,7 +3753,7 @@ function Orders({
           ? "Order added to Printing Queue ✓"
           : "Order removed from Printing Queue (reverted to Confirmed) ✓",
       );
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -3746,7 +3771,7 @@ function Orders({
         inQueue,
       });
       toast.success(res.message || (inQueue ? `Added ${ids.length} order(s) to Printing Queue` : `Removed ${ids.length} order(s) from Printing Queue`));
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -3765,7 +3790,7 @@ function Orders({
         note: "Marked as delivered by vendor",
       });
       toast.success("Order marked as Delivered ✓");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (e) {
       toast.error(errorText(e));
@@ -3784,7 +3809,7 @@ function Orders({
         note: "Marked as Shipped by Bookstore Office (Received from Vendor)",
       });
       toast.success(`Order ${ord.reference || ord.id} marked as Shipped ✓`);
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (e) {
       toast.error(errorText(e));
@@ -3815,7 +3840,7 @@ function Orders({
             ? `Marked ${res.count ?? ids.length} order(s) as printed ✓`
             : `Unmarked print status for ${res.count ?? ids.length} order(s).`),
       );
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -3824,15 +3849,18 @@ function Orders({
     }
   };
 
-  const handleBatchVendorDispatchOffice = async (ids: string[]) => {
-    if (!ids.length) return;
+  const handleBatchVendorDispatchOffice = async (
+    paramsOrIds: string[] | { allEligible?: boolean; ids?: string[] } = { allEligible: true },
+  ) => {
     setBatchDispatching(true);
     try {
-      const res = await api("manage/orders/batch-vendor-dispatch-office", {
-        orderIds: ids,
-      });
-      toast.success(res.message || `Dispatched ${res.count ?? ids.length} order(s) to Qanchi Campus.`);
-      window.dispatchEvent(new Event("orders-updated"));
+      const isObj = !Array.isArray(paramsOrIds) && typeof paramsOrIds === "object";
+      const payload = isObj
+        ? { allEligible: paramsOrIds.allEligible, orderIds: paramsOrIds.ids }
+        : { orderIds: paramsOrIds };
+      const res = await api("manage/orders/batch-vendor-dispatch-office", payload);
+      toast.success(res.message || `Dispatched ${res.count ?? "all"} order(s) to Qanchi Campus.`);
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -3850,7 +3878,7 @@ function Orders({
       });
       toast.success("Order dispatched to Bookstore Office ✓");
       setDispatchOfficeOrder(null);
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -4009,7 +4037,43 @@ function Orders({
   useEffect(() => {
     const handler = () => reload();
     window.addEventListener("orders-updated", handler);
-    return () => window.removeEventListener("orders-updated", handler);
+
+    // Auto-poll every 5 seconds in background so Super Admin and Vendor are always in real-time sync without manual page refresh
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        void reload();
+      }
+    }, 5000);
+
+    const onFocus = () => {
+      void reload();
+    };
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        void reload();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        bc = new BroadcastChannel("bookstore-orders-sync");
+        bc.onmessage = () => {
+          void reload();
+        };
+      }
+    } catch {}
+
+    return () => {
+      window.removeEventListener("orders-updated", handler);
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      bc?.close();
+    };
   }, [reload]);
 
   const activeFlowStep =
@@ -4060,7 +4124,7 @@ function Orders({
       setStatusList([activeFlowStep.to]);
       setActiveTab(activeFlowStep.to);
       setPage(1);
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (err) {
       toast.error(errorText(err));
@@ -4447,74 +4511,37 @@ function Orders({
             </button>
           );
         })()}
-        {isVendor && activeTab === "PRINTED" && (
-          <>
-            {(() => {
-              const isCampusLahoreSelected =
-                deliveryTypeList.includes("campus") || deliveryTypeList.includes("lahore");
-              if (!isCampusLahoreSelected) return null;
+        {isVendor && activeTab === "PRINTED" && (() => {
+          const isOtherOnly =
+            deliveryTypeList.length === 1 && deliveryTypeList[0] === "other";
+          if (isOtherOnly) return null;
 
-              const dispatchableIds = currentRows
-                .filter((r: any) => (isCampusOrder(r) || isLahoreOrder(r)) && !r.vendor_dispatched_at)
-                .map((r: any) => r.id);
-              const isEnabled = dispatchableIds.length > 0 && !batchDispatching && !loading;
+          const printedTotal = data?.status_counts?.["PRINTED"] ?? data?.total ?? currentRows.length;
+          const isEnabled = printedTotal > 0 && !batchDispatching && !loading;
 
-              return (
-                <button
-                  type="button"
-                  className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
-                  disabled={!isEnabled}
-                  onClick={() => handleBatchVendorDispatchOffice(dispatchableIds)}
-                  title={
-                    dispatchableIds.length > 0
-                      ? "Dispatch all printed orders to Qanchi Campus"
-                      : "No printed orders pending dispatch to Qanchi Campus"
-                  }
-                >
-                  <span className="toolbar-btn-icon-circle">
-                    <Building2 size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
-                  </span>
-                  <span>
-                    {batchDispatching
-                      ? "Dispatching…"
-                      : `Send All to Qanchi Campus (${dispatchableIds.length})`}
-                  </span>
-                </button>
-              );
-            })()}
-            {(() => {
-              const printedTotal = data?.total ?? currentRows.length;
-              const isEnabled = printedTotal > 0 && !batchPrinting && !loading;
-
-              return (
-                <button
-                  type="button"
-                  className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
-                  disabled={!isEnabled}
-                  onClick={() => {
-                    if (printedTotal === 0) {
-                      toast.info("No printed orders to unmark.");
-                      return;
-                    }
-                    handleBatchVendorPrint([], false, true);
-                  }}
-                  title={
-                    printedTotal > 0
-                      ? `Unmark all ${printedTotal} printed order(s) (send back to Printing Queue)`
-                      : "No printed orders to unmark"
-                  }
-                >
-                  <span className="toolbar-btn-icon-circle">
-                    <RotateCcw size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
-                  </span>
-                  <span>
-                    {batchPrinting ? "Updating…" : `Unmark All Printed (${printedTotal})`}
-                  </span>
-                </button>
-              );
-            })()}
-          </>
-        )}
+          return (
+            <button
+              type="button"
+              className={`btn compact toolbar-batch-btn ${isEnabled ? "active" : ""}`}
+              disabled={!isEnabled}
+              onClick={() => handleBatchVendorDispatchOffice({ allEligible: true })}
+              title={
+                printedTotal > 0
+                  ? `Dispatch all ${printedTotal} printed order(s) to Qanchi Campus`
+                  : "No printed orders pending dispatch to Qanchi Campus"
+              }
+            >
+              <span className="toolbar-btn-icon-circle">
+                <Building2 size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              </span>
+              <span>
+                {batchDispatching
+                  ? "Dispatching…"
+                  : `Send All to Qanchi Campus ${printedTotal > 0 ? `(${printedTotal})` : ""}`}
+              </span>
+            </button>
+          );
+        })()}
         {!isVendor && canUpdate && activeFlowStep && (
           <button
             type="button"
@@ -5414,7 +5441,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
       setNote("");
       setNext("");
       toast.success("Order updated.");
-      window.dispatchEvent(new Event("orders-updated"));
+      notifyOrdersUpdated();
       await reload();
     } catch (e) {
       toast.error(errorText(e));
@@ -5742,7 +5769,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       try {
                         await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: true });
                         toast.success("Order added to Printing Queue ✓");
-                        window.dispatchEvent(new Event("orders-updated"));
+                        notifyOrdersUpdated();
                         await reload();
                       } catch (e) {
                         toast.error(errorText(e));
@@ -5768,7 +5795,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                             printed: !o.vendor_printed_at,
                           });
                           toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
-                          window.dispatchEvent(new Event("orders-updated"));
+                          notifyOrdersUpdated();
                           await reload();
                         } catch (e) {
                           toast.error(errorText(e));
@@ -5790,7 +5817,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         try {
                           await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: false });
                           toast.success("Order removed from Printing Queue (reverted to Confirmed) ✓");
-                          window.dispatchEvent(new Event("orders-updated"));
+                          notifyOrdersUpdated();
                           await reload();
                         } catch (e) {
                           toast.error(errorText(e));
@@ -5922,7 +5949,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                                 note: "Marked as delivered by vendor",
                               });
                               toast.success("Order marked as Delivered ✓");
-                              window.dispatchEvent(new Event("orders-updated"));
+                              notifyOrdersUpdated();
                               await reload();
                             } catch (e) {
                               toast.error(errorText(e));
