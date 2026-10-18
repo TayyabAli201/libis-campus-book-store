@@ -1183,24 +1183,45 @@ function ProofUploader({
     <div className="proof-uploader">
       <Upload />
       <h3>Upload payment proof</h3>
-      <p>JPG, PNG or PDF · up to {max} MB</p>
+      <p>JPEG, JPG or PNG picture only (No PDF) · up to {max} MB</p>
       <input
         type="file"
         aria-label="Payment proof"
-        accept="image/jpeg,image/png,application/pdf"
+        accept="image/jpeg,image/png,image/jpg,.jpg,.jpeg,.png"
         disabled={busy}
         onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
           setError("");
           if (f.size > max * 1024 * 1024) {
-            setError(`Choose a file smaller than ${max} MB.`);
+            const sizeMsg = `Choose a file smaller than ${max} MB.`;
+            setError(sizeMsg);
+            toast.error(sizeMsg);
+            e.target.value = "";
             return;
           }
+          const lowerName = f.name.toLowerCase();
+          const hasImageExt =
+            lowerName.endsWith(".jpg") ||
+            lowerName.endsWith(".jpeg") ||
+            lowerName.endsWith(".png");
+          const isImageMime =
+            f.type === "image/jpeg" ||
+            f.type === "image/png" ||
+            f.type === "image/jpg" ||
+            (!f.type && hasImageExt);
+
           if (
-            !["image/jpeg", "image/png", "application/pdf"].includes(f.type)
+            !isImageMime ||
+            !hasImageExt ||
+            f.type === "application/pdf" ||
+            lowerName.endsWith(".pdf")
           ) {
-            setError("Choose a JPG, PNG or PDF.");
+            const formatMsg =
+              "Only picture uploads (JPEG, JPG, PNG) are allowed as payment proof. PDF and other file formats are not accepted.";
+            setError(formatMsg);
+            toast.error(formatMsg);
+            e.target.value = "";
             return;
           }
           setBusy(true);

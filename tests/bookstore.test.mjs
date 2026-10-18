@@ -1946,6 +1946,153 @@ test("Super Admin Bulk Send to Vendor: assigns verified orders in batch, rejects
   );
 });
 
+test("Payment proof uploads accept JPEG and PNG pictures only, strictly rejecting PDF and other formats with 415", async (t) => {
+  const sqlite = database(t);
+  env.BUCKET = {
+    put: async () => {},
+    get: async () => null,
+  };
+  const { id: bookId } = await saveBook(bookInput("PROOF-01"), admin, request);
+  const q = await quote(request, cart(bookId, 1));
+
+  // 1. PDF binary with application/pdf header must be rejected with 415
+  const pdfBytes = new TextEncoder().encode("%PDF-1.4 sample pdf content for payment proof");
+  const pdfReq = new Request(`http://127.0.0.1:5173/api/proofs?quote=${q.id}`, {
+    method: "POST",
+    headers: {
+      cookie: "cbs_guest=" + guest,
+      Origin: "http://127.0.0.1:5173",
+      "X-Requested-With": "CampusBookstore",
+      "Content-Type": "application/pdf",
+    },
+    body: pdfBytes,
+  });
+  const pdfRes = await POST(pdfReq);
+  assert.equal(pdfRes.status, 415);
+  const pdfBody = await pdfRes.json();
+  assert.match(
+    pdfBody.error,
+    /Only picture uploads \(JPEG, JPG, PNG\) are allowed\. PDF and other file formats are not accepted\./,
+  );
+
+  // 2. Text / generic binary file must also be rejected with 415
+  const txtBytes = new TextEncoder().encode("plain text invoice instead of picture");
+  const txtReq = new Request(`http://127.0.0.1:5173/api/proofs?quote=${q.id}`, {
+    method: "POST",
+    headers: {
+      cookie: "cbs_guest=" + guest,
+      Origin: "http://127.0.0.1:5173",
+      "X-Requested-With": "CampusBookstore",
+      "Content-Type": "text/plain",
+    },
+    body: txtBytes,
+  });
+  const txtRes = await POST(txtReq);
+  assert.equal(txtRes.status, 415);
+
+  // 3. Valid PNG upload must succeed (200)
+  const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3, 4, 5]);
+  const pngReq = new Request(`http://127.0.0.1:5173/api/proofs?quote=${q.id}`, {
+    method: "POST",
+    headers: {
+      cookie: "cbs_guest=" + guest,
+      Origin: "http://127.0.0.1:5173",
+      "X-Requested-With": "CampusBookstore",
+      "Content-Type": "image/png",
+    },
+    body: pngBytes,
+  });
+  const pngRes = await POST(pngReq);
+  assert.equal(pngRes.status, 200);
+  const pngBody = await pngRes.json();
+  assert.ok(pngBody.id, "Upload returns slip id");
+
+  // 4. Valid JPEG upload must succeed (200)
+  const jpegBytes = new Uint8Array([255, 216, 255, 224, 0, 16, 74, 70, 73, 70, 0, 1, 1, 0]);
+  const jpegReq = new Request(`http://127.0.0.1:5173/api/proofs?quote=${q.id}`, {
+    method: "POST",
+    headers: {
+      cookie: "cbs_guest=" + guest,
+      Origin: "http://127.0.0.1:5173",
+      "X-Requested-With": "CampusBookstore",
+      "Content-Type": "image/jpeg",
+    },
+    body: jpegBytes,
+  });
+  const jpegRes = await POST(jpegReq);
+  assert.equal(jpegRes.status, 200);
+  const jpegBody = await jpegRes.json();
+  assert.ok(jpegBody.id, "Upload returns slip id");
+});
+
+test("Super Admin status update to SHIPPED auto-stamps vendor_printed_at and vendor_dispatched_at when vendor forgets to mark printed", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/test");
+  const adminUser = {
+    id: "admin",
+    name: "QA Admin",
+    email: "qa@example.invalid",
+    role: "SUPER_ADMIN",
+    campus_id: null,
+    permissions: ["orders.update", "orders.manage"],
+  };
+
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Sync Printing Press",
+    phone: "03009988776",
+    email: "syncpress@example.com",
+    password: "Password123!",
+  });
+
+  const { id: bookId } = await saveBook(bookInput("SYNC-01"), adminUser, request);
+
+  const cartData = {
+    name: "Sync Student",
+    phone: "03211112233",
+    city: "Lahore",
+    address: "House 5, Lahore",
+    delivery_type: "campus",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 1 }],
+  };
+  const q = await quote(request, cartData);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const ord = await getOrder(request, placed.id, adminUser);
+  await decidePayment(request, adminUser, placed.id, "approve", "Approved", ord.version);
+
+  // Send to vendor -> PROCESSING (Printing Queue), vendor_printed_at is NULL
+  await assignOrderToVendor(testReq, adminUser, placed.id, vRes.vendor.id);
+  const beforeShip = sqlite.prepare("SELECT status, vendor_printed_at, vendor_dispatched_at FROM orders WHERE id=?").get(placed.id);
+  assert.equal(beforeShip.status, "PROCESSING");
+  assert.equal(beforeShip.vendor_printed_at, null);
+  assert.equal(beforeShip.vendor_dispatched_at, null);
+
+  // Super Admin receives physical books at office and marks order as SHIPPED
+  const freshOrd = await getOrder(request, placed.id, adminUser);
+  await changeStatus(
+    testReq,
+    adminUser,
+    placed.id,
+    "SHIPPED",
+    "Books received at Bookstore Office and marked Shipped",
+    freshOrd.version,
+  );
+
+  // Verify that vendor_printed_at and vendor_dispatched_at were automatically stamped!
+  const afterShip = sqlite.prepare("SELECT status, vendor_printed_at, vendor_dispatched_at FROM orders WHERE id=?").get(placed.id);
+  assert.equal(afterShip.status, "SHIPPED");
+  assert.ok(afterShip.vendor_printed_at, "vendor_printed_at must be auto-stamped when marked Shipped");
+  assert.ok(afterShip.vendor_dispatched_at, "vendor_dispatched_at must be auto-stamped for Lahore/Campus orders");
+});
+
+
+
 
 
 

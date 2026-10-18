@@ -121,15 +121,18 @@ export async function upload(req: Request, cover = false) {
   }
   const bytes = await readBounded(req, settings.max_upload_mb * 1024 * 1024);
   const mime = detectMime(bytes);
-  if (
-    !mime ||
-    (cover && mime === "application/pdf") ||
-    mime !== req.headers.get("content-type")
-  )
+  const headerType = (req.headers.get("content-type") || "").toLowerCase().trim();
+  const isJpeg =
+    mime === "image/jpeg" &&
+    (headerType === "image/jpeg" || headerType === "image/jpg");
+  const isPng = mime === "image/png" && headerType === "image/png";
+
+  if (!mime || (!isJpeg && !isPng)) {
     throw new AppError(
       415,
-      "Upload a valid JPG, PNG or PDF with the correct file type.",
+      "Only picture uploads (JPEG, JPG, PNG) are allowed. PDF and other file formats are not accepted.",
     );
+  }
   const id = uid(),
     key = `${cover ? "covers" : "proofs"}/${id}`;
   const digest = hash(bytes);

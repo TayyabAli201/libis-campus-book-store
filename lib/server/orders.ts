@@ -757,12 +757,21 @@ export async function changeStatus(
     );
     state = "RELEASED";
   }
+  const at = now();
+  let newVendorPrintedAt = o.vendor_printed_at;
+  let newVendorDispatchedAt = o.vendor_dispatched_at;
+  if (["SHIPPED", "DELIVERED"].includes(status)) {
+    if (!newVendorPrintedAt) newVendorPrintedAt = at;
+    if (!isOtherCityOrder(o) && !newVendorDispatchedAt) newVendorDispatchedAt = at;
+  }
   statements.push(
     stmt(
-      "UPDATE orders SET status=?,inventory_state=?,updated_at=?,version=version+1 WHERE id=?",
+      "UPDATE orders SET status=?,inventory_state=?,vendor_printed_at=?,vendor_dispatched_at=?,updated_at=?,version=version+1 WHERE id=?",
       status,
       state,
-      now(),
+      newVendorPrintedAt,
+      newVendorDispatchedAt,
+      at,
       o.id,
     ),
     stmt(
@@ -772,14 +781,14 @@ export async function changeStatus(
       status,
       note,
       u.email,
-      now(),
+      at,
     ),
     auditStmt(
       u.email,
       "ORDER_STATUS",
       o.id,
-      { status: o.status },
-      { status, note },
+      { status: o.status, vendor_printed_at: o.vendor_printed_at, vendor_dispatched_at: o.vendor_dispatched_at },
+      { status, note, vendor_printed_at: newVendorPrintedAt, vendor_dispatched_at: newVendorDispatchedAt },
       req,
     ),
   );
@@ -837,12 +846,15 @@ export async function setCourierTracking(
       ? `Delivered via ${cName} - Tracking #: ${tId}`
       : `Shipped via ${cName} - Tracking #: ${tId}`;
 
+  const newVendorPrintedAt = o.vendor_printed_at || at;
+
   const statements = [
     stmt(
-      "UPDATE orders SET courier_name=?,courier_tracking_id=?,status=?,updated_at=?,version=version+1 WHERE id=?",
+      "UPDATE orders SET courier_name=?,courier_tracking_id=?,status=?,vendor_printed_at=?,updated_at=?,version=version+1 WHERE id=?",
       cName,
       tId,
       nextStatus,
+      newVendorPrintedAt,
       at,
       o.id,
     ),
@@ -966,9 +978,11 @@ export async function vendorDispatchOffice(
     throw new AppError(400, "Other city orders must be dispatched via courier with tracking.");
   }
   const at = now();
+  const newVendorPrintedAt = o.vendor_printed_at || at;
   await batch([
     stmt(
-      "UPDATE orders SET status='SHIPPED', vendor_dispatched_at=?, updated_at=?, version=version+1 WHERE id=?",
+      "UPDATE orders SET status='SHIPPED', vendor_printed_at=?, vendor_dispatched_at=?, updated_at=?, version=version+1 WHERE id=?",
+      newVendorPrintedAt,
       at,
       at,
       o.id,
@@ -1121,7 +1135,7 @@ export async function batchVendorDispatchOffice(
   const s = scope(u);
   const placeholders = orderIds.map(() => "?").join(",");
   const ordersToUpdate = await all<any>(
-    `SELECT o.id, o.status, o.vendor_id, o.vendor_dispatched_at, o.delivery_type, o.city, o.address FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+    `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at, o.vendor_dispatched_at, o.delivery_type, o.city, o.address FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
     ...orderIds,
     ...s.args,
   );
@@ -1139,9 +1153,11 @@ export async function batchVendorDispatchOffice(
   const at = now();
   const statements: any[] = [];
   for (const o of eligible) {
+    const newVendorPrintedAt = o.vendor_printed_at || at;
     statements.push(
       stmt(
-        "UPDATE orders SET status='SHIPPED', vendor_dispatched_at=?, updated_at=?, version=version+1 WHERE id=?",
+        "UPDATE orders SET status='SHIPPED', vendor_printed_at=?, vendor_dispatched_at=?, updated_at=?, version=version+1 WHERE id=?",
+        newVendorPrintedAt,
         at,
         at,
         o.id,
@@ -1398,8 +1414,10 @@ export async function batchChangeStatus(
     city: string;
     address: string;
     courier_tracking_id: string | null;
+    vendor_printed_at: string | null;
+    vendor_dispatched_at: string | null;
   }>(
-    `SELECT o.id, o.status, o.version, o.reference, o.delivery_type, o.city, o.address, o.courier_tracking_id FROM orders o WHERE ${where} LIMIT 1000`,
+    `SELECT o.id, o.status, o.version, o.reference, o.delivery_type, o.city, o.address, o.courier_tracking_id, o.vendor_printed_at, o.vendor_dispatched_at FROM orders o WHERE ${where} LIMIT 1000`,
     ...args,
   );
 
@@ -1424,10 +1442,19 @@ export async function batchChangeStatus(
     const chunk = orders.slice(i, i + chunkSize);
     const statements = [];
     for (const ord of chunk) {
+      let newVendorPrintedAt = ord.vendor_printed_at;
+      let newVendorDispatchedAt = ord.vendor_dispatched_at;
+      if (["SHIPPED", "DELIVERED"].includes(toStatus)) {
+        if (!newVendorPrintedAt) newVendorPrintedAt = at;
+        if (!isOtherCityOrder(ord) && !newVendorDispatchedAt) newVendorDispatchedAt = at;
+      }
+
       statements.push(
         stmt(
-          "UPDATE orders SET status=?,updated_at=?,version=version+1 WHERE id=? AND status=?",
+          "UPDATE orders SET status=?,vendor_printed_at=?,vendor_dispatched_at=?,updated_at=?,version=version+1 WHERE id=? AND status=?",
           toStatus,
+          newVendorPrintedAt,
+          newVendorDispatchedAt,
           at,
           ord.id,
           fromStatus,

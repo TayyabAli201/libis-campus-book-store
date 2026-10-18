@@ -3677,6 +3677,7 @@ function Orders({
     [batchDispatching, setBatchDispatching] = useState(false),
     [batchQueueUpdating, setBatchQueueUpdating] = useState(false),
     [markingDeliveredId, setMarkingDeliveredId] = useState<string | null>(null),
+    [quickShippingId, setQuickShippingId] = useState<string | null>(null),
     [queueBusyId, setQueueBusyId] = useState<string | null>(null),
     [batchConfirm, setBatchConfirm] = useState<{
       fromStatus: string;
@@ -3765,6 +3766,25 @@ function Orders({
       toast.error(errorText(e));
     } finally {
       setMarkingDeliveredId(null);
+    }
+  };
+
+  const handleQuickShip = async (ord: any) => {
+    setQuickShippingId(ord.id);
+    try {
+      await api(`manage/orders/${ord.id}`, {
+        action: "status",
+        status: "SHIPPED",
+        version: ord.version,
+        note: "Marked as Shipped by Bookstore Office (Received from Vendor)",
+      });
+      toast.success(`Order ${ord.reference || ord.id} marked as Shipped ✓`);
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setQuickShippingId(null);
     }
   };
 
@@ -5095,14 +5115,121 @@ function Orders({
                   </TableActionButton>,
                   ...(isAdmin
                     ? [
-                        <button
-                          type="button"
-                          className="btn compact danger-button icon-only order-delete-btn"
-                          title="Delete order"
-                          onClick={() => setDeletingOrder(o)}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "nowrap",
+                          }}
                         >
-                          <Trash2 size={15} />
-                        </button>,
+                          {o.status === "PROCESSING" &&
+                            (!isOtherCityOrder(o) ? (
+                              <button
+                                type="button"
+                                className="btn compact"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  fontSize: "0.72rem",
+                                  fontWeight: 600,
+                                  padding: "3px 9px",
+                                  borderRadius: 9999,
+                                  background: "#2563eb",
+                                  color: "#fff",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  whiteSpace: "nowrap",
+                                }}
+                                disabled={quickShippingId === o.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickShip(o);
+                                }}
+                                title="Books received at office; mark as Shipped to student"
+                              >
+                                <Truck size={12} />
+                                {quickShippingId === o.id ? "Saving…" : "Mark Shipped"}
+                              </button>
+                            ) : o.courier_name && o.courier_tracking_id ? (
+                              <button
+                                type="button"
+                                className="courier-tracking-pill"
+                                style={{ fontSize: "0.72rem", padding: "2px 7px" }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCourierOrder(o);
+                                }}
+                                title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit.`}
+                              >
+                                <Truck size={11} /> {o.courier_name}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn compact"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  fontSize: "0.72rem",
+                                  fontWeight: 600,
+                                  padding: "3px 9px",
+                                  borderRadius: 9999,
+                                  background: "#0284c7",
+                                  color: "#fff",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  whiteSpace: "nowrap",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCourierOrder(o);
+                                }}
+                                title="Add external courier tracking to dispatch parcel"
+                              >
+                                <Truck size={12} /> Ship Courier
+                              </button>
+                            ))}
+                          {o.status === "SHIPPED" && (
+                            <button
+                              type="button"
+                              className="btn compact"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: "0.72rem",
+                                fontWeight: 600,
+                                padding: "3px 9px",
+                                borderRadius: 9999,
+                                background: "#059669",
+                                color: "#fff",
+                                border: "none",
+                                cursor: "pointer",
+                                whiteSpace: "nowrap",
+                              }}
+                              disabled={markingDeliveredId === o.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkDelivered(o);
+                              }}
+                              title="Mark this order as Delivered to student"
+                            >
+                              <CheckCircle2 size={12} />
+                              {markingDeliveredId === o.id ? "Saving…" : "Mark Delivered"}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn compact danger-button icon-only order-delete-btn"
+                            title="Delete order"
+                            onClick={() => setDeletingOrder(o)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>,
                       ]
                     : []),
                 ];
