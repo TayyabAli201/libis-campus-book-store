@@ -3567,6 +3567,11 @@ const STATUS_ADVANCE_FLOW: Record<
   string,
   { to: string; toLabel: string; fromLabel: string }
 > = {
+  PROCESSING: {
+    to: "SHIPPED",
+    toLabel: "Shipped",
+    fromLabel: "Printing Queue",
+  },
   SHIPPED: {
     to: "DELIVERED",
     toLabel: "Delivered",
@@ -4009,7 +4014,13 @@ function Orders({
 
   const activeFlowStep =
     statusList.length === 1 && STATUS_ADVANCE_FLOW[statusList[0]]
-      ? STATUS_ADVANCE_FLOW[statusList[0]]
+      ? {
+          ...STATUS_ADVANCE_FLOW[statusList[0]],
+          fromLabel:
+            activeTab === "PRINTED"
+              ? "Printed"
+              : STATUS_ADVANCE_FLOW[statusList[0]].fromLabel,
+        }
       : null;
   const filteredCount = data?.total ?? data?.rows?.length ?? 0;
 
@@ -4022,7 +4033,9 @@ function Orders({
           (!ord.courier_tracking_id || !ord.courier_tracking_id.trim()),
       );
       if (invalidOrder) {
-        toast.error("Please Add Tracking Details");
+        toast.error(
+          "Other City orders require courier tracking. Filter by 'Qanchi Campus' or 'Lahore' to mark in 1 click, or add tracking for other city orders.",
+        );
         setBatchConfirm(null);
         return;
       }
@@ -4037,6 +4050,7 @@ function Orders({
         from: dates.from,
         to: dates.to,
         campusId: campus,
+        printed: printedFilter,
       });
       const updatedCount = res.count ?? filteredCount;
       toast.success(
@@ -4044,6 +4058,7 @@ function Orders({
       );
       setBatchConfirm(null);
       setStatusList([activeFlowStep.to]);
+      setActiveTab(activeFlowStep.to);
       setPage(1);
       window.dispatchEvent(new Event("orders-updated"));
       await reload();
@@ -4500,7 +4515,7 @@ function Orders({
             })()}
           </>
         )}
-        {!["PROCESSING", "PRINTED"].includes(activeTab) && !isVendor && canUpdate && (
+        {!isVendor && canUpdate && activeFlowStep && (
           <button
             type="button"
             className={`btn compact toolbar-batch-btn ${activeFlowStep && filteredCount > 0 ? "active" : ""}`}
@@ -4513,7 +4528,9 @@ function Orders({
                       (!ord.courier_tracking_id || !ord.courier_tracking_id.trim()),
                   );
                   if (invalidOrder) {
-                    toast.error("Please Add Tracking Details");
+                    toast.error(
+                      "Other City orders require courier tracking. Filter by 'Qanchi Campus' or 'Lahore' to mark in 1 click, or add tracking for other city orders.",
+                    );
                     return;
                   }
                 }
@@ -4542,13 +4559,17 @@ function Orders({
             }
           >
             <span className="toolbar-btn-icon-circle">
-              <ArrowRightCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              {activeFlowStep.to === "SHIPPED" ? (
+                <Truck size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              ) : (
+                <ArrowRightCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              )}
             </span>
             <span>
               {batchUpdating
                 ? "Updating…"
                 : activeFlowStep
-                  ? `Move All to ${activeFlowStep.toLabel} (${filteredCount})`
+                  ? `Mark All ${activeFlowStep.toLabel} (${filteredCount})`
                   : "Change All Status"}
             </span>
           </button>

@@ -563,6 +563,7 @@ async function handle(req: Request) {
             from: z.string().optional(),
             to: z.string().optional(),
             campusId: z.string().optional(),
+            printed: z.string().optional(),
           })
           .parse(body);
         return ok(await batchChangeStatus(req, u, parsed));

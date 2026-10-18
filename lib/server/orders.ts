@@ -1340,6 +1340,7 @@ export async function batchChangeStatus(
     from?: string;
     to?: string;
     campusId?: string;
+    printed?: string;
   },
 ) {
   const { fromStatus, toStatus } = params;
@@ -1379,6 +1380,11 @@ export async function batchChangeStatus(
     if (params.q) {
       filters.push("(o.reference LIKE ? OR o.name LIKE ? OR o.phone LIKE ?)");
       args.push(...Array(3).fill("%" + params.q.slice(0, 100) + "%"));
+    }
+    if (params.printed === "1" || params.printed === "printed") {
+      filters.push("o.vendor_printed_at IS NOT NULL");
+    } else if (params.printed === "0" || params.printed === "unprinted") {
+      filters.push("o.vendor_printed_at IS NULL");
     }
     if (params.deliveryType && params.deliveryType !== "all") {
       const types = params.deliveryType
