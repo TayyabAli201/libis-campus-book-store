@@ -321,12 +321,27 @@ textarea:focus-visible,
   position: relative;
   padding: 20px;
   border-radius: 16px;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   box-shadow: 0 3px 14px color-mix(in srgb, var(--foreground) 3%, transparent);
   transition:
     border-color 250ms ease,
     box-shadow 300ms ease,
     transform 350ms var(--ui-ease);
+}
+.portal-main .metric:first-child:not(.metric-featured) {
+  background: var(--card, #ffffff);
+  color: var(--foreground);
+}
+.portal-main .metric:first-child:not(.metric-featured) .metric-heading span,
+.portal-main .metric:first-child:not(.metric-featured) small {
+  color: var(--muted-foreground);
+}
+.portal-main .metric:first-child:not(.metric-featured) strong {
+  color: var(--foreground);
 }
 .metric-heading {
   display: flex;
@@ -360,13 +375,37 @@ textarea:focus-visible,
   --metric-accent: #a66a13;
 }
 .portal-main .metric-blue {
-  --metric-accent: #467ba5;
+  --metric-accent: #2563eb;
+}
+.portal-main .metric-emerald,
+.portal-main .metric-green {
+  --metric-accent: #059669;
+}
+.portal-main .metric-rose,
+.portal-main .metric-red {
+  --metric-accent: #e11d48;
+}
+.portal-main .metric-purple,
+.portal-main .metric-indigo {
+  --metric-accent: #7c3aed;
 }
 .dark .portal-main .metric-amber {
   --metric-accent: #e2b46e;
 }
 .dark .portal-main .metric-blue {
-  --metric-accent: #90bcdf;
+  --metric-accent: #60a5fa;
+}
+.dark .portal-main .metric-emerald,
+.dark .portal-main .metric-green {
+  --metric-accent: #34d399;
+}
+.dark .portal-main .metric-rose,
+.dark .portal-main .metric-red {
+  --metric-accent: #fb7185;
+}
+.dark .portal-main .metric-purple,
+.dark .portal-main .metric-indigo {
+  --metric-accent: #a78bfa;
 }
 .portal-main .metric-featured {
   background: linear-gradient(135deg, #327ebd, #235b9a);

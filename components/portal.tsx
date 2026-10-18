@@ -6507,7 +6507,14 @@ function Vendors() {
 
   return (
     <>
-      <div className="metrics" style={{ marginBottom: 16 }}>
+      <div
+        className="metrics vendors-metrics"
+        style={{
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
         <div className="metric metric-blue">
           <div className="metric-heading">
             <span>Total Vendors</span>
@@ -6516,7 +6523,7 @@ function Vendors() {
             </span>
           </div>
           <strong>{totalVendors}</strong>
-          <small>{activeVendors} active printing partners</small>
+          <small>{activeVendors} active printing partner{activeVendors !== 1 ? "s" : ""}</small>
         </div>
 
         <div className="metric metric-amber">
@@ -6542,44 +6549,70 @@ function Vendors() {
         </div>
       </div>
 
-      <div className="toolbar" style={{ flexWrap: "wrap", gap: 8 }}>
-        <button
-          className="btn primary compact"
-          onClick={() =>
-            setEdit({
-              name: "",
-              phone: "",
-              email: "",
-              password: "",
-              address: "",
-              active: true,
-            })
-          }
-        >
-          <Plus size={16} />
-          Add Vendor Partner
-        </button>
+      <div
+        className="toolbar orders-toolbar"
+        style={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", flex: "1 1 auto" }}>
+          <button
+            type="button"
+            className="btn primary compact"
+            onClick={() =>
+              setEdit({
+                name: "",
+                phone: "",
+                email: "",
+                password: "",
+                address: "",
+                active: true,
+              })
+            }
+          >
+            <Plus size={16} />
+            Add Vendor Partner
+          </button>
 
-        <div className="search-wrap" style={{ flex: 1, minWidth: 220, maxWidth: 380 }}>
-          <Search size={15} className="search-icon" />
-          <input
-            type="search"
-            placeholder="Search vendor name, phone, email…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-          />
+          <div className="toolbar-search-box" style={{ maxWidth: 380, flex: "1 1 240px" }}>
+            <Search size={15} className="toolbar-search-icon" />
+            <input
+              type="text"
+              aria-label="Search vendors"
+              placeholder="Search vendor name, phone, email, address…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="toolbar-search-input"
+            />
+            {search && (
+              <button
+                type="button"
+                className="toolbar-search-clear"
+                onClick={() => setSearch("")}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
 
-        <button
-          className="btn compact"
-          onClick={() => reload()}
-          disabled={loading}
-          title="Refresh vendor list"
-        >
-          <RefreshCw size={14} className={loading ? "refresh-spinning" : undefined} />
-          Refresh
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => reload()}
+            disabled={loading}
+            title="Refresh vendor list"
+          >
+            <RefreshCw size={14} className={loading ? "refresh-spinning" : undefined} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <Result loading={loading} error={error}>

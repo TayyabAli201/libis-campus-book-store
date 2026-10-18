@@ -1461,13 +1461,13 @@ footer {
   font-size: 0.66rem;
 }
 
-.metric:first-child {
+.metric.metric-featured {
   background: var(--primary);
   color: var(--primary-foreground);
 }
 
-.metric:first-child>span,
-.metric:first-child small {
+.metric.metric-featured>span,
+.metric.metric-featured small {
   color: inherit;
   opacity: 0.8;
 }
