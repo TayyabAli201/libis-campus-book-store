@@ -259,3 +259,177 @@ export function orderSheet(
 
   return [headerRow, ...dataRows, grandTotalRow];
 }
+
+export const BOOK_SUMMARY_COLUMNS = [
+  "Sr No",
+  "Book Code",
+  "Book Name",
+  "Quantity",
+] as const;
+
+export const BOOK_SUMMARY_SHEET_COLUMNS = [
+  { width: 10 }, // Sr No
+  { width: 16 }, // Book Code
+  { width: 48 }, // Book Name
+  { width: 14 }, // Quantity
+];
+
+export function bookSummarySheet(orders: any[]) {
+  const ROW_HEIGHT = 22.5;
+  const FONT_FAMILY = "Lora";
+  const border = "#475569";
+
+  const headerCols = [
+    { value: "Sr No", width: 10 },
+    { value: "Book Code", width: 16 },
+    { value: "Book Name", width: 48 },
+    { value: "Quantity", width: 14 },
+  ];
+
+  // Theme Header Style: Royal Blue matching Bookstore Brand Theme with Lora font and 22.5pt height
+  const headerRow = headerCols.map((col) => ({
+    value: col.value,
+    fontFamily: FONT_FAMILY,
+    height: ROW_HEIGHT,
+    fontWeight: "bold" as const,
+    backgroundColor: "#1F65A8",
+    textColor: "#FFFFFF",
+    align: "center" as const,
+    alignVertical: "center" as const,
+    borderColor: "#1E3A8A",
+    borderStyle: "thin" as const,
+  }));
+
+  const bookMap = new Map<
+    string,
+    { code: string; title: string; quantity: number }
+  >();
+
+  orders.forEach((o) => {
+    const items =
+      o.items && o.items.length > 0
+        ? o.items
+        : [
+            {
+              code: "—",
+              title: "Order Record",
+              quantity: 1,
+            },
+          ];
+
+    items.forEach((item: any) => {
+      const rawCode = String(item.code || "").trim();
+      const rawTitle = String(item.title || "").trim();
+      const code = rawCode || "—";
+      const title = rawTitle || "—";
+      const qty = Number(item.quantity) || 1;
+
+      // Grouping key: normalize book code to uppercase; if no code, use title lowercase
+      const key =
+        (rawCode ? rawCode.toUpperCase() : rawTitle.toLowerCase()) || "—";
+
+      const existing = bookMap.get(key);
+      if (existing) {
+        existing.quantity += qty;
+        if (
+          (!existing.title || existing.title === "—") &&
+          title &&
+          title !== "—"
+        ) {
+          existing.title = title;
+        }
+        if ((!existing.code || existing.code === "—") && code && code !== "—") {
+          existing.code = code;
+        }
+      } else {
+        bookMap.set(key, {
+          code,
+          title,
+          quantity: qty,
+        });
+      }
+    });
+  });
+
+  const sortedBooks = Array.from(bookMap.values()).sort((a, b) => {
+    if (a.code === "—" && b.code !== "—") return 1;
+    if (b.code === "—" && a.code !== "—") return -1;
+    const cmp = a.code.localeCompare(b.code, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+    if (cmp !== 0) return cmp;
+    return a.title.localeCompare(b.title, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+
+  const grandTotalBooks = sortedBooks.reduce((sum, b) => sum + b.quantity, 0);
+
+  const dataRows = sortedBooks.map((b, idx) => [
+    {
+      value: idx + 1,
+      type: Number,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
+      align: "center" as const,
+      alignVertical: "center" as const,
+      borderColor: border,
+      borderStyle: "thin" as const,
+    },
+    {
+      value: b.code,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
+      fontWeight: "bold" as const,
+      align: "center" as const,
+      alignVertical: "center" as const,
+      borderColor: border,
+      borderStyle: "thin" as const,
+    },
+    {
+      value: b.title,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
+      align: "left" as const,
+      alignVertical: "center" as const,
+      borderColor: border,
+      borderStyle: "thin" as const,
+    },
+    {
+      value: b.quantity,
+      type: Number,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
+      align: "center" as const,
+      alignVertical: "center" as const,
+      borderColor: border,
+      borderStyle: "thin" as const,
+    },
+  ]);
+
+  const grandTotalRow = [
+    null,
+    null,
+    {
+      value: `(Total Books: ${grandTotalBooks})`,
+      columnSpan: 2,
+      span: 2,
+      colSpan: 2,
+      fontFamily: FONT_FAMILY,
+      height: ROW_HEIGHT,
+      fontWeight: "bold" as const,
+      backgroundColor: "#1F65A8",
+      textColor: "#FFFFFF",
+      align: "center" as const,
+      alignVertical: "center" as const,
+      borderColor: "#1E3A8A",
+      borderStyle: "thin" as const,
+    },
+    null,
+  ];
+
+  return [headerRow, ...dataRows, grandTotalRow];
+}
+

@@ -101,10 +101,11 @@ export async function rate(
 export async function user(
   req: Request,
   permission?: string,
-  portalHint?: "admin" | "campus",
+  portalHint?: "admin" | "campus" | "vendor",
 ): Promise<User> {
   const adminSid = cookieValue(req, "cbs_admin_session");
   const campusSid = cookieValue(req, "cbs_campus_session");
+  const vendorSid = cookieValue(req, "cbs_vendor_session");
   const genericSid = cookieValue(req, "cbs_session");
 
   const urlPath = req.url ? new URL(req.url, "http://localhost").pathname : "";
@@ -120,20 +121,27 @@ export async function user(
     urlPath.startsWith("/campus") ||
     referer.includes("/campus");
 
+  const isVendorContext =
+    portalHint === "vendor" ||
+    urlPath.startsWith("/vendor") ||
+    referer.includes("/vendor");
+
   let candidateSids: string[] = [];
 
   if (isAdminContext) {
     candidateSids = [adminSid, genericSid].filter(Boolean);
   } else if (isCampusContext) {
     candidateSids = [campusSid, genericSid].filter(Boolean);
+  } else if (isVendorContext) {
+    candidateSids = [vendorSid, genericSid].filter(Boolean);
   } else {
-    candidateSids = [adminSid, genericSid, campusSid].filter(Boolean);
+    candidateSids = [adminSid, vendorSid, genericSid, campusSid].filter(Boolean);
   }
 
   candidateSids = Array.from(new Set(candidateSids));
   if (candidateSids.length === 0) {
     candidateSids = Array.from(
-      new Set([adminSid, genericSid, campusSid].filter(Boolean)),
+      new Set([adminSid, vendorSid, genericSid, campusSid].filter(Boolean)),
     );
   }
   if (candidateSids.length === 0) {
@@ -143,11 +151,11 @@ export async function user(
   let foundUser: any = null;
   for (const sid of candidateSids) {
     const row = await one<any>(
-      `SELECT u.id,u.email,u.name,u.role,u.campus_id,c.name AS campus_name,c.code AS campus_code,c.category AS campus_category,u.must_change,c.permissions,c.active AS campus_active FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN campuses c ON c.id=u.campus_id WHERE s.id=? AND s.expires_at>? AND u.active=1`,
+      `SELECT u.id,u.email,u.name,u.role,u.campus_id,c.name AS campus_name,c.code AS campus_code,c.category AS campus_category,u.must_change,c.permissions,c.active AS campus_active,v.id AS vendor_id,v.name AS vendor_name,v.phone AS vendor_phone,v.active AS vendor_active FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN campuses c ON c.id=u.campus_id LEFT JOIN vendors v ON v.user_id=u.id WHERE s.id=? AND s.expires_at>? AND u.active=1`,
       hash(sid),
       Date.now(),
     );
-    if (!row || (row.role === "CAMPUS_ADMIN" && !row.campus_active)) {
+    if (!row || (row.role === "CAMPUS_ADMIN" && !row.campus_active) || (row.role === "VENDOR" && !row.vendor_active)) {
       continue;
     }
     if (isAdminContext) {
@@ -160,6 +168,14 @@ export async function user(
     }
     if (isCampusContext) {
       if (row.role === "CAMPUS_ADMIN") {
+        foundUser = row;
+        break;
+      }
+      if (!foundUser) foundUser = row;
+      continue;
+    }
+    if (isVendorContext) {
+      if (row.role === "VENDOR") {
         foundUser = row;
         break;
       }
@@ -186,7 +202,12 @@ export async function user(
       "Change your temporary password before continuing.",
     );
   }
-  if (
+  if (foundUser.role === "VENDOR") {
+    // Vendors have orders.read and orders.update permission on their scoped orders
+    if (permission && permission !== "profile" && permission !== "orders.read" && permission !== "orders.update") {
+      throw new AppError(403, "Your role does not have access to this action.");
+    }
+  } else if (
     permission &&
     permission !== "profile" &&
     foundUser.role !== "SUPER_ADMIN" &&
@@ -202,10 +223,17 @@ export async function admin(req: Request) {
     throw new AppError(403, "Super Admin access is required.");
   return u;
 }
+export async function vendor(req: Request) {
+  const u = await user(req, undefined, "vendor");
+  if (u.role !== "VENDOR")
+    throw new AppError(403, "Vendor access is required.");
+  return u;
+}
 export function scope(u: User, alias = "o") {
-  return u.role === "SUPER_ADMIN"
-    ? { sql: "1=1", args: [] }
-    : { sql: `${alias}.campus_id=?`, args: [u.campus_id] };
+  if (u.role === "SUPER_ADMIN") return { sql: "1=1", args: [] };
+  if (u.role === "CAMPUS_ADMIN") return { sql: `${alias}.campus_id=?`, args: [u.campus_id] };
+  if (u.role === "VENDOR") return { sql: `${alias}.vendor_id=?`, args: [u.vendor_id || u.id] };
+  return { sql: "1=0", args: [] };
 }
 export function guest(req: Request) {
   const t = cookieValue(req, "cbs_guest");
@@ -235,7 +263,8 @@ export async function authenticate(
     !valid ||
     !row?.active ||
     (portal === "admin" && row.role !== "SUPER_ADMIN") ||
-    (portal === "campus" && row.role !== "CAMPUS_ADMIN")
+    (portal === "campus" && row.role !== "CAMPUS_ADMIN") ||
+    (portal === "vendor" && row.role !== "VENDOR")
   )
     throw new AppError(401, "The email or password is incorrect.");
   if (
@@ -244,6 +273,12 @@ export async function authenticate(
       ?.active
   )
     throw new AppError(403, "Campus access is disabled.");
+  if (
+    row.role === "VENDOR" &&
+    !(await one<any>("SELECT active FROM vendors WHERE user_id=?", row.id))
+      ?.active
+  )
+    throw new AppError(403, "Vendor access is disabled.");
   const t = token();
   await batch([
     stmt("DELETE FROM rate_limits WHERE id=?", accountLimit),

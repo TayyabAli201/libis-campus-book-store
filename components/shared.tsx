@@ -908,7 +908,7 @@ export function DataTable({
   headers,
   rows,
 }: {
-  headers: string[];
+  headers: (string | ReactNode)[];
   rows: ReactNode[][];
 }) {
   return (
@@ -924,8 +924,8 @@ export function DataTable({
       <Table>
         <TableHeader>
           <TableRow>
-            {headers.map((h) => (
-              <TableHead key={h}>{h}</TableHead>
+            {headers.map((h, i) => (
+              <TableHead key={typeof h === "string" ? h : i}>{h}</TableHead>
             ))}
           </TableRow>
         </TableHeader>

@@ -5,12 +5,17 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, existsSync } from "node:fs";
 import { env } from "./helpers/cloudflare-test-env.mjs";
 import writeExcelFile from "write-excel-file/node";
-import { readSheet } from "read-excel-file/node";
+import readXlsxFile, { readSheet } from "read-excel-file/node";
 import {
   bookSheet,
   parseBookSheet,
   BOOK_COLUMNS,
 } from "../lib/book-spreadsheet.ts";
+import {
+  orderSheet,
+  bookSummarySheet,
+  BOOK_SUMMARY_SHEET_COLUMNS,
+} from "../lib/orders-spreadsheet.ts";
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -42,10 +47,31 @@ const {
   quote,
   submitOrder,
   getOrder,
+  listOrders,
   decidePayment,
   changeStatus,
   pendingOrderCount,
+  setCourierTracking,
+  vendorPrint,
+  vendorDispatchOffice,
+  batchVendorPrint,
+  batchVendorDispatchOffice,
+  setPrintingQueue,
+  batchSetPrintingQueue,
 } = await import("../lib/server/orders.ts");
+const {
+  listVendors,
+  createVendor,
+  updateVendor,
+  deleteVendor,
+  assignOrderToVendor,
+} = await import("../lib/server/vendors.ts");
+const {
+  getVendorWhatsAppMessage,
+  getVendorWhatsAppUrl,
+  formatWhatsAppPhone,
+  isOtherCityOrder,
+} = await import("../lib/contracts.ts");
 const { GET, POST, DELETE } = await import("../app/api/[...path]/route.ts");
 const { hash } = await import("../lib/server/security.ts");
 const admin = { id: "admin", email: "qa@example.invalid", role: "SUPER_ADMIN" };
@@ -90,6 +116,7 @@ function database(t) {
     "0005_password_resets.sql",
     "0006_binding_rate.sql",
     "0007_courier_tracking.sql",
+    "0008_vendor_management.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -1174,6 +1201,650 @@ test("External courier tracking can be attached to Other City orders and tracked
   });
   assert.equal(lahoreChangeRes.status, 200);
 });
+
+test("Vendor Management and Auto-Push Order System workflow", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/manage/vendors");
+
+  // 1. Create a vendor partner
+  const createRes = await createVendor(testReq, admin, {
+    name: "Al-Rehman Printers",
+    phone: "03214567890",
+    email: "alrehman@example.com",
+    password: "securePassword123",
+    address: "Royal Park, Urdu Bazaar, Lahore",
+  });
+  assert.equal(createRes.ok, true);
+  assert.equal(createRes.vendor.name, "Al-Rehman Printers");
+  assert.equal(createRes.vendor.email, "alrehman@example.com");
+
+  // Verify created user account with role VENDOR
+  const userRow = sqlite
+    .prepare("SELECT email, role, active FROM users WHERE email=?")
+    .get("alrehman@example.com");
+  assert.equal(userRow.role, "VENDOR");
+  assert.equal(userRow.active, 1);
+
+  // Duplicate email rejection
+  await assert.rejects(
+    () =>
+      createVendor(testReq, admin, {
+        name: "Duplicate Press",
+        phone: "03009999999",
+        email: "alrehman@example.com",
+        password: "anotherPassword123",
+      }),
+    /already exists/,
+  );
+
+  // 2. List vendors
+  const vendorList = await listVendors(admin);
+  assert.equal(vendorList.length, 1);
+  assert.equal(vendorList[0].name, "Al-Rehman Printers");
+  assert.equal(vendorList[0].assigned_orders_count, 0);
+
+  // 3. Update vendor
+  const updateRes = await updateVendor(testReq, admin, createRes.vendor.id, {
+    name: "Al-Rehman Printing Press",
+    phone: "03214567899",
+  });
+  assert.equal(updateRes.ok, true);
+  const updatedVendor = sqlite
+    .prepare("SELECT name, phone FROM vendors WHERE id=?")
+    .get(createRes.vendor.id);
+  assert.equal(updatedVendor.name, "Al-Rehman Printing Press");
+  assert.equal(updatedVendor.phone, "03214567899");
+
+  // 4. Place an Other City order and confirm payment
+  const { id: bookId } = await saveBook(bookInput("VEND101", { title: "Vendor Test Book", pages: 120, active: true }), admin, request);
+  const otherCart = {
+    name: "Sarfraz Khan",
+    phone: "03001122334",
+    city: "Rawalpindi",
+    address: "House 12, Satellite Town, Rawalpindi",
+    delivery_type: "other",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 2 }],
+  };
+  const q = await quote(request, otherCart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  // Verify order in pending state, then approve payment -> CONFIRMED
+  const currentOrder = await getOrder(request, placed.id, admin);
+  await decidePayment(request, admin, placed.id, "approve", "Payment verified", currentOrder.version);
+  const confirmedOrder = await getOrder(request, placed.id, admin);
+  assert.equal(confirmedOrder.status, "CONFIRMED");
+
+  // 5. Send order to Vendor ("assignOrderToVendor")
+  const assignRes = await assignOrderToVendor(
+    testReq,
+    admin,
+    placed.id,
+    createRes.vendor.id,
+    "Urgent printing required for exam",
+  );
+  assert.equal(assignRes.ok, true);
+  assert.equal(assignRes.status, "PROCESSING");
+  assert.equal(assignRes.vendor.id, createRes.vendor.id);
+  assert.ok(assignRes.whatsappUrl.includes("wa.me"));
+
+  // Check database fields
+  const dbOrder = sqlite
+    .prepare("SELECT status, vendor_id, vendor_notes FROM orders WHERE id=?")
+    .get(placed.id);
+  assert.equal(dbOrder.status, "PROCESSING");
+  assert.equal(dbOrder.vendor_id, createRes.vendor.id);
+  assert.equal(dbOrder.vendor_notes, "Urgent printing required for exam");
+
+  // Verify workload count updated in listVendors
+  const vendorsAfterAssign = await listVendors(admin);
+  assert.equal(vendorsAfterAssign[0].assigned_orders_count, 1);
+  assert.equal(vendorsAfterAssign[0].printing_orders_count, 1);
+
+  // 6. Vendor User Context & Permissions
+  const vendorUser = {
+    id: createRes.vendor.user_id,
+    vendor_id: createRes.vendor.id,
+    email: "alrehman@example.com",
+    name: "Al-Rehman Printing Press",
+    role: "VENDOR",
+    permissions: [],
+    campus_id: null,
+    must_change: 0,
+  };
+
+  // Vendor sees only their assigned orders
+  const vendorOrders = await listOrders(vendorUser);
+  assert.equal(vendorOrders.rows.length, 1);
+  assert.equal(vendorOrders.rows[0].id, placed.id);
+
+  // Another vendor does not see this order
+  const otherVendorUser = {
+    id: "other_vendor_user",
+    vendor_id: "other_vendor_id",
+    email: "other@example.com",
+    name: "Other Press",
+    role: "VENDOR",
+    permissions: [],
+    campus_id: null,
+    must_change: 0,
+  };
+  const otherVendorOrders = await listOrders(otherVendorUser);
+  assert.equal(otherVendorOrders.rows.length, 0);
+
+  // 7. Other City fulfillment by Vendor: Vendor attaches Courier Name & Tracking
+  const courierRes = await setCourierTracking(
+    testReq,
+    vendorUser,
+    placed.id,
+    "TCS Express",
+    "TCS-77889900",
+  );
+  assert.equal(courierRes.ok, true);
+  assert.equal(courierRes.status, "SHIPPED");
+
+  // Tracking page lookup by student reflects courier info
+  const trackRes = await GET(new Request("http://127.0.0.1:5173/api/orders/" + placed.reference));
+  assert.equal(trackRes.status, 200);
+  const trackData = await trackRes.json();
+  assert.equal(trackData.status, "SHIPPED");
+  assert.equal(trackData.courier_name, "TCS Express");
+  assert.equal(trackData.courier_tracking_id, "TCS-77889900");
+
+  // 8. Lahore / Campus protection: Vendor CANNOT attach courier tracking or mark as shipped
+  // Place a Lahore order and assign to vendor
+  const lahoreCart = {
+    name: "Hamza Tariq",
+    phone: "03112233445",
+    city: "Lahore",
+    address: "Model Town, Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 1 }],
+  };
+  const lahoreQ = await quote(request, lahoreCart);
+  const lahoreSlip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(lahoreSlip, hash(guest), "proof/" + lahoreSlip, lahoreSlip, lahoreQ.total);
+  const lahorePlaced = await submitOrder(request, lahoreQ.id, lahoreSlip);
+  const lahoreOrd = await getOrder(request, lahorePlaced.id, admin);
+  await decidePayment(request, admin, lahorePlaced.id, "approve", "Approved", lahoreOrd.version);
+  await assignOrderToVendor(testReq, admin, lahorePlaced.id, createRes.vendor.id, "Office batch");
+
+  // Vendor attempts to attach courier or mark Lahore order as shipped -> rejected
+  await assert.rejects(
+    () => setCourierTracking(testReq, vendorUser, lahorePlaced.id, "TCS", "12345"),
+    /only for Other City orders/,
+  );
+
+  // 8a. Vendor Print Marking
+  const printRes = await vendorPrint(testReq, vendorUser, lahorePlaced.id, true);
+  assert.equal(printRes.ok, true);
+  assert.ok(printRes.vendor_printed_at);
+  const printedDb = sqlite.prepare("SELECT vendor_printed_at FROM orders WHERE id=?").get(lahorePlaced.id);
+  assert.equal(printedDb.vendor_printed_at, printRes.vendor_printed_at);
+
+  // Vendor unmarking printed status
+  const unprintRes = await vendorPrint(testReq, vendorUser, lahorePlaced.id, false);
+  assert.equal(unprintRes.ok, true);
+  assert.equal(unprintRes.vendor_printed_at, null);
+
+  // Other vendor cannot access or mark print status
+  await assert.rejects(
+    () => vendorPrint(testReq, otherVendorUser, lahorePlaced.id, true),
+    /Order not found/,
+  );
+  await assert.rejects(
+    () => vendorDispatchOffice(testReq, otherVendorUser, lahorePlaced.id),
+    /Order not found/,
+  );
+
+  // 8b. Vendor Dispatch to Bookstore Office (Lahore & Campus orders)
+  const dispatchRes = await vendorDispatchOffice(testReq, vendorUser, lahorePlaced.id, "Sent with rider");
+  assert.equal(dispatchRes.ok, true);
+  assert.equal(dispatchRes.status, "SHIPPED");
+  assert.ok(dispatchRes.vendor_dispatched_at);
+  const lahoreDispatchedDb = sqlite.prepare("SELECT status, vendor_dispatched_at FROM orders WHERE id=?").get(lahorePlaced.id);
+  assert.equal(lahoreDispatchedDb.status, "SHIPPED");
+  assert.equal(lahoreDispatchedDb.vendor_dispatched_at, dispatchRes.vendor_dispatched_at);
+
+  // Other City order cannot be sent to office (must be via courier with tracking)
+  await assert.rejects(
+    () => vendorDispatchOffice(testReq, vendorUser, placed.id),
+    /Other city orders must be dispatched via courier/,
+  );
+
+  // Admin can mark Lahore order as DELIVERED once received at Bookstore office
+  const lahoreDbOrd = sqlite.prepare("SELECT version FROM orders WHERE id=?").get(lahorePlaced.id);
+  const adminDeliver = await changeStatus(
+    testReq,
+    admin,
+    lahorePlaced.id,
+    "DELIVERED",
+    "Delivered by Bookstore office to student",
+    lahoreDbOrd.version,
+  );
+  assert.equal(adminDeliver.status, "DELIVERED");
+
+  // 9. Deletion safety: Cannot delete vendor with assigned orders
+  await assert.rejects(
+    () => deleteVendor(testReq, admin, createRes.vendor.id),
+    /Cannot delete vendor with.*assigned order/,
+  );
+});
+
+test("Vendor queue decrement on print, batch printing, and Other City direct delivered flow", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/test");
+
+  // Create Book
+  const { id: bookId } = await saveBook(bookInput("VTEST-01"), admin, request);
+
+  // Create Vendor
+  const vendorRes = await createVendor(testReq, admin, {
+    name: "Tahir Book Binding",
+    phone: "03009988776",
+    email: "tahir@example.com",
+    password: "Password123!",
+  });
+  const vendorUser = {
+    id: vendorRes.vendor.user_id,
+    vendor_id: vendorRes.vendor.id,
+    email: "tahir@example.com",
+    name: "Tahir Book Binding",
+    role: "VENDOR",
+    permissions: [],
+    campus_id: null,
+    must_change: 0,
+  };
+
+  // Helper to place and push order to vendor
+  const createAndPushOrder = async (name, city, delivery_type) => {
+    const cart = {
+      name,
+      phone: "03211234567",
+      city,
+      address: `House 1, ${city}`,
+      delivery_type,
+      campus_id: null,
+      items: [{ id: bookId, quantity: 1 }],
+    };
+    const q = await quote(request, cart);
+    const slip = crypto.randomUUID();
+    sqlite
+      .prepare(
+        "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+      )
+      .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+    const placed = await submitOrder(request, q.id, slip);
+    const ord = await getOrder(request, placed.id, admin);
+    await decidePayment(request, admin, placed.id, "approve", "Approved", ord.version);
+    await assignOrderToVendor(testReq, admin, placed.id, vendorRes.vendor.id, "Batch item");
+    return placed;
+  };
+
+  const ord1 = await createAndPushOrder("Student 1", "Faisalabad", "other");
+  const ord2 = await createAndPushOrder("Student 2", "Multan", "other");
+  const ord3 = await createAndPushOrder("Student 3", "Lahore", "lahore");
+
+  // Initial state: 3 orders in Printing Queue
+  let vendorQueue = await listOrders(vendorUser, "", "PROCESSING");
+  assert.equal(vendorQueue.status_counts["PROCESSING"], 3, "Initially 3 unprinted orders in queue");
+  assert.equal(vendorQueue.status_counts["PRINTED"], 0, "Initially 0 printed orders");
+  assert.equal(vendorQueue.rows.length, 3, "3 rows in queue");
+
+  // Vendor marks 1 order as printed -> queue decrements from 3 to 2!
+  await vendorPrint(testReq, vendorUser, ord1.id, true);
+
+  vendorQueue = await listOrders(vendorUser, "", "PROCESSING");
+  assert.equal(vendorQueue.status_counts["PROCESSING"], 2, "Queue count decremented to 2");
+  assert.equal(vendorQueue.status_counts["PRINTED"], 1, "Printed count incremented to 1");
+  assert.equal(vendorQueue.rows.length, 2, "Only 2 unprinted orders remain in queue");
+  assert.equal(vendorQueue.rows.some((r) => r.id === ord1.id), false, "Marked order left the In Printing queue");
+
+  // Printed tab shows the marked order
+  const printedTab = await listOrders(vendorUser, "", "PROCESSING", "", "", 1, "", undefined, "", "1");
+  assert.equal(printedTab.rows.length, 1, "1 order in Printed / Ready tab");
+  assert.equal(printedTab.rows[0].id, ord1.id);
+
+  // Batch mark remaining 2 orders as printed
+  const batchPrintRes = await batchVendorPrint(testReq, vendorUser, [ord2.id, ord3.id], true);
+  assert.equal(batchPrintRes.ok, true);
+  assert.equal(batchPrintRes.count, 2);
+
+  vendorQueue = await listOrders(vendorUser, "", "PROCESSING");
+  assert.equal(vendorQueue.status_counts["PROCESSING"], 0, "In Printing queue is now 0");
+  assert.equal(vendorQueue.status_counts["PRINTED"], 3, "All 3 orders now in Printed tab");
+  assert.equal(vendorQueue.rows.length, 0, "No unprinted rows in queue");
+
+  // Batch dispatch office for Lahore order (ord3)
+  const batchDispatchRes = await batchVendorDispatchOffice(testReq, vendorUser, [ord3.id], "Office delivery");
+  assert.equal(batchDispatchRes.ok, true);
+  assert.equal(batchDispatchRes.count, 1);
+
+  const ord3Db = sqlite.prepare("SELECT status, vendor_dispatched_at FROM orders WHERE id=?").get(ord3.id);
+  assert.equal(ord3Db.status, "SHIPPED");
+  assert.ok(ord3Db.vendor_dispatched_at);
+
+  // Other City order (ord1): Vendor adds courier and marks directly as DELIVERED
+  const courierDelivered = await setCourierTracking(
+    testReq,
+    vendorUser,
+    ord1.id,
+    "Leopards",
+    "LEO-998877",
+    "DELIVERED",
+  );
+  assert.equal(courierDelivered.ok, true);
+  assert.equal(courierDelivered.status, "DELIVERED");
+
+  const ord1Db = sqlite.prepare("SELECT status, courier_name, courier_tracking_id FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(ord1Db.status, "DELIVERED");
+  assert.equal(ord1Db.courier_name, "Leopards");
+  assert.equal(ord1Db.courier_tracking_id, "LEO-998877");
+
+  // Vendor attaches courier tracking for ord2 -> moves to SHIPPED
+  await setCourierTracking(
+    testReq,
+    vendorUser,
+    ord2.id,
+    "TCS",
+    "TCS-554433",
+  );
+  const ord2Shipped = sqlite.prepare("SELECT status, version FROM orders WHERE id=?").get(ord2.id);
+  assert.equal(ord2Shipped.status, "SHIPPED");
+
+  // Both Admin and Vendor can mark a shipped Other City order as DELIVERED
+  const adminDeliverOrd2 = await changeStatus(
+    testReq,
+    admin,
+    ord2.id,
+    "DELIVERED",
+    "Admin marked as delivered",
+    ord2Shipped.version,
+  );
+  assert.equal(adminDeliverOrd2.status, "DELIVERED");
+});
+
+test("Printing Queue Management: Add to Queue, Mark Printed, Unmark Printed, Remove from Queue, and Batch Operations", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/test");
+  const adminUser = {
+    id: "admin",
+    name: "QA Admin",
+    email: "qa@example.invalid",
+    role: "SUPER_ADMIN",
+    campus_id: null,
+    permissions: ["orders.update", "orders.manage"],
+  };
+
+  const { id: bookId } = await saveBook(bookInput("PQTEST-01"), adminUser, request);
+  const createConfirmedOrder = async (name, city, delivery_type) => {
+    const cart = {
+      name,
+      phone: "03211234567",
+      city,
+      address: `House 1, ${city}`,
+      delivery_type,
+      campus_id: null,
+      items: [{ id: bookId, quantity: 1 }],
+    };
+    const q = await quote(request, cart);
+    const slip = crypto.randomUUID();
+    const digest = crypto.randomUUID();
+    sqlite
+      .prepare(
+        "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+      )
+      .run(slip, hash(guest), "proof/" + slip, digest, q.total);
+    const placed = await submitOrder(request, q.id, slip);
+    const ord = await getOrder(request, placed.id, adminUser);
+    await decidePayment(request, adminUser, placed.id, "approve", "Approved", ord.version);
+    return placed;
+  };
+
+  const ord1 = await createConfirmedOrder("Queue Student 1", "Lahore", "campus");
+  const ord2 = await createConfirmedOrder("Queue Student 2", "Rawalpindi", "other");
+
+  // 1. Initially both orders are in CONFIRMED
+  const initDb1 = sqlite.prepare("SELECT status, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(initDb1.status, "CONFIRMED");
+  assert.equal(initDb1.vendor_printed_at, null);
+
+  // 2. Add single order to Printing Queue: CONFIRMED -> PROCESSING
+  const qRes1 = await setPrintingQueue(testReq, adminUser, ord1.id, true);
+  assert.equal(qRes1.ok, true);
+  assert.equal(qRes1.status, "PROCESSING");
+  assert.equal(qRes1.in_queue, true);
+
+  const dbAfterAdd = sqlite.prepare("SELECT status, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(dbAfterAdd.status, "PROCESSING");
+  assert.equal(dbAfterAdd.vendor_printed_at, null);
+
+  // Verify listOrders with printed="0" includes ord1
+  const unprintedList = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
+  assert.ok(unprintedList.rows.some((r) => r.id === ord1.id), "ord1 appears in Printing Queue");
+
+  // Verify listOrders with printed="1" does NOT include ord1
+  const printedListBefore = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "1");
+  assert.ok(!printedListBefore.rows.some((r) => r.id === ord1.id), "ord1 is not yet printed");
+
+  // 3. Mark as Printed
+  const printRes = await vendorPrint(testReq, adminUser, ord1.id, true);
+  assert.equal(printRes.ok, true);
+  assert.ok(printRes.vendor_printed_at);
+
+  // Now ord1 is in printed list, and removed from unprinted queue
+  const unprintedListAfterPrint = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
+  assert.ok(!unprintedListAfterPrint.rows.some((r) => r.id === ord1.id), "ord1 no longer in unprinted queue");
+
+  const printedListAfterPrint = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "1");
+  assert.ok(printedListAfterPrint.rows.some((r) => r.id === ord1.id), "ord1 appears in Printed / Ready list");
+
+  // 4. Unmark Printed -> moves back into Printing Queue
+  const unmarkPrintRes = await vendorPrint(testReq, adminUser, ord1.id, false);
+  assert.equal(unmarkPrintRes.ok, true);
+  assert.equal(unmarkPrintRes.vendor_printed_at, null);
+
+  const unprintedListAfterUnmark = await listOrders(adminUser, "", "PROCESSING", "", "", 1, "", 15, "", "0");
+  assert.ok(unprintedListAfterUnmark.rows.some((r) => r.id === ord1.id), "ord1 is back in unprinted queue");
+
+  // 5. Remove from Printing Queue: reverts PROCESSING -> CONFIRMED
+  const removeQRes = await setPrintingQueue(testReq, adminUser, ord1.id, false);
+  assert.equal(removeQRes.ok, true);
+  assert.equal(removeQRes.status, "CONFIRMED");
+  assert.equal(removeQRes.in_queue, false);
+
+  const dbAfterRemove = sqlite.prepare("SELECT status, vendor_printed_at FROM orders WHERE id=?").get(ord1.id);
+  assert.equal(dbAfterRemove.status, "CONFIRMED");
+  assert.equal(dbAfterRemove.vendor_printed_at, null);
+
+  // 6. Batch operations: Add ord1 and ord2 to Printing Queue
+  const batchAddRes = await batchSetPrintingQueue(testReq, adminUser, [ord1.id, ord2.id], true);
+  assert.equal(batchAddRes.ok, true);
+  assert.equal(batchAddRes.count, 2);
+
+  const dbBatch1 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord1.id);
+  const dbBatch2 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord2.id);
+  assert.equal(dbBatch1.status, "PROCESSING");
+  assert.equal(dbBatch2.status, "PROCESSING");
+
+  // Batch remove from Printing Queue
+  const batchRemoveRes = await batchSetPrintingQueue(testReq, adminUser, [ord1.id, ord2.id], false);
+  assert.equal(batchRemoveRes.ok, true);
+  assert.equal(batchRemoveRes.count, 2);
+
+  const dbBatchRemove1 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord1.id);
+  const dbBatchRemove2 = sqlite.prepare("SELECT status FROM orders WHERE id=?").get(ord2.id);
+  assert.equal(dbBatchRemove1.status, "CONFIRMED");
+  assert.equal(dbBatchRemove2.status, "CONFIRMED");
+});
+
+test("Order Export: generates Sheet 1 (detailed orders) and Sheet 2 (consolidated book quantity summary) for Qanchi Campus & Lahore", async () => {
+  const sampleOrders = [
+    {
+      reference: "QA-0101-0001",
+      name: "Ali Raza",
+      phone: "03001234567",
+      address: "VU Qanchi Campus",
+      city: "Lahore",
+      items: [
+        { code: "CS101", title: "Introduction to Computing", quantity: 5 },
+        { code: "BIF401", title: "Bioinformatics 1", quantity: 2 },
+      ],
+    },
+    {
+      reference: "QA-0101-0002",
+      name: "Fatima Noor",
+      phone: "03007654321",
+      address: "Model Town",
+      city: "Lahore",
+      items: [
+        { code: "CS101", title: "Introduction to Computing", quantity: 5 },
+        { code: "BIF501", title: "Bioinformatics 2", quantity: 3 },
+      ],
+    },
+    {
+      reference: "QA-0101-0003",
+      name: "Usman Tariq",
+      phone: "03219876543",
+      address: "Gulberg III",
+      city: "Lahore",
+      items: [
+        { code: "ACC501", title: "Business Finance", quantity: 10 },
+        { code: "ACC311", title: "Fundamentals of Auditing", quantity: 6 },
+      ],
+    },
+  ];
+
+  // 1. Verify Sheet 1 (detailed orders) structure and totals
+  const s1Data = orderSheet(sampleOrders);
+  // Header row has 7 columns (without address/mobile by default)
+  assert.equal(s1Data[0][0].value, "Sr No");
+  assert.equal(s1Data[0][1].value, "Order Number");
+  assert.equal(s1Data[0][2].value, "Student Name");
+  assert.equal(s1Data[0][3].value, "Book Code");
+  assert.equal(s1Data[0][4].value, "Book Name");
+  assert.equal(s1Data[0][5].value, "Quantity");
+  assert.equal(s1Data[0][6].value, "Total Books");
+
+  // Grand total in Sheet 1: 5 + 2 + 5 + 3 + 10 + 6 = 31
+  const s1Footer = s1Data[s1Data.length - 1];
+  assert.equal(s1Footer[5].value, "(Total Books: 31)");
+
+  // 2. Verify Sheet 2 (consolidated book summary) aggregation, sorting, and styling
+  const s2Data = bookSummarySheet(sampleOrders);
+  // Header row has 4 columns: Sr No, Book Code, Book Name, Quantity
+  assert.deepEqual(
+    s2Data[0].map((c) => c.value),
+    ["Sr No", "Book Code", "Book Name", "Quantity"]
+  );
+
+  // Aggregated rows should be sorted by Book Code:
+  // 1. ACC311 -> 6
+  // 2. ACC501 -> 10
+  // 3. BIF401 -> 2
+  // 4. BIF501 -> 3
+  // 5. CS101  -> 10 (5 from Order 1 + 5 from Order 2 aggregated!)
+  const dataRows = s2Data.slice(1, -1);
+  assert.equal(dataRows.length, 5);
+
+  assert.equal(dataRows[0][0].value, 1);
+  assert.equal(dataRows[0][1].value, "ACC311");
+  assert.equal(dataRows[0][2].value, "Fundamentals of Auditing");
+  assert.equal(dataRows[0][3].value, 6);
+
+  assert.equal(dataRows[1][0].value, 2);
+  assert.equal(dataRows[1][1].value, "ACC501");
+  assert.equal(dataRows[1][2].value, "Business Finance");
+  assert.equal(dataRows[1][3].value, 10);
+
+  assert.equal(dataRows[2][0].value, 3);
+  assert.equal(dataRows[2][1].value, "BIF401");
+  assert.equal(dataRows[2][2].value, "Bioinformatics 1");
+  assert.equal(dataRows[2][3].value, 2);
+
+  assert.equal(dataRows[3][0].value, 4);
+  assert.equal(dataRows[3][1].value, "BIF501");
+  assert.equal(dataRows[3][2].value, "Bioinformatics 2");
+  assert.equal(dataRows[3][3].value, 3);
+
+  assert.equal(dataRows[4][0].value, 5);
+  assert.equal(dataRows[4][1].value, "CS101");
+  assert.equal(dataRows[4][2].value, "Introduction to Computing");
+  assert.equal(dataRows[4][3].value, 10, "CS101 aggregated count should be 5 + 5 = 10");
+
+  // Footer row: 4 cells [null, null, (Total Books: 31), null]
+  const s2Footer = s2Data[s2Data.length - 1];
+  assert.equal(s2Footer[0], null);
+  assert.equal(s2Footer[1], null);
+  assert.equal(s2Footer[2].value, "(Total Books: 31)");
+  assert.equal(s2Footer[2].columnSpan, 2);
+  assert.equal(s2Footer[3], null);
+
+  // 3. Verify multi-sheet Excel generation and reading
+  const orderColumns = [
+    { width: 10 },
+    { width: 24 },
+    { width: 26 },
+    { width: 16 },
+    { width: 46 },
+    { width: 12 },
+    { width: 14 },
+  ];
+
+  const buffer = await writeExcelFile([
+    {
+      sheet: "Qanchi Campus Lahore",
+      data: s1Data,
+      columns: orderColumns,
+      stickyRowsCount: 1,
+    },
+    {
+      sheet: "Books Summary",
+      data: s2Data,
+      columns: BOOK_SUMMARY_SHEET_COLUMNS,
+      stickyRowsCount: 1,
+    },
+  ]).toBuffer();
+
+  assert.equal(buffer.subarray(0, 2).toString(), "PK");
+
+  // Read all sheets using readXlsxFile from read-excel-file
+  const sheets = await readXlsxFile(buffer);
+  assert.equal(sheets.length, 2);
+  assert.equal(sheets[0].sheet, "Qanchi Campus Lahore");
+  assert.equal(sheets[1].sheet, "Books Summary");
+
+  // Verify Sheet 2 contents from parsed Excel
+  const s2ReadRows = sheets[1].data;
+  assert.deepEqual(s2ReadRows[0], ["Sr No", "Book Code", "Book Name", "Quantity"]);
+  assert.deepEqual(s2ReadRows[1], [1, "ACC311", "Fundamentals of Auditing", 6]);
+  assert.deepEqual(s2ReadRows[5], [5, "CS101", "Introduction to Computing", 10]);
+  assert.deepEqual(s2ReadRows[6], [null, null, "(Total Books: 31)", null]);
+
+  // 4. Verify Other City standalone export contains only 1 sheet (no summary sheet)
+  const otherCityBuffer = await writeExcelFile(orderSheet(sampleOrders, { includeAddress: true }), {
+    sheet: "Other City",
+    columns: orderColumns,
+  }).toBuffer();
+  const otherCitySheets = await readSheet(otherCityBuffer);
+  // Returns single sheet rows directly
+  assert.equal(otherCitySheets[0][0], "Sr No");
+  assert.equal(otherCitySheets[0][1], "Order Number");
+});
+
+
+
 
 
 

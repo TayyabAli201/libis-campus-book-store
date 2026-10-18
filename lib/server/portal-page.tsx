@@ -8,7 +8,7 @@ export async function PortalPage({
   portal,
   segments,
 }: {
-  portal: "admin" | "campus";
+  portal: "admin" | "campus" | "vendor";
   segments: string[];
 }) {
   const h = await headers();
@@ -41,13 +41,18 @@ export async function PortalPage({
   }
   if (
     (portal === "admin" && u.role !== "SUPER_ADMIN") ||
-    (portal === "campus" && u.role !== "CAMPUS_ADMIN")
+    (portal === "campus" && u.role !== "CAMPUS_ADMIN") ||
+    (portal === "vendor" && u.role !== "VENDOR")
   )
     redirect("/" + portal + "/login");
-  const section = segments[0] || "dashboard";
+  const section = segments[0] || (portal === "vendor" ? "orders" : "dashboard");
   if (section === "inventory") redirect("/" + portal + "/books");
   if (section === "payments") redirect("/" + portal + "/orders?status=PAYMENT_PENDING");
-  if (
+  if (portal === "vendor") {
+    if (!["orders", "profile"].includes(section)) {
+      redirect("/vendor/orders");
+    }
+  } else if (
     ![
       "dashboard",
       "orders",
@@ -58,6 +63,7 @@ export async function PortalPage({
       "students",
       "reports",
       "users",
+      "vendors",
       "settings",
       "audit",
       "profile",

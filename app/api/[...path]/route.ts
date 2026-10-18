@@ -46,11 +46,24 @@ import {
   setCourierTracking,
   removeCourierTracking,
   batchChangeStatus,
+  vendorPrint,
+  vendorDispatchOffice,
+  batchVendorPrint,
+  batchVendorDispatchOffice,
+  setPrintingQueue,
+  batchSetPrintingQueue,
 } from "@/lib/server/orders";
+import {
+  listVendors,
+  createVendor,
+  updateVendor,
+  deleteVendor,
+  assignOrderToVendor,
+} from "@/lib/server/vendors";
 import { upload } from "@/lib/server/uploads";
 import { bootstrap } from "@/lib/server/seed";
 import { reports } from "@/lib/server/reports";
-import { password, permissions, settingsInput } from "@/lib/contracts";
+import { password, permissions, settingsInput, isOtherCityOrder } from "@/lib/contracts";
 export const dynamic = "force-dynamic";
 async function json(req: Request) {
   if (Number(req.headers.get("content-length")) > 500000)
@@ -80,12 +93,21 @@ async function json(req: Request) {
 const ok = (
   data: unknown,
   status = 200,
-  headers: Record<string, string> = {},
-) =>
-  Response.json(data, {
+  headers: Record<string, string> | Headers = {},
+) => {
+  const h = new Headers({ "Cache-Control": "no-store" });
+  if (headers instanceof Headers) {
+    headers.forEach((v, k) => h.append(k, v));
+  } else {
+    for (const [k, v] of Object.entries(headers)) {
+      h.set(k, v);
+    }
+  }
+  return Response.json(data, {
     status,
-    headers: { "Cache-Control": "no-store", ...headers },
+    headers: h,
   });
+};
 async function handle(req: Request) {
   const url = new URL(req.url),
     p = url.pathname.replace(/^\/api\//, "").split("/"),
@@ -111,13 +133,20 @@ async function handle(req: Request) {
         .object({
           email: z.string().trim().email().max(200),
           password: z.string().min(1).max(128),
-          portal: z.enum(["admin", "campus"]),
+          portal: z.enum(["admin", "campus", "vendor"]),
         })
         .parse(await json(req));
       const r = await authenticate(req, b.email, b.password, b.portal);
-      return ok({ must_change: r.must_change }, 200, {
-        "Set-Cookie": cookie(req, "cbs_session", r.token, 8 * 3600),
-      });
+      const cookieName =
+        b.portal === "vendor"
+          ? "cbs_vendor_session"
+          : b.portal === "campus"
+            ? "cbs_campus_session"
+            : "cbs_admin_session";
+      const h = new Headers();
+      h.append("Set-Cookie", cookie(req, "cbs_session", r.token, 8 * 3600));
+      h.append("Set-Cookie", cookie(req, cookieName, r.token, 8 * 3600));
+      return ok({ must_change: r.must_change }, 200, h);
     }
     if (action === "forgot-password" && method === "POST") {
       const b = z
@@ -239,13 +268,20 @@ async function handle(req: Request) {
       });
     }
     if (action === "logout" && method === "POST") {
-      await stmt(
-        "DELETE FROM sessions WHERE id=?",
-        hash(cookieValue(req, "cbs_session")),
-      ).run();
-      return ok({ ok: true }, 200, {
-        "Set-Cookie": cookie(req, "cbs_session", "", 0),
-      });
+      const sid =
+        cookieValue(req, "cbs_session") ||
+        cookieValue(req, "cbs_vendor_session") ||
+        cookieValue(req, "cbs_admin_session") ||
+        cookieValue(req, "cbs_campus_session");
+      if (sid) {
+        await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
+      }
+      const h = new Headers();
+      h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
+      h.append("Set-Cookie", cookie(req, "cbs_admin_session", "", 0));
+      h.append("Set-Cookie", cookie(req, "cbs_campus_session", "", 0));
+      h.append("Set-Cookie", cookie(req, "cbs_vendor_session", "", 0));
+      return ok({ ok: true }, 200, h);
     }
     if (action === "profile" && method === "POST") {
       const u = await user(req, "profile");
@@ -530,6 +566,36 @@ async function handle(req: Request) {
           .parse(body);
         return ok(await batchChangeStatus(req, u, parsed));
       }
+      if (id === "batch-vendor-print" && method === "POST") {
+        const body = await json(req);
+        const parsed = z
+          .object({
+            orderIds: z.array(z.string()).min(1),
+            printed: z.boolean().default(true),
+          })
+          .parse(body);
+        return ok(await batchVendorPrint(req, u, parsed.orderIds, parsed.printed));
+      }
+      if (id === "batch-vendor-dispatch-office" && method === "POST") {
+        const body = await json(req);
+        const parsed = z
+          .object({
+            orderIds: z.array(z.string()).min(1),
+            note: z.string().optional().default(""),
+          })
+          .parse(body);
+        return ok(await batchVendorDispatchOffice(req, u, parsed.orderIds, parsed.note));
+      }
+      if (id === "batch-printing-queue" && method === "POST") {
+        const body = await json(req);
+        const parsed = z
+          .object({
+            orderIds: z.array(z.string()).min(1),
+            inQueue: z.boolean(),
+          })
+          .parse(body);
+        return ok(await batchSetPrintingQueue(req, u, parsed.orderIds, parsed.inQueue));
+      }
       if (method === "GET") {
         if (id) return ok(await getOrder(req, id, u));
         const page = Math.max(
@@ -554,6 +620,7 @@ async function handle(req: Request) {
             url.searchParams.get("campus") || "",
             parsedLimit,
             url.searchParams.get("delivery_type") || "",
+            url.searchParams.get("printed") || "",
           ),
         );
       }
@@ -583,14 +650,34 @@ async function handle(req: Request) {
               "manual",
               "courier",
               "remove_courier",
+              "assign_vendor",
+              "vendor_print",
+              "vendor_dispatch_office",
+              "printing_queue",
             ]),
             status: z.string().optional(),
             courier_name: z.string().trim().max(100).optional(),
             courier_tracking_id: z.string().trim().max(100).optional(),
+            vendor_id: z.string().trim().optional(),
             note: z.string().trim().max(2000).default(""),
             version: z.number().int().optional(),
+            printed: z.boolean().optional(),
+            in_queue: z.boolean().optional(),
           })
           .parse(await json(req));
+        if (b.action === "printing_queue") {
+          return ok(await setPrintingQueue(req, u, id, b.in_queue !== false));
+        }
+        if (b.action === "vendor_print") {
+          return ok(await vendorPrint(req, u, id, b.printed));
+        }
+        if (b.action === "vendor_dispatch_office") {
+          return ok(await vendorDispatchOffice(req, u, id, b.note));
+        }
+        if (b.action === "assign_vendor") {
+          if (!b.vendor_id) throw new AppError(400, "Please select a vendor.");
+          return ok(await assignOrderToVendor(req, u, id, b.vendor_id, b.note));
+        }
         if (b.action === "note") {
           if (u.role !== "SUPER_ADMIN")
             throw new AppError(403, "Super Admin access required.");
@@ -628,6 +715,7 @@ async function handle(req: Request) {
               id,
               b.courier_name || "",
               b.courier_tracking_id || "",
+              b.status,
             ),
           );
         if (b.action === "remove_courier")
@@ -897,6 +985,22 @@ async function handle(req: Request) {
           ),
         ]);
         return ok({ id: userId });
+      }
+    }
+    if (section === "vendors") {
+      const u = await admin(req);
+      if (method === "GET") {
+        return ok(await listVendors(u));
+      }
+      if (method === "POST") {
+        const body = await json(req);
+        if (id) {
+          return ok(await updateVendor(req, u, id, body));
+        }
+        return ok(await createVendor(req, u, body));
+      }
+      if (method === "DELETE" && id) {
+        return ok(await deleteVendor(req, u, id));
       }
     }
     if (section === "settings") {

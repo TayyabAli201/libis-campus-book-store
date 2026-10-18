@@ -42,6 +42,12 @@ import {
   Search,
   Calendar,
   ListFilter,
+  Factory,
+  Send,
+  MessageCircle,
+  Printer,
+  RotateCcw,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -92,8 +98,13 @@ import {
   transitions,
   permissions,
   getWhatsAppUrl,
+  getVendorWhatsAppUrl,
+  formatWhatsAppPhone,
   isOtherCityOrder,
+  isCampusOrder,
+  isLahoreOrder,
   type User,
+  type Vendor,
   type Book,
   type StoreSettings,
 } from "@/lib/contracts";
@@ -106,6 +117,7 @@ const nav = [
   ["books", "Books", Library, "books.read"],
   ["pricing", "Pricing management", Coins, "admin"],
   ["campuses", "Campuses", Building2, "admin"],
+  ["vendors", "Vendors", Factory, "admin"],
   ["students", "Students", Users, "students.read"],
   ["reports", "Reports", BarChart3, "reports.read"],
   ["users", "User accounts", Users, "admin"],
@@ -131,7 +143,7 @@ export function Login({
   portal,
   storeName = "Campus Bookstore",
 }: {
-  portal: "admin" | "campus";
+  portal: "admin" | "campus" | "vendor";
   storeName?: string;
 }) {
   const signingIn = useRef(false);
@@ -169,7 +181,11 @@ export function Login({
         </a>
         <div>
           <span className="eyebrow">
-            {portal === "admin" ? "THE CONTROL ROOM" : "YOUR CAMPUS, CONNECTED"}
+            {portal === "admin"
+              ? "THE CONTROL ROOM"
+              : portal === "vendor"
+                ? "VENDOR HUB"
+                : "YOUR CAMPUS, CONNECTED"}
           </span>
           <h1>
             Good books.
@@ -179,12 +195,18 @@ export function Login({
           <p>
             {portal === "admin"
               ? "Every book, every order, every campus. Thoughtfully managed from one place."
-              : "A clear view of your campus orders, students and course materials."}
+              : portal === "vendor"
+                ? "Direct access to assigned print orders, batch fulfillment and courier tracking."
+                : "A clear view of your campus orders, students and course materials."}
           </p>
         </div>
         <span>
           {storeName} /{" "}
-          {portal === "admin" ? "Super Admin" : "Campus Portal"}
+          {portal === "admin"
+            ? "Super Admin"
+            : portal === "vendor"
+              ? "Vendor Portal"
+              : "Campus Portal"}
         </span>
       </section>
       <section className="login-form">
@@ -199,14 +221,18 @@ export function Login({
             {forgotMode === "none"
               ? portal === "admin"
                 ? "Admin sign in"
-                : "Campus sign in"
+                : portal === "vendor"
+                  ? "Vendor sign in"
+                  : "Campus sign in"
               : forgotMode === "request"
                 ? "Reset Admin Password"
                 : "Enter Verification Code"}
           </h2>
           <p>
             {forgotMode === "none"
-              ? "Use the account provided by your administrator."
+              ? portal === "vendor"
+                ? "Sign in to manage and fulfill your assigned print orders."
+                : "Use the account provided by your administrator."
               : forgotMode === "request"
                 ? "We will send a 6-digit verification code to tayyabali201@gmail.com."
                 : "Check tayyabali201@gmail.com for your code, then set your new password."}
@@ -236,7 +262,7 @@ export function Login({
                 setError("");
                 try {
                   const r = await api("login", { email, password, portal });
-                  location.href = `/${portal}/${r.must_change ? "profile" : "dashboard"}`;
+                  location.href = `/${portal}/${r.must_change ? "profile" : portal === "vendor" ? "orders" : "dashboard"}`;
                 } catch (e) {
                   setError(errorText(e));
                 } finally {
@@ -459,7 +485,9 @@ export function Login({
           <p className="small-text">
             {portal === "campus"
               ? "Campus accounts are created by Super Admin. Contact your administrator for access or a password reset."
-              : "Use your secure administrator account. Passwords can be reset via email verification."}
+              : portal === "vendor"
+                ? "Vendor accounts are provisioned by Bookstore Administration. Contact the admin office for access."
+                : "Use your secure administrator account. Passwords can be reset via email verification."}
           </p>
           <a href="/" className="text-link">
             Return to the bookstore
@@ -483,7 +511,8 @@ export function Portal({
   storeName?: string;
 }) {
   const isAdmin = user.role === "SUPER_ADMIN",
-    base = isAdmin ? "/admin" : "/campus";
+    isVendor = user.role === "VENDOR",
+    base = isAdmin ? "/admin" : isVendor ? "/vendor" : "/campus";
   const title = nav.find((n) => n[0] === section)?.[1] || "Overview";
   const [pendingCount, setPendingCount] = useState(pendingOrders);
   const [currentStoreName, setCurrentStoreName] = useState(storeName);
@@ -537,7 +566,7 @@ export function Portal({
         <SidebarHeader>
           <a
             className="brand portal-brand"
-            href={base + "/dashboard"}
+            href={base + (isVendor ? "/orders" : "/dashboard")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -549,18 +578,22 @@ export function Portal({
             <BrandText name={currentStoreName} />
           </a>
           <span className="portal-label">
-            {isAdmin ? "SUPER ADMIN" : "CAMPUS PORTAL"}
+            {isAdmin ? "SUPER ADMIN" : isVendor ? "VENDOR PORTAL" : "CAMPUS PORTAL"}
           </span>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
             {nav
-              .filter(
-                (n) =>
+              .filter((n) => {
+                if (isVendor) {
+                  return n[0] === "orders" || n[0] === "profile";
+                }
+                return (
                   isAdmin ||
                   n[3] === "profile" ||
-                  user.permissions.includes(n[3]),
-              )
+                  user.permissions.includes(n[3])
+                );
+              })
               .map(([id, title, Icon]) => (
                 <SidebarMenuItem key={id}>
                   <SidebarMenuButton asChild isActive={section === id}>
@@ -612,7 +645,7 @@ export function Portal({
           <div>
             <SidebarTrigger />
             <span>
-              {isAdmin ? "Workspace" : "Campus"} / <strong>{title}</strong>
+              {isAdmin ? "Workspace" : isVendor ? "Vendor" : "Campus"} / <strong>{title}</strong>
             </span>
           </div>
           <ThemeSwitch />
@@ -623,7 +656,9 @@ export function Portal({
               <span className="eyebrow">
                 {isAdmin
                   ? `${(currentStoreName || "Campus Bookstore").toUpperCase()} OPERATIONS`
-                  : "CAMPUS WORKSPACE"}
+                  : isVendor
+                    ? "PRINTING & LOGISTICS PORTAL"
+                    : "CAMPUS WORKSPACE"}
               </span>
               <h1>{title}</h1>
             </div>
@@ -652,6 +687,8 @@ export function Portal({
             <Pricing />
           ) : section === "campuses" ? (
             <Campuses />
+          ) : section === "vendors" ? (
+            <Vendors />
           ) : section === "users" ? (
             <UserAccounts />
           ) : section === "settings" ? (
@@ -1901,6 +1938,9 @@ function CourierTrackingModal({
 }) {
   const [courierName, setCourierName] = useState(order.courier_name || "");
   const [trackingId, setTrackingId] = useState(order.courier_tracking_id || "");
+  const [deliveryStatus, setDeliveryStatus] = useState<"SHIPPED" | "DELIVERED">(
+    order.status === "DELIVERED" ? "DELIVERED" : "SHIPPED",
+  );
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -1935,8 +1975,13 @@ function CourierTrackingModal({
         action: "courier",
         courier_name: courierName.trim(),
         courier_tracking_id: trackingId.trim(),
+        status: deliveryStatus,
       });
-      toast.success("Courier tracking details saved successfully!");
+      toast.success(
+        deliveryStatus === "DELIVERED"
+          ? "Courier tracking saved & order marked as Delivered ✓"
+          : "Courier tracking details saved successfully!",
+      );
       window.dispatchEvent(new Event("orders-updated"));
       onSaved();
       onClose();
@@ -2044,6 +2089,34 @@ function CourierTrackingModal({
             </p>
           </div>
 
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--muted)", marginTop: 12 }}>
+            <label className="field-label" style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: "0.85rem" }}>
+              Parcel Fulfillment Status
+            </label>
+            <div style={{ display: "flex", gap: 16 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="fulfillment_status"
+                  value="SHIPPED"
+                  checked={deliveryStatus === "SHIPPED"}
+                  onChange={() => setDeliveryStatus("SHIPPED")}
+                />
+                <span>🚚 Mark as Shipped</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="fulfillment_status"
+                  value="DELIVERED"
+                  checked={deliveryStatus === "DELIVERED"}
+                  onChange={() => setDeliveryStatus("DELIVERED")}
+                />
+                <span>✅ Mark as Delivered</span>
+              </label>
+            </div>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 16 }}>
             <div>
               {order.courier_tracking_id && (
@@ -2094,6 +2167,210 @@ function CourierTrackingModal({
   );
 }
 
+function AssignVendorModal({
+  order,
+  onClose,
+  onAssigned,
+}: {
+  order: any;
+  onClose: () => void;
+  onAssigned: () => void;
+}) {
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(true);
+  const [selectedVendorId, setSelectedVendorId] = useState(order.vendor_id || "");
+  const [vendorNotes, setVendorNotes] = useState(order.vendor_notes || "");
+  const [busy, setBusy] = useState(false);
+  const [assignedResult, setAssignedResult] = useState<any | null>(null);
+
+  useEffect(() => {
+    api("manage/vendors")
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data?.vendors || []);
+        setVendors(list);
+        if (!selectedVendorId && list.length > 0) {
+          const firstActive = list.find((v: any) => v.active);
+          if (firstActive) setSelectedVendorId(firstActive.id);
+        }
+      })
+      .catch((err) => toast.error(errorText(err)))
+      .finally(() => setLoadingVendors(false));
+  }, [order.vendor_id, selectedVendorId]);
+
+  const isOther = isOtherCityOrder(order);
+  const totalBooks = Number(
+    order.total_books ??
+      (order.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 1),
+  );
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVendorId) {
+      toast.error("Please select a printing vendor.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api("manage/orders/" + order.id, {
+        action: "assign_vendor",
+        vendor_id: selectedVendorId,
+        notes: vendorNotes.trim(),
+      });
+      toast.success(res.message || "Order sent to vendor successfully!");
+      window.dispatchEvent(new Event("orders-updated"));
+      setAssignedResult(res);
+      onAssigned();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent style={{ maxWidth: 500 }}>
+        <DialogHeader>
+          <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Factory size={20} style={{ color: "var(--primary)" }} />
+            {order.vendor_id ? "Reassign Vendor" : "Send Order to Vendor"}
+          </DialogTitle>
+          <DialogDescription>
+            Order <strong>{order.reference}</strong> · {order.name} ({order.city || "Other City"}) · {totalBooks} book{totalBooks === 1 ? "" : "s"}
+          </DialogDescription>
+        </DialogHeader>
+
+        {assignedResult ? (
+          <div className="stack" style={{ gap: 16, marginTop: 8 }}>
+            <div
+              style={{
+                padding: "14px 16px",
+                borderRadius: 8,
+                background: "rgba(16, 185, 129, 0.12)",
+                border: "1px solid #10b981",
+                color: "#065f46",
+                fontSize: "0.9rem",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                <CheckCircle2 size={18} /> Order Pushed to {assignedResult.vendor_name || "Vendor"}!
+              </div>
+              <div>The order has automatically moved to <strong>Printing</strong> status and is now live in the vendor portal.</div>
+            </div>
+
+            {assignedResult.whatsapp_url && (
+              <a
+                href={assignedResult.whatsapp_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn primary"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "#25D366",
+                  borderColor: "#25D366",
+                  color: "#fff",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  padding: "10px 16px",
+                }}
+              >
+                <MessageCircle size={18} /> Open WhatsApp to Notify Vendor
+              </a>
+            )}
+
+            <button type="button" className="btn full" onClick={onClose}>
+              Done / Close
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="stack" style={{ gap: 14, marginTop: 6 }}>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: isOther ? "rgba(59, 130, 246, 0.08)" : "rgba(245, 158, 11, 0.08)",
+                border: `1px solid ${isOther ? "#3b82f6" : "#f59e0b"}`,
+                fontSize: "0.83rem",
+                lineHeight: 1.45,
+              }}
+            >
+              {isOther ? (
+                <div>
+                  <strong>🚚 Other City (Courier Dispatch):</strong> Vendor will book courier and attach tracking ID in their portal.
+                </div>
+              ) : (
+                <div>
+                  <strong>🏛️ Lahore & Campus (Office Delivery):</strong> Vendor will deliver printed batch directly to the <strong>Bookstore Office</strong>. (Only Bookstore Admin dispatches to student).
+                </div>
+              )}
+            </div>
+
+            <Field label="Select Printing Vendor">
+              {loadingVendors ? (
+                <div style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Loading vendors…</div>
+              ) : vendors.length === 0 ? (
+                <div style={{ color: "#ef4444", fontSize: "0.85rem" }}>
+                  No vendors found. Please add a vendor in <a href="/admin/vendors" className="text-link">Vendors section</a> first.
+                </div>
+              ) : (
+                <select
+                  value={selectedVendorId}
+                  onChange={(e) => setSelectedVendorId(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "var(--card)",
+                  }}
+                >
+                  <option value="" disabled>-- Select Vendor --</option>
+                  {vendors
+                    .filter((v) => v.active || v.id === order.vendor_id)
+                    .map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.phone}) — {v.printing_orders_count || 0} in printing
+                      </option>
+                    ))}
+                </select>
+              )}
+            </Field>
+
+            <Field label="Printing Instructions / Notes (Optional)">
+              <textarea
+                rows={2}
+                value={vendorNotes}
+                onChange={(e) => setVendorNotes(e.target.value)}
+                placeholder="e.g. Urgent print, glossy cover, deliver with tomorrow's batch"
+                style={{ fontSize: "0.88rem" }}
+              />
+            </Field>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+              <button type="button" className="btn compact" onClick={onClose} disabled={busy}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn primary compact"
+                disabled={busy || !selectedVendorId || vendors.length === 0}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <Send size={15} />
+                {busy ? "Sending…" : "Push Order to Vendor"}
+              </button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function OrderModalPopup({
   id,
   user,
@@ -2111,8 +2388,11 @@ function OrderModalPopup({
   const [decision, setDecision] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
   const [courierModalOpen, setCourierModalOpen] = useState(false);
+  const [assignVendorOpen, setAssignVendorOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const admin = user.role === "SUPER_ADMIN";
+  const isVendor = user.role === "VENDOR";
   const canUpdate = admin || user.permissions.includes("orders.update");
 
   const act = async (action: string, status?: string) => {
@@ -2162,7 +2442,7 @@ function OrderModalPopup({
               )}
             </div>
             <div className="order-modal-header-actions">
-              {o && <ReceiptButtons order={o} />}
+              {o && !isVendor && <ReceiptButtons order={o} />}
               {admin && o && (
                 <button
                   className="btn compact danger-button"
@@ -2249,7 +2529,7 @@ function OrderModalPopup({
                         </p>
                       </div>
                     </div>
-                    {canUpdate && (
+                    {(canUpdate || isVendor) && (
                       <button
                         type="button"
                         className={isPaymentVerified || o.courier_tracking_id ? "btn primary compact" : "btn compact"}
@@ -2287,116 +2567,620 @@ function OrderModalPopup({
                 );
               })()}
 
-              <div className="checkout-grid order-modal-grid">
-                <div className="stack">
-                  {/* Direct Online Payment Slip View */}
-                  {o.slip_id && (
-                    <div className="panel slip-online-panel">
-                      <div className="slip-panel-header">
-                        <h3>Attached Payment Slip</h3>
-                        <div className="slip-actions">
-                          <a
-                            className="btn primary compact"
-                            href={"/api/proofs/" + o.slip_id + "?download=1"}
-                            download
-                          >
-                            <Download size={15} /> Download
-                          </a>
+              {/* Vendor Assignment Banner / Action */}
+              {o && (() => {
+                if (o.vendor_name) {
+                  return (
+                    <div
+                      className="vendor-assigned-banner"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 16px",
+                        borderRadius: 8,
+                        background: "color-mix(in srgb, var(--primary) 8%, var(--card))",
+                        border: "1px solid color-mix(in srgb, var(--primary) 25%, var(--border))",
+                        margin: "2px 0 10px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 8,
+                            background: "var(--primary)",
+                            color: "var(--primary-foreground)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Factory size={18} />
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: "0.92rem", display: "block" }}>
+                            Assigned to Vendor: {o.vendor_name}
+                          </strong>
+                          <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                            {o.vendor_phone ? `WhatsApp: ${o.vendor_phone}` : ""}
+                            {o.vendor_notes ? ` · Instructions: "${o.vendor_notes}"` : ""}
+                          </p>
                         </div>
                       </div>
-                      <div className="slip-online-frame-wrap">
-                        {o.slip_mime === "application/pdf" ? (
-                          <iframe
-                            src={"/api/proofs/" + o.slip_id}
-                            className="slip-online-iframe"
-                            title="Payment Slip PDF"
-                          />
-                        ) : (
-                          <img
-                            src={"/api/proofs/" + o.slip_id}
-                            alt="Payment Slip"
-                            className="slip-online-img"
-                            onClick={() => window.open("/api/proofs/" + o.slip_id, "_blank")}
-                            title="Click to view full size"
-                          />
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {o.vendor_phone && (
+                          <a
+                            href={getVendorWhatsAppUrl(o, { name: o.vendor_name, phone: o.vendor_phone })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn compact"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              background: "#25D366",
+                              borderColor: "#25D366",
+                              color: "#fff",
+                              fontWeight: 600,
+                              fontSize: "0.8rem",
+                            }}
+                            title="Open WhatsApp chat with vendor"
+                          >
+                            <MessageCircle size={14} /> WhatsApp Vendor
+                          </a>
+                        )}
+                        {admin && (
+                          <button
+                            type="button"
+                            className="btn compact"
+                            onClick={() => setAssignVendorOpen(true)}
+                            style={{ fontSize: "0.8rem" }}
+                          >
+                            Reassign
+                          </button>
                         )}
                       </div>
                     </div>
-                  )}
+                  );
+                }
 
-                  <div className="print-only">
-                    <OrderReceipt o={o} />
+                if (admin && ["CONFIRMED", "PROCESSING"].includes(o.status)) {
+                  return (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 16px",
+                        borderRadius: 8,
+                        background: "rgba(37, 99, 235, 0.06)",
+                        border: "1px dashed #3b82f6",
+                        margin: "2px 0 10px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: "0.9rem", color: "#1d4ed8" }}>Ready for Printing Vendor</strong>
+                        <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                          Push this order directly to a printing vendor to start printing and notify them via WhatsApp/Email.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn primary compact"
+                        onClick={() => setAssignVendorOpen(true)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                      >
+                        <Send size={14} /> Send to Vendor
+                      </button>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+
+              {/* Printing Queue Management Card */}
+              {canUpdate && ["CONFIRMED", "PROCESSING"].includes(o.status) && (
+                <div
+                  className="printing-queue-banner"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 16px",
+                    borderRadius: 8,
+                    background:
+                      o.status === "PROCESSING"
+                        ? o.vendor_printed_at
+                          ? "rgba(22, 163, 74, 0.08)"
+                          : "rgba(245, 158, 11, 0.08)"
+                        : "var(--muted)",
+                    border:
+                      o.status === "PROCESSING"
+                        ? o.vendor_printed_at
+                          ? "1px solid #86efac"
+                          : "1px solid #fde68a"
+                        : "1px dashed var(--border)",
+                    margin: "2px 0 10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        background:
+                          o.status === "PROCESSING"
+                            ? o.vendor_printed_at
+                              ? "#16a34a"
+                              : "#d97706"
+                            : "var(--primary)",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Printer size={18} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: "0.92rem" }}>Printing Queue Management</strong>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            background:
+                              o.status === "PROCESSING"
+                                ? o.vendor_printed_at
+                                  ? "rgba(22, 163, 74, 0.15)"
+                                  : "rgba(245, 158, 11, 0.15)"
+                                : "var(--card)",
+                            color:
+                              o.status === "PROCESSING"
+                                ? o.vendor_printed_at
+                                  ? "#15803d"
+                                  : "#b45309"
+                                : "var(--muted-foreground)",
+                          }}
+                        >
+                          {o.status === "PROCESSING"
+                            ? o.vendor_printed_at
+                              ? "Printed / Ready"
+                              : "In Printing Queue"
+                            : "Order Confirmed"}
+                        </span>
+                      </div>
+                      <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                        {o.status === "CONFIRMED"
+                          ? "This order is confirmed and ready to be queued for printing."
+                          : o.vendor_printed_at
+                            ? `Marked as printed (${formatDateDMY(o.vendor_printed_at)}). Ready for dispatch or pickup.`
+                            : "Order is in the active printing queue waiting for printing."}
+                      </p>
+                    </div>
                   </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    {o.status === "CONFIRMED" ? (
+                      <button
+                        type="button"
+                        className="btn primary compact"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: true });
+                            toast.success("Order added to Printing Queue ✓");
+                            window.dispatchEvent(new Event("orders-updated"));
+                            await reload();
+                          } catch (e) {
+                            toast.error(errorText(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                      >
+                        <Printer size={14} /> Add to Printing Queue
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await api(`manage/orders/${o.id}`, {
+                                action: "vendor_print",
+                                printed: !o.vendor_printed_at,
+                              });
+                              toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
+                              window.dispatchEvent(new Event("orders-updated"));
+                              await reload();
+                            } catch (e) {
+                              toast.error(errorText(e));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                        >
+                          {o.vendor_printed_at ? <RotateCcw size={13} /> : <CheckCircle2 size={14} />}
+                          {o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn compact"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: false });
+                              toast.success("Order removed from Printing Queue (reverted to Confirmed) ✓");
+                              window.dispatchEvent(new Event("orders-updated"));
+                              await reload();
+                            } catch (e) {
+                              toast.error(errorText(e));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--destructive)" }}
+                          title="Remove from Printing Queue and send back to Confirmed status"
+                        >
+                          <XCircle size={13} /> Remove from Queue
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="checkout-grid order-modal-grid">
+                <div className="stack">
+                  {!isVendor && (
+                    <>
+                      {/* Direct Online Payment Slip View */}
+                      {o.slip_id && (
+                        <div className="panel slip-online-panel">
+                          <div className="slip-panel-header">
+                            <h3>Attached Payment Slip</h3>
+                            <div className="slip-actions">
+                              <a
+                                className="btn primary compact"
+                                href={"/api/proofs/" + o.slip_id + "?download=1"}
+                                download
+                              >
+                                <Download size={15} /> Download
+                              </a>
+                            </div>
+                          </div>
+                          <div className="slip-online-frame-wrap">
+                            {o.slip_mime === "application/pdf" ? (
+                              <iframe
+                                src={"/api/proofs/" + o.slip_id}
+                                className="slip-online-iframe"
+                                title="Payment Slip PDF"
+                              />
+                            ) : (
+                              <img
+                                src={"/api/proofs/" + o.slip_id}
+                                alt="Payment Slip"
+                                className="slip-online-img"
+                                onClick={() => window.open("/api/proofs/" + o.slip_id, "_blank")}
+                                title="Click to view full size"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="print-only">
+                        <OrderReceipt o={o} />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="stack no-print">
-                  <div className="panel stack">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
-                      <h3 style={{ margin: 0 }}>Payment verification</h3>
-                      <Status value={o.payment_status} />
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                  {isVendor ? (
+                    <div className="panel stack">
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Order total to receive:</span>
-                        <strong style={{ fontSize: "1.08rem", color: "var(--foreground)" }}>{money(o.total)}</strong>
+                        <h3 style={{ margin: 0 }}>Printing & Fulfillment Instructions</h3>
+                        <Status value={o.status} />
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
-                        <strong style={{ fontSize: "0.9rem" }}>
-                          {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
-                          {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
-                        </strong>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                          <strong style={{ fontSize: "0.95rem" }}>
+                            {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                            {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                          </strong>
+                        </div>
+                        {o.vendor_notes && (
+                          <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
+                            <span style={{ color: "var(--muted-foreground)" }}>Special Notes: </span>
+                            <strong>{o.vendor_notes}</strong>
+                          </div>
+                        )}
                       </div>
-                    </div>
 
-                    {o.payment_note && (
-                      <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
-                        <strong>Note:</strong> {o.payment_note}
-                      </div>
-                    )}
-                    {canUpdate && (
-                      <Field label="Reason or note">
-                        <textarea
-                          rows={3}
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="Explain rejection, request or status update"
-                        />
-                      </Field>
-                    )}
-                    {admin && o.status === "PAYMENT_PENDING" && (
-                      <div className="actions">
-                        {[
-                          ["approve", "Approve Payment"],
-                          ["reject", "Reject Payment"],
-                          ["request", "Request New Slip"],
-                          ["manual", "Manual Review"],
-                        ].map(([action, label]) => (
-                          <button
-                            key={action}
-                            className={
-                              "btn compact " +
-                              (action === "approve" ? "primary" : "")
-                            }
-                            onClick={() => setDecision({ action, label })}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {admin && (
-                      <button
-                        className="btn compact"
-                        disabled={!note.trim()}
-                        onClick={() => act("note")}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "10px 14px",
+                          borderRadius: 8,
+                          background: "var(--muted)",
+                          margin: "2px 0 6px",
+                        }}
                       >
-                        Save private admin note
-                      </button>
-                    )}
-                  </div>
-                  {canUpdate && transitions[o.status]?.length > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <CheckCircle2
+                            size={16}
+                            color={o.vendor_printed_at ? "#16a34a" : "var(--muted-foreground)"}
+                          />
+                          <span style={{ fontSize: "0.85rem" }}>Print Status:</span>
+                          <strong>{o.vendor_printed_at ? "Printed ✓" : "Pending Print"}</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await api(`manage/orders/${o.id}`, {
+                                action: "vendor_print",
+                                printed: !o.vendor_printed_at,
+                              });
+                              toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared");
+                              await reload();
+                            } catch (e) {
+                              toast.error(errorText(e));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          {o.vendor_printed_at ? "Unmark" : "Mark as Printed"}
+                        </button>
+                      </div>
+
+                      {isOtherCityOrder(o) ? (
+                        o.status === "SHIPPED" ? (
+                          <div
+                            style={{
+                              padding: "12px 14px",
+                              borderRadius: 8,
+                              background: "rgba(16, 185, 129, 0.08)",
+                              border: "1px solid #10b981",
+                              fontSize: "0.85rem",
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            <strong style={{ color: "#047857" }}>🚚 Shipped via Courier:</strong>
+                            <p style={{ margin: "4px 0 8px" }}>
+                              Shipped via <strong>{o.courier_name}</strong> · Tracking ID: <code>{o.courier_tracking_id}</code>. Once the parcel is delivered to student, click below to mark as Delivered:
+                            </p>
+                            <button
+                              type="button"
+                              className="btn primary compact"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await api(`manage/orders/${o.id}`, {
+                                    action: "status",
+                                    status: "DELIVERED",
+                                    version: o.version,
+                                    note: "Marked as delivered by vendor",
+                                  });
+                                  toast.success("Order marked as Delivered ✓");
+                                  window.dispatchEvent(new Event("orders-updated"));
+                                  await reload();
+                                } catch (e) {
+                                  toast.error(errorText(e));
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                              style={{ gap: 6, background: "#059669", borderColor: "#059669" }}
+                            >
+                              <CheckCircle2 size={14} /> Mark as Delivered
+                            </button>
+                          </div>
+                        ) : o.status === "DELIVERED" ? (
+                          <div
+                            style={{
+                              padding: "12px 14px",
+                              borderRadius: 8,
+                              background: "rgba(16, 185, 129, 0.08)",
+                              border: "1px solid #10b981",
+                              fontSize: "0.85rem",
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            <strong style={{ color: "#047857" }}>✅ Delivered to Student:</strong>
+                            <p style={{ margin: "4px 0 0" }}>
+                              Fulfillment complete. Delivered via {o.courier_name} (Tracking: {o.courier_tracking_id}).
+                            </p>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              padding: "12px 14px",
+                              borderRadius: 8,
+                              background: "rgba(59, 130, 246, 0.08)",
+                              border: "1px solid #3b82f6",
+                              fontSize: "0.85rem",
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            <strong>🚚 Other City Delivery:</strong>
+                            <p style={{ margin: "4px 0 0" }}>
+                              Please print books and dispatch via courier. Once dispatched, click "Add Courier Details" or "Edit Tracking" above to attach tracking ID. Saving tracking will automatically mark order as <strong>Shipped</strong>.
+                            </p>
+                          </div>
+                        )
+                      ) : (
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "rgba(245, 158, 11, 0.08)",
+                            border: "1px solid #f59e0b",
+                            fontSize: "0.85rem",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          <strong>🏛️ Deliver to Bookstore Office:</strong>
+                          <p style={{ margin: "4px 0 8px" }}>
+                            This order is for Lahore / VU Qanchi Campus. Once books are printed, click below to mark this batch as dispatched to the Bookstore Office.
+                          </p>
+                          {o.status === "PROCESSING" ? (
+                            <button
+                              type="button"
+                              className="btn primary compact"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await api(`manage/orders/${o.id}`, {
+                                    action: "vendor_dispatch_office",
+                                  });
+                                  toast.success("Order dispatched to Bookstore Office ✓");
+                                  await reload();
+                                } catch (e) {
+                                  toast.error(errorText(e));
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                              style={{ gap: 6, background: "#2563eb" }}
+                            >
+                              <Building2 size={14} /> Send to Bookstore Office
+                            </button>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                              <span
+                                className="mono-pill"
+                                style={{
+                                  background: "rgba(37, 99, 235, 0.15)",
+                                  color: "#1d4ed8",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <Building2 size={12} /> Dispatched to Office
+                              </span>
+                              <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+                                Awaiting admin verification & delivery
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="panel stack">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                        <h3 style={{ margin: 0 }}>Payment verification</h3>
+                        <Status value={o.payment_status} />
+                      </div>
+
+                      {(o.vendor_printed_at || o.vendor_dispatched_at) && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                          {o.vendor_printed_at && (
+                            <span className="mono-pill" style={{ background: "rgba(22, 163, 74, 0.15)", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <CheckCircle2 size={13} /> Printed by Vendor ({formatDateDMY(o.vendor_printed_at)})
+                            </span>
+                          )}
+                          {o.vendor_dispatched_at && (
+                            <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.15)", color: "#1d4ed8", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <Building2 size={13} /> Dispatched by Vendor to Office ({formatDateDMY(o.vendor_dispatched_at)})
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Order total to receive:</span>
+                          <strong style={{ fontSize: "1.08rem", color: "var(--foreground)" }}>{money(o.total)}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                          <strong style={{ fontSize: "0.9rem" }}>
+                            {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                            {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {o.payment_note && (
+                        <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
+                          <strong>Note:</strong> {o.payment_note}
+                        </div>
+                      )}
+                      {canUpdate && (
+                        <Field label="Reason or note">
+                          <textarea
+                            rows={3}
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Explain rejection, request or status update"
+                          />
+                        </Field>
+                      )}
+                      {admin && o.status === "PAYMENT_PENDING" && (
+                        <div className="actions">
+                          {[
+                            ["approve", "Approve Payment"],
+                            ["reject", "Reject Payment"],
+                            ["request", "Request New Slip"],
+                            ["manual", "Manual Review"],
+                          ].map(([action, label]) => (
+                            <button
+                              key={action}
+                              className={
+                                "btn compact " +
+                                (action === "approve" ? "primary" : "")
+                              }
+                              onClick={() => setDecision({ action, label })}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {admin && (
+                        <button
+                          className="btn compact"
+                          disabled={!note.trim()}
+                          onClick={() => act("note")}
+                        >
+                          Save private admin note
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {!isVendor && canUpdate && transitions[o.status]?.length > 0 && (
                     <div className="panel stack">
                       <h3>Update fulfilment</h3>
                       <Choose
@@ -2520,6 +3304,14 @@ function OrderModalPopup({
             onSaved={reload}
           />
         )}
+
+        {assignVendorOpen && o && (
+          <AssignVendorModal
+            order={o}
+            onClose={() => setAssignVendorOpen(false)}
+            onAssigned={reload}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -2546,11 +3338,22 @@ const STATUS_ADVANCE_FLOW: Record<
   },
 };
 
-const ORDER_WORKFLOW_TABS = [
-  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [] as string[], color: "all" },
+type WorkflowTab = {
+  id: string;
+  label: string;
+  title: string;
+  icon: string;
+  statuses: string[];
+  color: string;
+  urgent?: boolean;
+};
+
+const ORDER_WORKFLOW_TABS: WorkflowTab[] = [
+  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
   { id: "PAYMENT_PENDING", label: "Pending", title: "Pending Payment Verification", icon: "⏳", statuses: ["PAYMENT_PENDING"], urgent: true, color: "pending" },
-  { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready to Print", icon: "📑", statuses: ["CONFIRMED"], color: "confirmed" },
-  { id: "PROCESSING", label: "Printing", title: "Printing / In Press", icon: "🖨️", statuses: ["PROCESSING"], color: "printing" },
+  { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready for Printing Queue", icon: "📑", statuses: ["CONFIRMED"], color: "confirmed" },
+  { id: "PROCESSING", label: "Printing Queue", title: "Orders Currently in Printing Queue", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
+  { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", icon: "📦", statuses: ["PROCESSING"], color: "confirmed" },
   { id: "SHIPPED", label: "Shipped", title: "Shipped / With Rider", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
   { id: "DELIVERED", label: "Delivered", title: "Delivered / Completed", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
   { id: "CANCELLED", label: "Cancelled", title: "Cancelled Orders", icon: "❌", statuses: ["CANCELLED"], color: "cancelled" },
@@ -2565,6 +3368,20 @@ const ORDER_DELIVERY_CHIPS = [
   { id: "other", label: "Other Cities (Courier)", icon: "📦" },
 ];
 
+const VENDOR_WORKFLOW_TABS: WorkflowTab[] = [
+  { id: "PROCESSING", label: "Printing Queue", title: "Orders Currently In Printing Queue", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
+  { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", icon: "📦", statuses: ["PROCESSING"], color: "confirmed" },
+  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
+  { id: "SHIPPED", label: "Shipped", title: "Orders Shipped / Handed Over", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
+  { id: "DELIVERED", label: "Delivered", title: "Completed Orders", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
+];
+
+const VENDOR_DELIVERY_CHIPS = [
+  { id: "all", label: "All Orders", icon: "🌐" },
+  { id: "other", label: "Other Cities (Courier Dispatch)", icon: "📦" },
+  { id: "campus_lahore", label: "Qanchi Campus Lahore", icon: "🏛️" },
+];
+
 function Orders({
   base,
   payments = false,
@@ -2574,12 +3391,27 @@ function Orders({
   payments?: boolean;
   user?: User;
 }) {
+  const isAdmin = user?.role === "SUPER_ADMIN";
+  const isVendor = user?.role === "VENDOR";
+  const canUpdate = isAdmin || isVendor || user?.permissions?.includes("orders.update");
+
   const [campus, setCampus] = useState("");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const param = new URLSearchParams(location.search).get("status");
+      if (param) return param;
+    }
+    if (isVendor) return "PROCESSING";
+    return payments ? "PAYMENT_PENDING" : "ALL";
+  });
+  const [printedFilter, setPrintedFilter] = useState<string>(() => (isVendor ? "0" : ""));
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [statusList, setStatusList] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       const param = new URLSearchParams(location.search).get("status");
       if (param) return [param];
     }
+    if (isVendor) return ["PROCESSING"];
     return payments ? ["PAYMENT_PENDING"] : [];
   });
 
@@ -2588,8 +3420,16 @@ function Orders({
     const campusParam = params.get("campus");
     if (campusParam) setCampus(campusParam);
     const statusParam = params.get("status");
-    if (statusParam) setStatusList([statusParam]);
-  }, []);
+    if (statusParam) {
+      setStatusList([statusParam]);
+      setActiveTab(statusParam);
+      setPrintedFilter(statusParam === "PROCESSING" ? "0" : "");
+    } else if (isVendor) {
+      setStatusList(["PROCESSING"]);
+      setActiveTab("PROCESSING");
+      setPrintedFilter("0");
+    }
+  }, [isVendor]);
   const [q, setQ] = useState(""),
     [deliveryTypeList, setDeliveryTypeList] = useState<string[]>([]),
     [page, setPage] = useState(1),
@@ -2598,6 +3438,11 @@ function Orders({
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
     [deletingOrder, setDeletingOrder] = useState<any | null>(null),
     [batchUpdating, setBatchUpdating] = useState(false),
+    [batchPrinting, setBatchPrinting] = useState(false),
+    [batchDispatching, setBatchDispatching] = useState(false),
+    [batchQueueUpdating, setBatchQueueUpdating] = useState(false),
+    [markingDeliveredId, setMarkingDeliveredId] = useState<string | null>(null),
+    [queueBusyId, setQueueBusyId] = useState<string | null>(null),
     [batchConfirm, setBatchConfirm] = useState<{
       fromStatus: string;
       toStatus: string;
@@ -2606,17 +3451,150 @@ function Orders({
       toLabel: string;
     } | null>(null),
     [exporting, setExporting] = useState(false),
-    [editingCourierOrder, setEditingCourierOrder] = useState<any | null>(null);
+    [editingCourierOrder, setEditingCourierOrder] = useState<any | null>(null),
+    [assigningOrder, setAssigningOrder] = useState<any | null>(null),
+    [printingBusyId, setPrintingBusyId] = useState<string | null>(null),
+    [dispatchOfficeOrder, setDispatchOfficeOrder] = useState<any | null>(null),
+    [dispatchingOffice, setDispatchingOffice] = useState(false);
 
-  const isAdmin = user?.role === "SUPER_ADMIN";
-  const canUpdate = isAdmin || user?.permissions?.includes("orders.update");
+  const handleVendorPrint = async (ord: any, markAsPrinted: boolean) => {
+    setPrintingBusyId(ord.id);
+    try {
+      await api(`manage/orders/${ord.id}`, {
+        action: "vendor_print",
+        printed: markAsPrinted,
+      });
+      toast.success(markAsPrinted ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setPrintingBusyId(null);
+    }
+  };
+
+  const handleSetPrintingQueue = async (ord: any, inQueue: boolean) => {
+    setQueueBusyId(ord.id);
+    try {
+      await api(`manage/orders/${ord.id}`, {
+        action: "printing_queue",
+        in_queue: inQueue,
+      });
+      toast.success(
+        inQueue
+          ? "Order added to Printing Queue ✓"
+          : "Order removed from Printing Queue (reverted to Confirmed) ✓",
+      );
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setQueueBusyId(null);
+    }
+  };
+
+  const handleBatchSetPrintingQueue = async (ids: string[], inQueue: boolean) => {
+    if (!ids.length) return;
+    setBatchQueueUpdating(true);
+    try {
+      const res = await api("manage/orders/batch-printing-queue", {
+        orderIds: ids,
+        inQueue,
+      });
+      toast.success(res.message || (inQueue ? `Added ${ids.length} order(s) to Printing Queue` : `Removed ${ids.length} order(s) from Printing Queue`));
+      setSelectedOrderIds([]);
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBatchQueueUpdating(false);
+    }
+  };
+
+  const handleMarkDelivered = async (ord: any) => {
+    setMarkingDeliveredId(ord.id);
+    try {
+      await api(`manage/orders/${ord.id}`, {
+        action: "status",
+        status: "DELIVERED",
+        version: ord.version,
+        note: "Marked as delivered by vendor",
+      });
+      toast.success("Order marked as Delivered ✓");
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setMarkingDeliveredId(null);
+    }
+  };
+
+  const handleBatchVendorPrint = async (ids: string[], markAsPrinted = true) => {
+    if (!ids.length) return;
+    setBatchPrinting(true);
+    try {
+      const res = await api("manage/orders/batch-vendor-print", {
+        orderIds: ids,
+        printed: markAsPrinted,
+      });
+      toast.success(res.message || `Updated print status for ${res.count ?? ids.length} order(s).`);
+      setSelectedOrderIds([]);
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBatchPrinting(false);
+    }
+  };
+
+  const handleBatchVendorDispatchOffice = async (ids: string[]) => {
+    if (!ids.length) return;
+    setBatchDispatching(true);
+    try {
+      const res = await api("manage/orders/batch-vendor-dispatch-office", {
+        orderIds: ids,
+      });
+      toast.success(res.message || `Dispatched ${res.count ?? ids.length} order(s) to Bookstore Office.`);
+      setSelectedOrderIds([]);
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBatchDispatching(false);
+    }
+  };
+
+  const handleDispatchOffice = async () => {
+    if (!dispatchOfficeOrder) return;
+    setDispatchingOffice(true);
+    try {
+      await api(`manage/orders/${dispatchOfficeOrder.id}`, {
+        action: "vendor_dispatch_office",
+      });
+      toast.success("Order dispatched to Bookstore Office ✓");
+      setDispatchOfficeOrder(null);
+      window.dispatchEvent(new Event("orders-updated"));
+      await reload();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setDispatchingOffice(false);
+    }
+  };
 
   const exportOrders = async () => {
     setExporting(true);
     try {
       const statusParam = statusList.join(",");
       const deliveryTypeParam = deliveryTypeList.join(",");
-      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
+      const printedParam = isVendor ? printedFilter : "";
+      const exportPath = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&printed=${encodeURIComponent(printedParam)}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}&limit=all`;
       const res = await api(exportPath);
       const rows = res.rows || [];
       if (!rows.length) {
@@ -2667,11 +3645,22 @@ function Orders({
       const includeAddress = deliveryTypeList.length === 0 || deliveryTypeList.includes("other");
       const includeMobile = includeAddress;
 
+      const includeBookSummary =
+        (deliveryTypeList.length > 0 &&
+          deliveryTypeList.every((t) => t === "campus" || t === "lahore")) ||
+        (deliveryTypeList.length === 0 &&
+          rows.length > 0 &&
+          rows.every((r: any) => isCampusOrder(r) || isLahoreOrder(r)));
+
       try {
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
-        await exportOrdersExcel(rows, filename, { includeAddress, sheetName });
+        await exportOrdersExcel(rows, filename, {
+          includeAddress,
+          sheetName,
+          includeBookSummary,
+        });
         toast.success(
-          `Exported ${rows.length} order(s)${includeAddress ? " with address & phone" : ""} to ${filename}.`,
+          `Exported ${rows.length} order(s)${includeAddress ? " with address & phone" : ""}${includeBookSummary ? " with Books Summary" : ""} to ${filename}.`,
         );
       } catch (excelErr) {
         // Fallback to structured CSV with book items
@@ -2742,7 +3731,8 @@ function Orders({
 
   const statusParam = statusList.join(",");
   const deliveryTypeParam = deliveryTypeList.join(",");
-  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&page=${page}&limit=${pageSize}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
+  const printedParam = printedFilter;
+  const path = `manage/orders?q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusParam)}&delivery_type=${encodeURIComponent(deliveryTypeParam)}&printed=${encodeURIComponent(printedParam)}&page=${page}&limit=${pageSize}&from=${dates.from}&to=${dates.to}&campus=${encodeURIComponent(campus)}`;
   const { data, error, loading, reload } = useData(path);
 
   useEffect(() => {
@@ -2799,14 +3789,17 @@ function Orders({
   };
 
   const isTabActive = (tab: (typeof ORDER_WORKFLOW_TABS)[number]) => {
-    if (tab.id === "ALL") {
-      return statusList.length === 0;
-    }
-    return statusList.length === 1 && statusList[0] === tab.statuses[0];
+    return activeTab === tab.id;
   };
 
   const getTabCount = (tab: (typeof ORDER_WORKFLOW_TABS)[number]) => {
     if (!data?.status_counts) return undefined;
+    if (tab.id === "PRINTED") {
+      return data.status_counts.PRINTED || 0;
+    }
+    if (tab.id === "PROCESSING") {
+      return data.status_counts.PROCESSING || 0;
+    }
     if (tab.id === "ALL") {
       return data.status_counts.ALL ?? data.total ?? 0;
     }
@@ -2848,33 +3841,116 @@ function Orders({
   const isPendingView =
     payments || (statusList.length === 1 && statusList[0] === "PAYMENT_PENDING");
 
-  const headers = isPendingView
+  const currentRows = data?.rows || [];
+  const allCurrentSelected =
+    currentRows.length > 0 &&
+    currentRows.every((r: any) => selectedOrderIds.includes(r.id));
+  const someCurrentSelected =
+    currentRows.some((r: any) => selectedOrderIds.includes(r.id)) && !allCurrentSelected;
+
+  const selectAllCheckbox = (
+    <input
+      type="checkbox"
+      checked={allCurrentSelected}
+      ref={(el) => {
+        if (el) el.indeterminate = someCurrentSelected;
+      }}
+      onChange={(e) => {
+        if (e.target.checked) {
+          const currentIds = currentRows.map((r: any) => r.id);
+          setSelectedOrderIds((prev) => Array.from(new Set([...prev, ...currentIds])));
+        } else {
+          const currentIds = new Set(currentRows.map((r: any) => r.id));
+          setSelectedOrderIds((prev) => prev.filter((id) => !currentIds.has(id)));
+        }
+      }}
+      aria-label="Select all orders"
+      style={{ cursor: "pointer", width: 16, height: 16 }}
+    />
+  );
+
+  const headers = isVendor
     ? [
+        selectAllCheckbox,
         "Order",
         "Student",
         "Books",
         "Date",
-        "Total",
-        "Payment",
-        "Review",
-        ...(isAdmin ? ["Actions"] : []),
+        "Status",
+        "Logistics & Action",
+        "View",
       ]
-    : [
-        "Order",
-        "Student",
-        "Books",
-        "Date",
-        "Total",
-        "Order status",
-        "Payment",
-        "Details",
-        ...(isAdmin ? ["Actions"] : []),
-      ];
+    : isPendingView
+      ? [
+          selectAllCheckbox,
+          "Order",
+          "Student",
+          "Books",
+          "Date",
+          "Total",
+          "Payment",
+          "Review",
+          ...(isAdmin ? ["Actions"] : []),
+        ]
+      : [
+          selectAllCheckbox,
+          "Order",
+          "Student",
+          "Books",
+          "Date",
+          "Total",
+          "Order status",
+          "Payment",
+          "Details",
+          ...(isAdmin ? ["Actions"] : []),
+        ];
 
   return (
     <>
+      {isVendor && (data?.status_counts?.["PROCESSING"] || 0) > 0 && (
+        <div
+          className="notice dashboard-notice vendor-printing-notice"
+          style={{
+            marginBottom: 16,
+            background: "rgba(245, 158, 11, 0.1)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            borderRadius: 10,
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span
+            className="notice-icon"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "rgba(245, 158, 11, 0.2)",
+              color: "#d97706",
+              flexShrink: 0,
+            }}
+          >
+            <Bell size={18} />
+          </span>
+          <div style={{ flex: 1 }}>
+            <strong style={{ fontSize: "0.95rem", color: "var(--foreground)" }}>
+              {data.status_counts["PROCESSING"]}{" "}
+              {data.status_counts["PROCESSING"] === 1 ? "Order" : "Orders"} currently in your Printing Queue!
+            </strong>
+            <p style={{ margin: "2px 0 0", fontSize: "0.83rem", color: "var(--muted-foreground)" }}>
+              Print the books for these orders. Mark them as "Printed" when ready, then dispatch Other City orders via courier or send Lahore/Campus batches to the Bookstore Office.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="orders-workflow-tabs-container" role="tablist" aria-label="Order Workflow Stages">
-        {ORDER_WORKFLOW_TABS.map((tab) => {
+        {(isVendor ? VENDOR_WORKFLOW_TABS : ORDER_WORKFLOW_TABS).map((tab) => {
           const active = isTabActive(tab);
           const count = getTabCount(tab);
           return (
@@ -2886,12 +3962,22 @@ function Orders({
               title={tab.title || tab.label}
               className={`orders-workflow-tab tab-${tab.color} ${active ? "active" : ""}`}
               onClick={() => {
-                if (tab.id === "ALL" || isTabActive(tab)) {
+                setSelectedOrderIds([]);
+                setPage(1);
+                setActiveTab(tab.id);
+                if (tab.id === "PROCESSING") {
+                  setStatusList(["PROCESSING"]);
+                  setPrintedFilter("0");
+                } else if (tab.id === "PRINTED") {
+                  setStatusList(["PROCESSING"]);
+                  setPrintedFilter("1");
+                } else if (tab.id === "ALL") {
                   setStatusList([]);
+                  setPrintedFilter("");
                 } else {
                   setStatusList([...tab.statuses]);
+                  setPrintedFilter("");
                 }
-                setPage(1);
               }}
             >
               <span>{tab.icon}</span>
@@ -2911,42 +3997,171 @@ function Orders({
       </div>
 
       <div className="orders-delivery-chips-bar" aria-label="Delivery channel filters">
-        {ORDER_DELIVERY_CHIPS.map((chip) => {
-          const isChipActive =
-            chip.id === "all"
-              ? deliveryTypeList.length === 0
-              : deliveryTypeList.includes(chip.id);
-          return (
-            <button
-              key={chip.id}
-              type="button"
-              className={`orders-delivery-chip ${isChipActive ? "active" : ""}`}
-              onClick={() => {
-                setPage(1);
-                if (chip.id === "all") {
-                  setDeliveryTypeList([]);
-                  return;
-                }
-                if (chip.id === "other") {
-                  // Other City is exclusive: toggling off goes to all, toggling on deselects campus and lahore
-                  setDeliveryTypeList(deliveryTypeList.includes("other") ? [] : ["other"]);
-                  return;
-                }
-                // For "campus" or "lahore": remove "other" first, then toggle this chip while preserving the other local chip
-                const withoutOther = deliveryTypeList.filter((id) => id !== "other");
-                if (withoutOther.includes(chip.id)) {
-                  setDeliveryTypeList(withoutOther.filter((id) => id !== chip.id));
-                } else {
-                  setDeliveryTypeList([...withoutOther, chip.id]);
-                }
-              }}
-            >
-              <span>{chip.icon}</span>
-              <span>{chip.label}</span>
-            </button>
-          );
-        })}
+        {isVendor
+          ? VENDOR_DELIVERY_CHIPS.map((chip) => {
+              const isChipActive =
+                chip.id === "all"
+                  ? deliveryTypeList.length === 0
+                  : chip.id === "other"
+                    ? deliveryTypeList.includes("other")
+                    : deliveryTypeList.includes("campus") || deliveryTypeList.includes("lahore");
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={`orders-delivery-chip ${isChipActive ? "active" : ""}`}
+                  onClick={() => {
+                    setPage(1);
+                    if (chip.id === "all") {
+                      setDeliveryTypeList([]);
+                    } else if (chip.id === "other") {
+                      setDeliveryTypeList(deliveryTypeList.includes("other") ? [] : ["other"]);
+                    } else if (chip.id === "campus_lahore") {
+                      const isCombined =
+                        deliveryTypeList.includes("campus") && deliveryTypeList.includes("lahore");
+                      setDeliveryTypeList(isCombined ? [] : ["campus", "lahore"]);
+                    }
+                  }}
+                >
+                  <span>{chip.icon}</span>
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })
+          : ORDER_DELIVERY_CHIPS.map((chip) => {
+              const isChipActive =
+                chip.id === "all"
+                  ? deliveryTypeList.length === 0
+                  : deliveryTypeList.includes(chip.id);
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={`orders-delivery-chip ${isChipActive ? "active" : ""}`}
+                  onClick={() => {
+                    setPage(1);
+                    if (chip.id === "all") {
+                      setDeliveryTypeList([]);
+                      return;
+                    }
+                    if (chip.id === "other") {
+                      // Other City is exclusive: toggling off goes to all, toggling on deselects campus and lahore
+                      setDeliveryTypeList(deliveryTypeList.includes("other") ? [] : ["other"]);
+                      return;
+                    }
+                    // For "campus" or "lahore": remove "other" first, then toggle this chip while preserving the other local chip
+                    const withoutOther = deliveryTypeList.filter((id) => id !== "other");
+                    if (withoutOther.includes(chip.id)) {
+                      setDeliveryTypeList(withoutOther.filter((id) => id !== chip.id));
+                    } else {
+                      setDeliveryTypeList([...withoutOther, chip.id]);
+                    }
+                  }}
+                >
+                  <span>{chip.icon}</span>
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })}
       </div>
+
+      {selectedOrderIds.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--primary) 12%, var(--card))",
+            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
+            margin: "0 0 14px",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <CheckCircle2 size={18} color="var(--primary)" />
+            <strong style={{ fontSize: "0.9rem" }}>
+              {selectedOrderIds.length} order{selectedOrderIds.length === 1 ? "" : "s"} selected
+            </strong>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {(activeTab === "CONFIRMED" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "CONFIRMED")) && (
+              <button
+                type="button"
+                className="btn compact primary"
+                disabled={batchQueueUpdating}
+                onClick={() => handleBatchSetPrintingQueue(selectedOrderIds, true)}
+                style={{ fontSize: "0.82rem", gap: 6 }}
+                title="Add selected orders to Printing Queue"
+              >
+                <Printer size={14} /> Add Selected to Printing Queue
+              </button>
+            )}
+
+            {(activeTab === "PROCESSING" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "PROCESSING" && !r.vendor_printed_at)) && (
+              <button
+                type="button"
+                className="btn compact primary"
+                disabled={batchPrinting}
+                onClick={() => handleBatchVendorPrint(selectedOrderIds, true)}
+                style={{ fontSize: "0.82rem", gap: 6 }}
+                title="Mark selected orders as Printed"
+              >
+                <CheckCircle2 size={14} /> Mark Selected as Printed
+              </button>
+            )}
+
+            {(activeTab === "PRINTED" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "PROCESSING" && r.vendor_printed_at)) && (
+              <button
+                type="button"
+                className="btn compact"
+                disabled={batchPrinting}
+                onClick={() => handleBatchVendorPrint(selectedOrderIds, false)}
+                style={{ fontSize: "0.82rem", gap: 6 }}
+                title="Unmark printed status and move back to Printing Queue"
+              >
+                <RotateCcw size={14} /> Unmark Selected Printed
+              </button>
+            )}
+
+            {(activeTab === "PROCESSING" || activeTab === "PRINTED" || currentRows.some((r: any) => selectedOrderIds.includes(r.id) && r.status === "PROCESSING")) && (
+              <button
+                type="button"
+                className="btn compact"
+                disabled={batchQueueUpdating}
+                onClick={() => handleBatchSetPrintingQueue(selectedOrderIds, false)}
+                style={{ fontSize: "0.82rem", gap: 6, color: "var(--destructive)" }}
+                title="Remove selected orders from Printing Queue (reverts them to Confirmed status)"
+              >
+                <XCircle size={14} /> Remove Selected from Queue
+              </button>
+            )}
+
+            {isVendor && activeTab === "PRINTED" && (
+              <button
+                type="button"
+                className="btn compact"
+                disabled={batchDispatching}
+                onClick={() => handleBatchVendorDispatchOffice(selectedOrderIds)}
+                style={{ fontSize: "0.82rem", gap: 6, background: "#2563eb", color: "#fff" }}
+              >
+                <Building2 size={14} /> Send Selected to Bookstore Office
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="btn compact"
+              onClick={() => setSelectedOrderIds([])}
+              style={{ fontSize: "0.82rem" }}
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="toolbar orders-toolbar">
         <div className="toolbar-search-box">
@@ -2997,7 +4212,94 @@ function Orders({
           </span>
           <span>{exporting ? "Exporting…" : "Export Orders"}</span>
         </button>
-        {canUpdate && (
+        {activeTab === "CONFIRMED" && canUpdate && (
+          <button
+            type="button"
+            className="btn compact toolbar-batch-btn active"
+            disabled={batchQueueUpdating || loading || currentRows.length === 0}
+            onClick={() => handleBatchSetPrintingQueue(currentRows.map((r: any) => r.id), true)}
+            title="Add all confirmed orders on this page to Printing Queue"
+          >
+            <span className="toolbar-btn-icon-circle">
+              <Printer size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+            </span>
+            <span>
+              {batchQueueUpdating ? "Updating…" : `Add All to Printing Queue (${filteredCount})`}
+            </span>
+          </button>
+        )}
+        {activeTab === "PROCESSING" && (
+          <>
+            <button
+              type="button"
+              className="btn compact toolbar-batch-btn active"
+              disabled={batchPrinting || loading || currentRows.length === 0}
+              onClick={() => {
+                const ids = currentRows.filter((r: any) => !r.vendor_printed_at).map((r: any) => r.id);
+                if (!ids.length) {
+                  toast.info("All visible orders are already marked as printed.");
+                  return;
+                }
+                handleBatchVendorPrint(ids, true);
+              }}
+              title="Mark all orders in current queue as printed"
+            >
+              <span className="toolbar-btn-icon-circle">
+                <CheckCircle2 size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              </span>
+              <span>
+                {batchPrinting ? "Updating…" : `Mark All in Queue as Printed (${currentRows.length})`}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="btn compact toolbar-batch-btn"
+              disabled={batchQueueUpdating || loading || currentRows.length === 0}
+              onClick={() => handleBatchSetPrintingQueue(currentRows.map((r: any) => r.id), false)}
+              title="Remove all visible orders from Printing Queue (reverts them to Confirmed)"
+            >
+              <span className="toolbar-btn-icon-circle">
+                <XCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              </span>
+              <span>
+                {batchQueueUpdating ? "Updating…" : `Remove All from Queue (${currentRows.length})`}
+              </span>
+            </button>
+          </>
+        )}
+        {activeTab === "PRINTED" && (
+          <>
+            <button
+              type="button"
+              className="btn compact toolbar-batch-btn active"
+              disabled={batchPrinting || loading || currentRows.length === 0}
+              onClick={() => handleBatchVendorPrint(currentRows.map((r: any) => r.id), false)}
+              title="Unmark all printed orders (send back to Printing Queue)"
+            >
+              <span className="toolbar-btn-icon-circle">
+                <RotateCcw size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              </span>
+              <span>
+                {batchPrinting ? "Updating…" : `Unmark All Printed (${currentRows.length})`}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="btn compact toolbar-batch-btn"
+              disabled={batchQueueUpdating || loading || currentRows.length === 0}
+              onClick={() => handleBatchSetPrintingQueue(currentRows.map((r: any) => r.id), false)}
+              title="Remove all visible orders from Printing Queue (reverts them to Confirmed)"
+            >
+              <span className="toolbar-btn-icon-circle">
+                <XCircle size={14} strokeWidth={2.4} className="toolbar-batch-icon" />
+              </span>
+              <span>
+                {batchQueueUpdating ? "Updating…" : `Remove All from Queue (${currentRows.length})`}
+              </span>
+            </button>
+          </>
+        )}
+        {!["PROCESSING", "PRINTED", "CONFIRMED"].includes(activeTab) && !isVendor && canUpdate && (
           <button
             type="button"
             className={`btn compact toolbar-batch-btn ${activeFlowStep && filteredCount > 0 ? "active" : ""}`}
@@ -3028,7 +4330,7 @@ function Orders({
             }
             title={
               statusList.length === 0
-                ? "Select a status filter (Order Confirmed, Processing / Printing, or Shipped) to enable status change"
+                ? "Select a status filter to enable status change"
                 : statusList.length > 1
                   ? "Select a single status filter to change status"
                   : !activeFlowStep
@@ -3105,7 +4407,98 @@ function Orders({
                     </a>
                   </div>
                 )}
-                {isOther && (
+                {/* Admin Vendor badge / Quick send */}
+                {isAdmin && (
+                  o.vendor_name ? (
+                    <div style={{ marginTop: 3, display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span
+                        className="vendor-badge-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 7px",
+                          borderRadius: 9999,
+                          background: "rgba(139, 92, 246, 0.12)",
+                          color: "#7c3aed",
+                          border: "1px solid #c4b5fd",
+                          width: "fit-content",
+                        }}
+                        title={`Assigned to ${o.vendor_name}${o.vendor_phone ? ` (${o.vendor_phone})` : ""}`}
+                      >
+                        <Factory size={11} /> {o.vendor_name}
+                      </span>
+                      {o.vendor_dispatched_at ? (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: "0.70rem",
+                            fontWeight: 600,
+                            padding: "2px 7px",
+                            borderRadius: 9999,
+                            background: "rgba(37, 99, 235, 0.12)",
+                            color: "#1d4ed8",
+                            border: "1px solid #93c5fd",
+                            width: "fit-content",
+                          }}
+                          title={`Vendor dispatched this order to the Bookstore Office on ${formatDateDMY(o.vendor_dispatched_at)}`}
+                        >
+                          <Building2 size={10} /> Dispatched to Office
+                        </span>
+                      ) : o.vendor_printed_at ? (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: "0.70rem",
+                            fontWeight: 600,
+                            padding: "2px 7px",
+                            borderRadius: 9999,
+                            background: "rgba(22, 163, 74, 0.12)",
+                            color: "#15803d",
+                            border: "1px solid #86efac",
+                            width: "fit-content",
+                          }}
+                          title={`Vendor marked books as printed on ${formatDateDMY(o.vendor_printed_at)}`}
+                        >
+                          <CheckCircle2 size={10} /> Printed by Vendor
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : ["CONFIRMED", "PROCESSING"].includes(o.status) ? (
+                    <div style={{ marginTop: 3 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssigningOrder(o);
+                        }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "rgba(59, 130, 246, 0.1)",
+                          color: "#2563eb",
+                          border: "1px solid #93c5fd",
+                          cursor: "pointer",
+                        }}
+                        title="Send this order to a printing vendor"
+                      >
+                        <Send size={10} /> Send to Vendor
+                      </button>
+                    </div>
+                  ) : null
+                )}
+                {isOther && !isVendor && (
                   <div style={{ marginTop: 4 }}>
                     {o.courier_name && o.courier_tracking_id ? (
                       <button
@@ -3152,8 +4545,336 @@ function Orders({
               </div>
             );
 
+            const isSelected = selectedOrderIds.includes(o.id);
+            const selectCheckbox = (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (e.target.checked) {
+                    setSelectedOrderIds((prev) => [...prev, o.id]);
+                  } else {
+                    setSelectedOrderIds((prev) => prev.filter((id) => id !== o.id));
+                  }
+                }}
+                aria-label={`Select order ${o.reference}`}
+                style={{ cursor: "pointer", width: 16, height: 16 }}
+              />
+            );
+
+            if (isVendor) {
+              const vendorBooksCell = (
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <div style={{ whiteSpace: "nowrap" }} title={`${booksCount} book(s) ordered by student`}>
+                    <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
+                    <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
+                      {booksCount === 1 ? "book" : "books"}
+                    </span>
+                  </div>
+                  {o.status === "PROCESSING" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVendorPrint(o, !o.vendor_printed_at);
+                        }}
+                        disabled={printingBusyId === o.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          cursor: "pointer",
+                          background: o.vendor_printed_at ? "rgba(22, 163, 74, 0.15)" : "var(--muted)",
+                          color: o.vendor_printed_at ? "#15803d" : "var(--muted-foreground)",
+                          border: o.vendor_printed_at ? "1px solid #86efac" : "1px solid var(--border)",
+                          transition: "all 0.15s ease",
+                          width: "fit-content",
+                        }}
+                        title={o.vendor_printed_at ? "Click to unmark as printed" : "Click to mark as printed"}
+                      >
+                        {o.vendor_printed_at ? <RotateCcw size={11} /> : <CheckCircle2 size={11} color="currentColor" />}
+                        {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSetPrintingQueue(o, false);
+                        }}
+                        disabled={queueBusyId === o.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          fontSize: "0.70rem",
+                          fontWeight: 500,
+                          padding: "1px 5px",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          background: "none",
+                          color: "var(--muted-foreground)",
+                          border: "1px dashed var(--border)",
+                          width: "fit-content",
+                        }}
+                        title="Remove from Printing Queue (reverts to Confirmed)"
+                      >
+                        <XCircle size={10} />
+                        {queueBusyId === o.id ? "Reverting…" : "Remove from Queue"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+
+              return [
+                selectCheckbox,
+                refCell,
+                <div>
+                  <strong>{o.name}</strong>
+                  {isOther && o.phone && (
+                    <p style={{ margin: "2px 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                      {o.phone}
+                    </p>
+                  )}
+                </div>,
+                vendorBooksCell,
+                formatDateDMY(o.created_at),
+                <Status value={o.status} />,
+                isOther ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {o.courier_name && o.courier_tracking_id ? (
+                      <button
+                        type="button"
+                        className="courier-tracking-pill"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCourierOrder(o);
+                        }}
+                        title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit.`}
+                      >
+                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="courier-add-tracking-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCourierOrder(o);
+                        }}
+                        title="Add external courier tracking to dispatch parcel"
+                      >
+                        <Truck size={11} /> Ship via Courier
+                      </button>
+                    )}
+                    {o.status === "SHIPPED" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkDelivered(o);
+                        }}
+                        disabled={markingDeliveredId === o.id}
+                        className="btn compact"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "#059669",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                          width: "fit-content",
+                        }}
+                        title="Mark this parcel as Delivered to student"
+                      >
+                        <CheckCircle2 size={11} />
+                        {markingDeliveredId === o.id ? "Saving…" : "Mark Delivered"}
+                      </button>
+                    )}
+                    {o.status === "DELIVERED" && (
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          color: "#059669",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <CheckCircle2 size={11} /> Delivered ✓
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    {o.status === "PROCESSING" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDispatchOfficeOrder(o);
+                        }}
+                        className="btn compact"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          padding: "3px 10px",
+                          borderRadius: 9999,
+                          background: "#2563eb",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        title="Mark printed order as dispatched to Bookstore Office"
+                      >
+                        <Building2 size={12} /> Send to Office
+                      </button>
+                    ) : o.vendor_dispatched_at || ["SHIPPED", "DELIVERED"].includes(o.status) ? (
+                      <span
+                        className="map-pin-pill campus-badge"
+                        style={{
+                          fontSize: "0.75rem",
+                          padding: "3px 8px",
+                          background: "rgba(37, 99, 235, 0.12)",
+                          color: "#1d4ed8",
+                          borderColor: "#93c5fd",
+                        }}
+                        title="Batch dispatched to Bookstore Office"
+                      >
+                        <Building2 size={12} /> Sent to Office ✓
+                      </span>
+                    ) : (
+                      <span
+                        className="map-pin-pill campus-badge"
+                        style={{ fontSize: "0.75rem", padding: "3px 8px" }}
+                        title="Deliver this batch to Bookstore Administration Office"
+                      >
+                        <Building2 size={12} /> Deliver to Office
+                      </span>
+                    )}
+                  </div>
+                ),
+                <TableActionButton
+                  onClick={() => setActiveOrderId(o.id)}
+                  title={`View details for order ${o.reference || o.id}`}
+                  icon={<Eye size={13} strokeWidth={2.4} />}
+                  variant="order"
+                >
+                  View order
+                </TableActionButton>,
+              ];
+            }
+
+            const statusCell = (
+              <div>
+                <Status value={o.status} />
+                {o.status === "PROCESSING" && (
+                  <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleVendorPrint(o, !o.vendor_printed_at);
+                      }}
+                      disabled={printingBusyId === o.id}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 9999,
+                        cursor: "pointer",
+                        background: o.vendor_printed_at ? "rgba(22, 163, 74, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                        color: o.vendor_printed_at ? "#15803d" : "#b45309",
+                        border: o.vendor_printed_at ? "1px solid #86efac" : "1px solid #fde68a",
+                        width: "fit-content",
+                      }}
+                      title={o.vendor_printed_at ? "Unmark as printed (move back to Printing Queue)" : "Mark order as printed"}
+                    >
+                      {o.vendor_printed_at ? <RotateCcw size={11} /> : <CheckCircle2 size={11} />}
+                      {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetPrintingQueue(o, false);
+                      }}
+                      disabled={queueBusyId === o.id}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        fontSize: "0.70rem",
+                        fontWeight: 500,
+                        padding: "1px 5px",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        background: "none",
+                        color: "var(--muted-foreground)",
+                        border: "1px dashed var(--border)",
+                        width: "fit-content",
+                      }}
+                      title="Remove from Printing Queue (reverts order to Confirmed)"
+                    >
+                      <XCircle size={10} />
+                      {queueBusyId === o.id ? "Reverting…" : "Remove from Queue"}
+                    </button>
+                  </div>
+                )}
+                {o.status === "CONFIRMED" && canUpdate && (
+                  <div style={{ marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetPrintingQueue(o, true);
+                      }}
+                      disabled={queueBusyId === o.id}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 9999,
+                        cursor: "pointer",
+                        background: "rgba(245, 158, 11, 0.12)",
+                        color: "#b45309",
+                        border: "1px solid #fde68a",
+                        width: "fit-content",
+                      }}
+                      title="Move order into Printing Queue"
+                    >
+                      <Printer size={11} />
+                      {queueBusyId === o.id ? "Adding…" : "Add to Printing Queue"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+
             return isPendingView
               ? [
+                  selectCheckbox,
                   refCell,
                   <div>
                     {o.name}
@@ -3200,6 +4921,7 @@ function Orders({
                     : []),
                 ]
               : [
+                  selectCheckbox,
                   refCell,
                   <div>
                     {o.name}
@@ -3223,7 +4945,7 @@ function Orders({
                   booksCell,
                   formatDateDMY(o.created_at),
                   money(o.total),
-                  <Status value={o.status} />,
+                  statusCell,
                   <Status value={o.payment_status} />,
                   <TableActionButton
                     onClick={() => setActiveOrderId(o.id)}
@@ -3357,6 +5079,22 @@ function Orders({
           onSaved={reload}
         />
       )}
+
+      {assigningOrder && (
+        <AssignVendorModal
+          order={assigningOrder}
+          onClose={() => setAssigningOrder(null)}
+          onAssigned={reload}
+        />
+      )}
+
+      <Confirm
+        open={!!dispatchOfficeOrder}
+        onClose={() => setDispatchOfficeOrder(null)}
+        title={`Dispatch Order ${dispatchOfficeOrder?.reference || ""} to Bookstore Office?`}
+        description="Mark this Lahore / VU Qanchi Campus order as printed and handed over / dispatched to the Bookstore Office. The admin will be notified and can track receipt."
+        onConfirm={handleDispatchOffice}
+      />
     </>
   );
 }
@@ -3365,9 +5103,12 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
     [note, setNote] = useState(""),
     [next, setNext] = useState(""),
     [decision, setDecision] = useState<any>(null),
-    [courierModalOpen, setCourierModalOpen] = useState(false);
+    [courierModalOpen, setCourierModalOpen] = useState(false),
+    [assignVendorOpen, setAssignVendorOpen] = useState(false),
+    [busy, setBusy] = useState(false);
   const admin = user.role === "SUPER_ADMIN",
-    canUpdate = admin || user.permissions.includes("orders.update");
+    isVendor = user.role === "VENDOR",
+    canUpdate = admin || isVendor || user.permissions.includes("orders.update");
   const act = async (action: string, status?: string) => {
     try {
       await api("manage/orders/" + id, {
@@ -3452,7 +5193,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                     </p>
                   </div>
                 </div>
-                {canUpdate && (
+                {(canUpdate || isVendor) && (
                   <button
                     type="button"
                     className={isPaymentVerified || o.courier_tracking_id ? "btn primary compact" : "btn compact"}
@@ -3490,87 +5231,592 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             );
           })()}
 
-          <div className="checkout-grid">
-            <div className="print-only">
-              <OrderReceipt o={o} />
-            </div>
-            <div className="stack no-print">
-              <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
-                <div>
-                  <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
-                  <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or download PDF</p>
-                </div>
-                <ReceiptButtons order={o} />
-              </div>
-            </div>
-            <div className="stack no-print">
-              <div className="panel stack">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
-                  <h3 style={{ margin: 0 }}>Payment verification</h3>
-                  <Status value={o.payment_status} />
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Order total to receive:</span>
-                    <strong style={{ fontSize: "1.08rem", color: "var(--foreground)" }}>{money(o.total)}</strong>
+          {/* Vendor Assignment Banner / Action */}
+          {o && (() => {
+            if (o.vendor_name) {
+              return (
+                <div
+                  className="vendor-assigned-banner no-print"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 16px",
+                    borderRadius: 8,
+                    background: "color-mix(in srgb, var(--primary) 8%, var(--card))",
+                    border: "1px solid color-mix(in srgb, var(--primary) 25%, var(--border))",
+                    marginBottom: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        background: "var(--primary)",
+                        color: "var(--primary-foreground)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Factory size={18} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: "0.92rem", display: "block" }}>
+                        Assigned to Vendor: {o.vendor_name}
+                      </strong>
+                      <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                        {o.vendor_phone ? `WhatsApp: ${o.vendor_phone}` : ""}
+                        {o.vendor_notes ? ` · Instructions: "${o.vendor_notes}"` : ""}
+                      </p>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
-                    <strong style={{ fontSize: "0.9rem" }}>
-                      {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
-                      {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
-                    </strong>
-                  </div>
-                </div>
-
-                {o.payment_note && (
-                  <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
-                    <strong>Note:</strong> {o.payment_note}
-                  </div>
-                )}
-                {canUpdate && (
-                  <Field label="Reason or note">
-                    <textarea
-                      rows={3}
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="Explain rejection, request or status update"
-                    />
-                  </Field>
-                )}
-                {admin && o.status === "PAYMENT_PENDING" && (
-                  <div className="actions">
-                    {[
-                      ["approve", "Approve Payment"],
-                      ["reject", "Reject Payment"],
-                      ["request", "Request New Slip"],
-                      ["manual", "Manual Review"],
-                    ].map(([action, label]) => (
-                      <button
-                        key={action}
-                        className={
-                          "btn compact " +
-                          (action === "approve" ? "primary" : "")
-                        }
-                        onClick={() => setDecision({ action, label })}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {o.vendor_phone && (
+                      <a
+                        href={getVendorWhatsAppUrl(o, { name: o.vendor_name, phone: o.vendor_phone })}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn compact"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          background: "#25D366",
+                          borderColor: "#25D366",
+                          color: "#fff",
+                          fontWeight: 600,
+                          fontSize: "0.8rem",
+                        }}
+                        title="Open WhatsApp chat with vendor"
                       >
-                        {label}
+                        <MessageCircle size={14} /> WhatsApp Vendor
+                      </a>
+                    )}
+                    {admin && (
+                      <button
+                        type="button"
+                        className="btn compact"
+                        onClick={() => setAssignVendorOpen(true)}
+                        style={{ fontSize: "0.8rem" }}
+                      >
+                        Reassign
                       </button>
-                    ))}
+                    )}
                   </div>
-                )}
-                {admin && (
+                </div>
+              );
+            }
+
+            if (admin && ["CONFIRMED", "PROCESSING"].includes(o.status)) {
+              return (
+                <div
+                  className="no-print"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    background: "rgba(37, 99, 235, 0.06)",
+                    border: "1px dashed #3b82f6",
+                    marginBottom: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: "0.9rem", color: "#1d4ed8" }}>Ready for Printing Vendor</strong>
+                    <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                      Push this order directly to a printing vendor to start printing and notify them via WhatsApp/Email.
+                    </p>
+                  </div>
                   <button
-                    className="btn compact"
-                    disabled={!note.trim()}
-                    onClick={() => act("note")}
+                    type="button"
+                    className="btn primary compact"
+                    onClick={() => setAssignVendorOpen(true)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                   >
-                    Save private admin note
+                    <Send size={14} /> Send to Vendor
                   </button>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
+
+          {/* Printing Queue Management Card */}
+          {canUpdate && ["CONFIRMED", "PROCESSING"].includes(o.status) && (
+            <div
+              className="printing-queue-banner no-print"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                padding: "12px 16px",
+                borderRadius: 8,
+                background:
+                  o.status === "PROCESSING"
+                    ? o.vendor_printed_at
+                      ? "rgba(22, 163, 74, 0.08)"
+                      : "rgba(245, 158, 11, 0.08)"
+                    : "var(--muted)",
+                border:
+                  o.status === "PROCESSING"
+                    ? o.vendor_printed_at
+                      ? "1px solid #86efac"
+                      : "1px solid #fde68a"
+                    : "1px dashed var(--border)",
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    background:
+                      o.status === "PROCESSING"
+                        ? o.vendor_printed_at
+                          ? "#16a34a"
+                          : "#d97706"
+                        : "var(--primary)",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Printer size={18} />
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: "0.92rem" }}>Printing Queue Management</strong>
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        background:
+                          o.status === "PROCESSING"
+                            ? o.vendor_printed_at
+                              ? "rgba(22, 163, 74, 0.15)"
+                              : "rgba(245, 158, 11, 0.15)"
+                            : "var(--card)",
+                        color:
+                          o.status === "PROCESSING"
+                            ? o.vendor_printed_at
+                              ? "#15803d"
+                              : "#b45309"
+                            : "var(--muted-foreground)",
+                      }}
+                    >
+                      {o.status === "PROCESSING"
+                        ? o.vendor_printed_at
+                          ? "Printed / Ready"
+                          : "In Printing Queue"
+                        : "Order Confirmed"}
+                    </span>
+                  </div>
+                  <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                    {o.status === "CONFIRMED"
+                      ? "This order is confirmed and ready to be queued for printing."
+                      : o.vendor_printed_at
+                        ? `Marked as printed (${formatDateDMY(o.vendor_printed_at)}). Ready for dispatch or pickup.`
+                        : "Order is in the active printing queue waiting for printing."}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {o.status === "CONFIRMED" ? (
+                  <button
+                    type="button"
+                    className="btn primary compact"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: true });
+                        toast.success("Order added to Printing Queue ✓");
+                        window.dispatchEvent(new Event("orders-updated"));
+                        await reload();
+                      } catch (e) {
+                        toast.error(errorText(e));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    <Printer size={14} /> Add to Printing Queue
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await api(`manage/orders/${o.id}`, {
+                            action: "vendor_print",
+                            printed: !o.vendor_printed_at,
+                          });
+                          toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared (back in queue)");
+                          window.dispatchEvent(new Event("orders-updated"));
+                          await reload();
+                        } catch (e) {
+                          toast.error(errorText(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      {o.vendor_printed_at ? <RotateCcw size={13} /> : <CheckCircle2 size={14} />}
+                      {o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn compact"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: false });
+                          toast.success("Order removed from Printing Queue (reverted to Confirmed) ✓");
+                          window.dispatchEvent(new Event("orders-updated"));
+                          await reload();
+                        } catch (e) {
+                          toast.error(errorText(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--destructive)" }}
+                      title="Remove from Printing Queue and send back to Confirmed status"
+                    >
+                      <XCircle size={13} /> Remove from Queue
+                    </button>
+                  </>
                 )}
               </div>
-              {canUpdate && transitions[o.status]?.length > 0 && (
+            </div>
+          )}
+
+          <div className="checkout-grid">
+            {!isVendor && (
+              <>
+                <div className="print-only">
+                  <OrderReceipt o={o} />
+                </div>
+                <div className="stack no-print">
+                  <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
+                      <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or download PDF</p>
+                    </div>
+                    <ReceiptButtons order={o} />
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="stack no-print">
+              {isVendor ? (
+                <div className="panel stack">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h3 style={{ margin: 0 }}>Printing & Fulfillment Instructions</h3>
+                    <Status value={o.status} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                      <strong style={{ fontSize: "0.95rem" }}>
+                        {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                        {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                      </strong>
+                    </div>
+                    {o.vendor_notes && (
+                      <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
+                        <span style={{ color: "var(--muted-foreground)" }}>Special Notes: </span>
+                        <strong>{o.vendor_notes}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      background: "var(--muted)",
+                      margin: "2px 0 6px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2
+                        size={16}
+                        color={o.vendor_printed_at ? "#16a34a" : "var(--muted-foreground)"}
+                      />
+                      <span style={{ fontSize: "0.85rem" }}>Print Status:</span>
+                      <strong>{o.vendor_printed_at ? "Printed ✓" : "Pending Print"}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await api(`manage/orders/${o.id}`, {
+                            action: "vendor_print",
+                            printed: !o.vendor_printed_at,
+                          });
+                          toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared");
+                          await reload();
+                        } catch (e) {
+                          toast.error(errorText(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      {o.vendor_printed_at ? "Unmark" : "Mark as Printed"}
+                    </button>
+                  </div>
+
+                  {isOtherCityOrder(o) ? (
+                    o.status === "SHIPPED" ? (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 8,
+                          background: "rgba(16, 185, 129, 0.08)",
+                          border: "1px solid #10b981",
+                          fontSize: "0.85rem",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <strong style={{ color: "#047857" }}>🚚 Shipped via Courier:</strong>
+                        <p style={{ margin: "4px 0 8px" }}>
+                          Shipped via <strong>{o.courier_name}</strong> · Tracking ID: <code>{o.courier_tracking_id}</code>. Once the parcel is delivered to student, click below to mark as Delivered:
+                        </p>
+                        <button
+                          type="button"
+                          className="btn primary compact"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await api(`manage/orders/${o.id}`, {
+                                action: "status",
+                                status: "DELIVERED",
+                                version: o.version,
+                                note: "Marked as delivered by vendor",
+                              });
+                              toast.success("Order marked as Delivered ✓");
+                              window.dispatchEvent(new Event("orders-updated"));
+                              await reload();
+                            } catch (e) {
+                              toast.error(errorText(e));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          style={{ gap: 6, background: "#059669", borderColor: "#059669" }}
+                        >
+                          <CheckCircle2 size={14} /> Mark as Delivered
+                        </button>
+                      </div>
+                    ) : o.status === "DELIVERED" ? (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 8,
+                          background: "rgba(16, 185, 129, 0.08)",
+                          border: "1px solid #10b981",
+                          fontSize: "0.85rem",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <strong style={{ color: "#047857" }}>✅ Delivered to Student:</strong>
+                        <p style={{ margin: "4px 0 0" }}>
+                          Fulfillment complete. Delivered via {o.courier_name} (Tracking: {o.courier_tracking_id}).
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 8,
+                          background: "rgba(59, 130, 246, 0.08)",
+                          border: "1px solid #3b82f6",
+                          fontSize: "0.85rem",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <strong>🚚 Other City Delivery:</strong>
+                        <p style={{ margin: "4px 0 0" }}>
+                          Please print books and dispatch via courier. Once dispatched, click "Add Courier Details" or "Edit Tracking" above to attach tracking ID. Saving tracking will automatically mark order as <strong>Shipped</strong>.
+                        </p>
+                      </div>
+                    )
+                  ) : (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(245, 158, 11, 0.08)",
+                        border: "1px solid #f59e0b",
+                        fontSize: "0.85rem",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <strong>🏛️ Deliver to Bookstore Office:</strong>
+                      <p style={{ margin: "4px 0 8px" }}>
+                        This order is for Lahore / VU Qanchi Campus. Once books are printed, click below to mark this batch as dispatched to the Bookstore Office.
+                      </p>
+                      {o.status === "PROCESSING" ? (
+                        <button
+                          type="button"
+                          className="btn primary compact"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await api(`manage/orders/${o.id}`, {
+                                action: "vendor_dispatch_office",
+                              });
+                              toast.success("Order dispatched to Bookstore Office ✓");
+                              await reload();
+                            } catch (e) {
+                              toast.error(errorText(e));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          style={{ gap: 6, background: "#2563eb" }}
+                        >
+                          <Building2 size={14} /> Send to Bookstore Office
+                        </button>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                          <span
+                            className="mono-pill"
+                            style={{
+                              background: "rgba(37, 99, 235, 0.15)",
+                              color: "#1d4ed8",
+                              fontWeight: 600,
+                            }}
+                          >
+                            <Building2 size={12} /> Dispatched to Office
+                          </span>
+                          <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+                            Awaiting admin verification & delivery
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="panel stack">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                    <h3 style={{ margin: 0 }}>Payment verification</h3>
+                    <Status value={o.payment_status} />
+                  </div>
+
+                  {(o.vendor_printed_at || o.vendor_dispatched_at) && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                      {o.vendor_printed_at && (
+                        <span className="mono-pill" style={{ background: "rgba(22, 163, 74, 0.15)", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <CheckCircle2 size={13} /> Printed by Vendor ({formatDateDMY(o.vendor_printed_at)})
+                        </span>
+                      )}
+                      {o.vendor_dispatched_at && (
+                        <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.15)", color: "#1d4ed8", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <Building2 size={13} /> Dispatched by Vendor to Office ({formatDateDMY(o.vendor_dispatched_at)})
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Order total to receive:</span>
+                      <strong style={{ fontSize: "1.08rem", color: "var(--foreground)" }}>{money(o.total)}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                      <strong style={{ fontSize: "0.9rem" }}>
+                        {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
+                        {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {o.payment_note && (
+                    <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
+                      <strong>Note:</strong> {o.payment_note}
+                    </div>
+                  )}
+                  {canUpdate && (
+                    <Field label="Reason or note">
+                      <textarea
+                        rows={3}
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Explain rejection, request or status update"
+                      />
+                    </Field>
+                  )}
+                  {admin && o.status === "PAYMENT_PENDING" && (
+                    <div className="actions">
+                      {[
+                        ["approve", "Approve Payment"],
+                        ["reject", "Reject Payment"],
+                        ["request", "Request New Slip"],
+                        ["manual", "Manual Review"],
+                      ].map(([action, label]) => (
+                        <button
+                          key={action}
+                          className={
+                            "btn compact " +
+                            (action === "approve" ? "primary" : "")
+                          }
+                          onClick={() => setDecision({ action, label })}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {admin && (
+                    <button
+                      className="btn compact"
+                      disabled={!note.trim()}
+                      onClick={() => act("note")}
+                    >
+                      Save private admin note
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {!isVendor && canUpdate && transitions[o.status]?.length > 0 && (
                 <div className="panel stack">
                   <h3>Update fulfilment</h3>
                   <Choose
@@ -3679,6 +5925,14 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
               order={o}
               onClose={() => setCourierModalOpen(false)}
               onSaved={reload}
+            />
+          )}
+
+          {assignVendorOpen && (
+            <AssignVendorModal
+              order={o}
+              onClose={() => setAssignVendorOpen(false)}
+              onAssigned={reload}
             />
           )}
         </>
@@ -3898,6 +6152,369 @@ function Campuses() {
     </>
   );
 }
+
+function Vendors() {
+  const { data, error, loading, reload } = useData<any[]>("manage/vendors");
+  const [edit, setEdit] = useState<any>(null);
+  const [remove, setRemove] = useState<any>(null);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const vendors: any[] = Array.isArray(data) ? data : ((data as any)?.vendors || []);
+
+  const totalVendors = vendors.length;
+  const activeVendors = vendors.filter((v) => v.active).length;
+  const totalInPrinting = vendors.reduce(
+    (sum, v) => sum + (Number(v.printing_orders_count) || 0),
+    0,
+  );
+  const totalAssigned = vendors.reduce(
+    (sum, v) => sum + (Number(v.assigned_orders_count) || 0),
+    0,
+  );
+
+  const filtered = vendors.filter((v) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      (v.name || "").toLowerCase().includes(q) ||
+      (v.phone || "").toLowerCase().includes(q) ||
+      (v.email || "").toLowerCase().includes(q) ||
+      (v.address || "").toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <>
+      <div className="metrics" style={{ marginBottom: 16 }}>
+        <div className="metric metric-blue">
+          <div className="metric-heading">
+            <span>Total Vendors</span>
+            <span className="metric-icon">
+              <Factory size={19} />
+            </span>
+          </div>
+          <strong>{totalVendors}</strong>
+          <small>{activeVendors} active printing partners</small>
+        </div>
+
+        <div className="metric metric-amber">
+          <div className="metric-heading">
+            <span>Currently Printing</span>
+            <span className="metric-icon">
+              <Clock3 size={19} />
+            </span>
+          </div>
+          <strong>{totalInPrinting}</strong>
+          <small>Orders in active print batches</small>
+        </div>
+
+        <div className="metric metric-emerald">
+          <div className="metric-heading">
+            <span>Total Assigned</span>
+            <span className="metric-icon">
+              <Package size={19} />
+            </span>
+          </div>
+          <strong>{totalAssigned}</strong>
+          <small>Cumulative vendor orders</small>
+        </div>
+      </div>
+
+      <div className="toolbar" style={{ flexWrap: "wrap", gap: 8 }}>
+        <button
+          className="btn primary compact"
+          onClick={() =>
+            setEdit({
+              name: "",
+              phone: "",
+              email: "",
+              password: "",
+              address: "",
+              active: true,
+            })
+          }
+        >
+          <Plus size={16} />
+          Add Vendor Partner
+        </button>
+
+        <div className="search-wrap" style={{ flex: 1, minWidth: 220, maxWidth: 380 }}>
+          <Search size={15} className="search-icon" />
+          <input
+            type="search"
+            placeholder="Search vendor name, phone, email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-input"
+          />
+        </div>
+
+        <button
+          className="btn compact"
+          onClick={() => reload()}
+          disabled={loading}
+          title="Refresh vendor list"
+        >
+          <RefreshCw size={14} className={loading ? "refresh-spinning" : undefined} />
+          Refresh
+        </button>
+      </div>
+
+      <Result loading={loading} error={error}>
+        <DataTable
+          headers={[
+            "Vendor Partner",
+            "Contact & WhatsApp",
+            "Press / Address",
+            "Active Workload",
+            "Portal Access",
+            "Actions",
+          ]}
+          rows={filtered.map((v) => {
+            const waNumber = formatWhatsAppPhone(v.phone || "");
+            const waHref = waNumber ? `https://wa.me/${waNumber}` : null;
+            return [
+              <div key={`vendor-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <strong style={{ fontSize: "0.95rem" }}>{v.name}</strong>
+                <span className="mono small-text" style={{ color: "var(--muted-foreground)" }}>
+                  {v.email}
+                </span>
+              </div>,
+
+              <div key={`contact-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>{v.phone || "—"}</span>
+                {waHref && (
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn compact"
+                    style={{
+                      padding: "2px 6px",
+                      height: 24,
+                      fontSize: "0.75rem",
+                      gap: 4,
+                      color: "#16a34a",
+                      borderColor: "rgba(22, 163, 74, 0.3)",
+                      background: "rgba(22, 163, 74, 0.08)",
+                    }}
+                    title={`Open WhatsApp chat with ${v.name}`}
+                  >
+                    <MessageCircle size={12} />
+                    WhatsApp
+                  </a>
+                )}
+              </div>,
+
+              v.address || <span style={{ color: "var(--muted-foreground)" }}>—</span>,
+
+              <div key={`workload-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span
+                  className="mono-pill"
+                  style={{
+                    background: (v.printing_orders_count || 0) > 0 ? "rgba(245, 158, 11, 0.15)" : undefined,
+                    color: (v.printing_orders_count || 0) > 0 ? "#b45309" : undefined,
+                    fontWeight: 600,
+                  }}
+                >
+                  {v.printing_orders_count || 0} in printing
+                </span>
+                <span className="small-text" style={{ color: "var(--muted-foreground)" }}>
+                  ({v.assigned_orders_count || 0} total)
+                </span>
+              </div>,
+
+              <span
+                key={`status-${v.id}`}
+                className={v.active ? "badge-success" : "badge-muted"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  background: v.active ? "rgba(22, 163, 74, 0.12)" : "var(--muted)",
+                  color: v.active ? "#15803d" : "var(--muted-foreground)",
+                }}
+              >
+                {v.active ? "Active" : "Disabled"}
+              </span>,
+
+              <div className="row-actions" key={`act-${v.id}`}>
+                <button
+                  onClick={() =>
+                    setEdit({
+                      id: v.id,
+                      name: v.name,
+                      phone: v.phone,
+                      email: v.email,
+                      address: v.address || "",
+                      active: !!v.active,
+                      password: "",
+                    })
+                  }
+                >
+                  Edit
+                </button>
+                <a href={"/admin/orders?search=" + encodeURIComponent(v.name)}>
+                  Orders
+                </a>
+                <button
+                  className="btn-destructive-text"
+                  onClick={() => setRemove(v)}
+                >
+                  Delete
+                </button>
+              </div>,
+            ];
+          })}
+        />
+      </Result>
+
+      <Dialog open={!!edit} onOpenChange={(v) => !v && setEdit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {edit?.id ? "Edit Vendor Partner" : "Add Vendor Partner"}
+            </DialogTitle>
+            <DialogDescription>
+              {edit?.id
+                ? "Update vendor contact details or set a new password."
+                : "Create a new printing vendor partner with portal credentials."}
+            </DialogDescription>
+          </DialogHeader>
+          {edit && (
+            <form
+              className="stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                try {
+                  const payload: any = {
+                    name: edit.name,
+                    phone: edit.phone,
+                    address: edit.address || null,
+                  };
+                  if (!edit.id) {
+                    payload.email = edit.email;
+                    payload.password = edit.password;
+                  } else {
+                    payload.active = !!edit.active;
+                    if (edit.password?.trim()) {
+                      payload.password = edit.password.trim();
+                    }
+                  }
+                  await api(
+                    "manage/vendors" + (edit.id ? "/" + edit.id : ""),
+                    payload,
+                  );
+                  setEdit(null);
+                  toast.success(edit.id ? "Vendor updated." : "Vendor partner created.");
+                  await reload();
+                } catch (err) {
+                  toast.error(errorText(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Field label="Vendor / Press name">
+                <input
+                  required
+                  placeholder="e.g. Royal Print Solutions"
+                  value={edit.name}
+                  onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                />
+              </Field>
+
+              <Field
+                label="WhatsApp / Phone number"
+                hint="Used for 1-click WhatsApp order dispatch"
+              >
+                <input
+                  required
+                  placeholder="0300 1234567 or +923001234567"
+                  value={edit.phone}
+                  onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+                />
+              </Field>
+
+              <Field
+                label="Login email address"
+                hint={edit.id ? "Email cannot be changed after creation." : "Used by the vendor to sign in at /vendor/login"}
+              >
+                <input
+                  type="email"
+                  required
+                  disabled={!!edit.id}
+                  placeholder="vendor@example.com"
+                  value={edit.email}
+                  onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+                />
+              </Field>
+
+              <Field
+                label={edit.id ? "Change password (optional)" : "Portal login password"}
+                hint={edit.id ? "Leave blank to keep existing password." : "Minimum 6 characters"}
+              >
+                <input
+                  type="password"
+                  required={!edit.id}
+                  minLength={6}
+                  placeholder={edit.id ? "•••••••• (unchanged)" : "At least 6 characters"}
+                  value={edit.password}
+                  onChange={(e) => setEdit({ ...edit, password: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Press / Workshop address" hint="Physical location or city notes">
+                <input
+                  placeholder="e.g. Shop # 4, Urdu Bazaar, Lahore"
+                  value={edit.address}
+                  onChange={(e) => setEdit({ ...edit, address: e.target.value })}
+                />
+              </Field>
+
+              {edit.id && (
+                <div className="toggle-row">
+                  <span>Vendor portal access active</span>
+                  <Switch
+                    checked={edit.active}
+                    onCheckedChange={(v) => setEdit({ ...edit, active: v })}
+                  />
+                </div>
+              )}
+
+              <button className="btn primary" disabled={busy}>
+                {busy ? "Saving…" : edit.id ? "Save vendor" : "Create vendor partner"}
+              </button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Confirm
+        open={!!remove}
+        onClose={() => setRemove(null)}
+        title={`Delete ${remove?.name || "vendor"}?`}
+        description="Vendor portal account will be removed. Vendors linked to existing orders cannot be deleted and must be disabled instead."
+        onConfirm={async () => {
+          try {
+            await api("manage/vendors/" + remove.id, {}, "DELETE");
+            await reload();
+            toast.success("Vendor partner deleted.");
+          } catch (e) {
+            toast.error(errorText(e));
+          }
+        }}
+      />
+    </>
+  );
+}
+
 function UserAccounts() {
   const { data, error, loading, reload } = useData<any[]>("manage/users");
   const [campuses, setCampuses] = useState<any[]>([]),

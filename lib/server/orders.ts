@@ -321,7 +321,7 @@ export async function getOrder(
   if (digits.length >= 7) {
     const phoneWildcard = `%${digits.slice(-10)}%`;
     o = await one<any>(
-      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=? OR o.phone=? OR o.phone LIKE ? ORDER BY o.created_at DESC LIMIT 1",
+      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=? OR o.phone=? OR o.phone LIKE ? ORDER BY o.created_at DESC LIMIT 1",
       identifier.toLowerCase(),
       identifier.toUpperCase(),
       identifier,
@@ -329,7 +329,7 @@ export async function getOrder(
     );
   } else {
     o = await one<any>(
-      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
+      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
       identifier.toLowerCase(),
       identifier.toUpperCase(),
     );
@@ -340,7 +340,10 @@ export async function getOrder(
       "Order not found. Check your Order ID and try again.",
     );
   const staffAccess =
-    !!u && (u.role === "SUPER_ADMIN" || o.campus_id === u.campus_id);
+    !!u &&
+    (u.role === "SUPER_ADMIN" ||
+      (u.role === "CAMPUS_ADMIN" && o.campus_id === u.campus_id) ||
+      (u.role === "VENDOR" && o.vendor_id === (u.vendor_id || u.id)));
   if (u && !staffAccess && access === "private")
     throw new AppError(404, "Order not found.");
   let owned = false;
@@ -416,6 +419,7 @@ export async function listOrders(
   campusId = "",
   limit?: number | "all",
   deliveryType = "",
+  printed = "",
 ) {
   const s = scope(u);
   const filters = [s.sql];
@@ -440,6 +444,22 @@ export async function listOrders(
       const placeholders = statuses.map(() => "?").join(",");
       filters.push(`o.status IN (${placeholders})`);
       args.push(...statuses);
+    }
+  }
+  if (status === "PROCESSING") {
+    if (printed === "1" || printed === "printed") {
+      filters.push("o.vendor_printed_at IS NOT NULL");
+    } else if (printed === "all") {
+      // both printed and unprinted
+    } else if (printed === "0" || printed === "unprinted" || u.role === "VENDOR") {
+      // Default for In Printing queue: only unprinted orders!
+      filters.push("o.vendor_printed_at IS NULL");
+    }
+  } else if (printed) {
+    if (printed === "1" || printed === "printed") {
+      filters.push("o.vendor_printed_at IS NOT NULL");
+    } else if (printed === "0" || printed === "unprinted") {
+      filters.push("o.vendor_printed_at IS NULL");
     }
   }
   if (deliveryType && deliveryType !== "all") {
@@ -474,7 +494,7 @@ export async function listOrders(
   const limitClause = isAll ? "LIMIT 10000" : `LIMIT ${pageSize} OFFSET ?`;
   const queryArgs = isAll ? [...args] : [...args, (page - 1) * pageSize];
   const rows = await all(
-    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
+    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
     ...queryArgs,
   );
   rows.forEach((o) => {
@@ -483,7 +503,7 @@ export async function listOrders(
     delete o.quote_id;
     delete o.store_snapshot;
   });
-  if (isAll && rows.length > 0) {
+  if (rows.length > 0) {
     const orderIds = rows.map((r: any) => r.id);
     const allItems: any[] = [];
     for (let i = 0; i < orderIds.length; i += 100) {
@@ -551,6 +571,17 @@ export async function listOrders(
     allCount += r.cnt;
   });
   status_counts["ALL"] = allCount;
+
+  const unprintedRow = await one<{ cnt: number }>(
+    `SELECT COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} AND o.status='PROCESSING' AND o.vendor_printed_at IS NULL`,
+    ...tabArgs,
+  );
+  const printedRow = await one<{ cnt: number }>(
+    `SELECT COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} AND o.status='PROCESSING' AND o.vendor_printed_at IS NOT NULL`,
+    ...tabArgs,
+  );
+  status_counts["PROCESSING"] = unprintedRow?.cnt || 0;
+  status_counts["PRINTED"] = printedRow?.cnt || 0;
 
   return {
     rows,
@@ -762,6 +793,7 @@ export async function setCourierTracking(
   id: string,
   courierName: string,
   trackingId: string,
+  targetStatus?: string,
 ) {
   const o = await getOrder(req, id, u);
   const cName = courierName.trim();
@@ -782,6 +814,10 @@ export async function setCourierTracking(
     throw new AppError(400, "Courier tracking details are only for Other City orders.");
   }
 
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only update courier tracking for orders assigned to you.");
+  }
+
   const isPaymentVerified =
     o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING";
   if (!isPaymentVerified) {
@@ -792,8 +828,14 @@ export async function setCourierTracking(
   }
 
   const at = now();
-  const nextStatus = o.status === "DELIVERED" ? "DELIVERED" : "SHIPPED";
-  const note = `Shipped via ${cName} - Tracking #: ${tId}`;
+  const nextStatus =
+    targetStatus === "DELIVERED" || o.status === "DELIVERED"
+      ? "DELIVERED"
+      : "SHIPPED";
+  const note =
+    nextStatus === "DELIVERED"
+      ? `Delivered via ${cName} - Tracking #: ${tId}`
+      : `Shipped via ${cName} - Tracking #: ${tId}`;
 
   const statements = [
     stmt(
@@ -832,6 +874,9 @@ export async function removeCourierTracking(
   id: string,
 ) {
   const o = await getOrder(req, id, u);
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only remove courier tracking for orders assigned to you.");
+  }
   const at = now();
   const nextStatus = o.status === "SHIPPED" ? "PROCESSING" : o.status;
   const note = "Courier tracking details removed (order returned to Printing)";
@@ -867,6 +912,334 @@ export async function removeCourierTracking(
   ];
   await batch(statements);
   return { ok: true, removed: true, status: nextStatus };
+}
+
+export async function vendorPrint(
+  req: Request,
+  u: User,
+  id: string,
+  printed = true,
+) {
+  const o = await getOrder(req, id, u);
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only update print status for your assigned orders.");
+  }
+  const isPrinted = printed !== false;
+  const printTime = isPrinted ? now() : null;
+  await batch([
+    stmt("UPDATE orders SET vendor_printed_at=?, version=version+1 WHERE id=?", printTime, o.id),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      o.status,
+      isPrinted ? "Marked books as printed by vendor" : "Unmarked printed status",
+      u.email,
+      now(),
+    ),
+    auditStmt(
+      u.email,
+      "VENDOR_PRINT_MARK",
+      o.id,
+      { vendor_printed_at: o.vendor_printed_at },
+      { vendor_printed_at: printTime },
+      req,
+    ),
+  ]);
+  return { ok: true, vendor_printed_at: printTime };
+}
+
+export async function vendorDispatchOffice(
+  req: Request,
+  u: User,
+  id: string,
+  note = "",
+) {
+  const o = await getOrder(req, id, u);
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only dispatch your assigned orders.");
+  }
+  if (isOtherCityOrder(o)) {
+    throw new AppError(400, "Other city orders must be dispatched via courier with tracking.");
+  }
+  const at = now();
+  await batch([
+    stmt(
+      "UPDATE orders SET status='SHIPPED', vendor_dispatched_at=?, updated_at=?, version=version+1 WHERE id=?",
+      at,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      "SHIPPED",
+      note?.trim()
+        ? `Dispatched by vendor to Bookstore Office: ${note.trim()}`
+        : "Dispatched by vendor to Bookstore Office",
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "VENDOR_DISPATCH_OFFICE",
+      o.id,
+      { status: o.status, vendor_dispatched_at: o.vendor_dispatched_at },
+      { status: "SHIPPED", vendor_dispatched_at: at },
+      req,
+    ),
+  ]);
+  return { ok: true, status: "SHIPPED", vendor_dispatched_at: at };
+}
+
+export async function batchVendorPrint(
+  req: Request,
+  u: User,
+  orderIds: string[],
+  printed = true,
+) {
+  if (!orderIds || !orderIds.length) {
+    throw new AppError(400, "Please select at least one order.");
+  }
+  const isPrinted = printed !== false;
+  const printTime = isPrinted ? now() : null;
+  const s = scope(u);
+  const placeholders = orderIds.map(() => "?").join(",");
+  const ordersToUpdate = await all<any>(
+    `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+    ...orderIds,
+    ...s.args,
+  );
+  if (!ordersToUpdate.length) {
+    throw new AppError(404, "No eligible orders found.");
+  }
+  const statements: any[] = [];
+  for (const o of ordersToUpdate) {
+    if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+      continue;
+    }
+    statements.push(
+      stmt("UPDATE orders SET vendor_printed_at=?, version=version+1 WHERE id=?", printTime, o.id),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        o.id,
+        o.status,
+        isPrinted ? "Marked books as printed by vendor (batch)" : "Unmarked printed status (batch)",
+        u.email,
+        now(),
+      ),
+      auditStmt(u.email, "VENDOR_PRINT_MARK", o.id, { vendor_printed_at: o.vendor_printed_at }, { vendor_printed_at: printTime }, req),
+    );
+  }
+  if (statements.length > 0) {
+    await batch(statements);
+  }
+  return { ok: true, count: ordersToUpdate.length, vendor_printed_at: printTime };
+}
+
+export async function batchVendorDispatchOffice(
+  req: Request,
+  u: User,
+  orderIds: string[],
+  note = "",
+) {
+  if (!orderIds || !orderIds.length) {
+    throw new AppError(400, "Please select at least one order.");
+  }
+  const s = scope(u);
+  const placeholders = orderIds.map(() => "?").join(",");
+  const ordersToUpdate = await all<any>(
+    `SELECT o.id, o.status, o.vendor_id, o.vendor_dispatched_at, o.delivery_type, o.city, o.address FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+    ...orderIds,
+    ...s.args,
+  );
+  if (!ordersToUpdate.length) {
+    throw new AppError(404, "No eligible orders found.");
+  }
+  const eligible = ordersToUpdate.filter((o) => {
+    if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) return false;
+    if (isOtherCityOrder(o)) return false;
+    return o.status === "PROCESSING";
+  });
+  if (!eligible.length) {
+    throw new AppError(400, "None of the selected orders are eligible for office dispatch (must be Lahore / Campus in Printing).");
+  }
+  const at = now();
+  const statements: any[] = [];
+  for (const o of eligible) {
+    statements.push(
+      stmt(
+        "UPDATE orders SET status='SHIPPED', vendor_dispatched_at=?, updated_at=?, version=version+1 WHERE id=?",
+        at,
+        at,
+        o.id,
+      ),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        o.id,
+        "SHIPPED",
+        note?.trim()
+          ? `Dispatched by vendor to Bookstore Office (batch): ${note.trim()}`
+          : "Dispatched by vendor to Bookstore Office (batch)",
+        u.email,
+        at,
+      ),
+      auditStmt(
+        u.email,
+        "VENDOR_DISPATCH_OFFICE",
+        o.id,
+        { status: o.status, vendor_dispatched_at: o.vendor_dispatched_at },
+        { status: "SHIPPED", vendor_dispatched_at: at, destination: "Bookstore Office" },
+        req,
+      ),
+    );
+  }
+  await batch(statements);
+  return { ok: true, count: eligible.length, status: "SHIPPED", vendor_dispatched_at: at };
+}
+
+export async function setPrintingQueue(
+  req: Request,
+  u: User,
+  id: string,
+  inQueue: boolean,
+) {
+  const o = await getOrder(req, id, u);
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only update the printing queue for your assigned orders.");
+  }
+  const at = now();
+  if (inQueue) {
+    if (!["CONFIRMED", "PROCESSING"].includes(o.status)) {
+      throw new AppError(400, "Only confirmed orders can be added to the Printing Queue.");
+    }
+    if (o.status === "PROCESSING" && !o.vendor_printed_at) {
+      return { ok: true, status: "PROCESSING", in_queue: true, vendor_printed_at: null };
+    }
+    await batch([
+      stmt(
+        "UPDATE orders SET status='PROCESSING', vendor_printed_at=NULL, updated_at=?, version=version+1 WHERE id=?",
+        at,
+        o.id,
+      ),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        o.id,
+        "PROCESSING",
+        "Added to Printing Queue.",
+        u.email,
+        at,
+      ),
+      auditStmt(u.email, "ORDER_PRINT_QUEUE_ADD", o.id, { status: o.status }, { status: "PROCESSING" }, req),
+    ]);
+    return { ok: true, status: "PROCESSING", in_queue: true, vendor_printed_at: null };
+  } else {
+    // Remove from Printing Queue -> Reverts to CONFIRMED
+    if (o.status !== "PROCESSING") {
+      throw new AppError(400, "Only orders currently in printing can be removed from the Printing Queue.");
+    }
+    await batch([
+      stmt(
+        "UPDATE orders SET status='CONFIRMED', vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?",
+        at,
+        o.id,
+      ),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        o.id,
+        "CONFIRMED",
+        "Removed from Printing Queue. Reverted to Confirmed status.",
+        u.email,
+        at,
+      ),
+      auditStmt(u.email, "ORDER_PRINT_QUEUE_REMOVE", o.id, { status: o.status }, { status: "CONFIRMED" }, req),
+    ]);
+    return { ok: true, status: "CONFIRMED", in_queue: false, vendor_printed_at: null };
+  }
+}
+
+export async function batchSetPrintingQueue(
+  req: Request,
+  u: User,
+  orderIds: string[],
+  inQueue: boolean,
+) {
+  if (!orderIds || !orderIds.length) {
+    throw new AppError(400, "Please select at least one order.");
+  }
+  const s = scope(u);
+  const placeholders = orderIds.map(() => "?").join(",");
+  const orders = await all<any>(
+    `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+    ...orderIds,
+    ...s.args,
+  );
+  if (!orders.length) {
+    throw new AppError(404, "No eligible orders found.");
+  }
+  const targetStatus = inQueue ? "PROCESSING" : "CONFIRMED";
+  const eligible = orders.filter((o) => {
+    if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) return false;
+    if (inQueue) {
+      return ["CONFIRMED", "PROCESSING"].includes(o.status);
+    } else {
+      return o.status === "PROCESSING";
+    }
+  });
+  if (!eligible.length) {
+    throw new AppError(
+      400,
+      inQueue
+        ? "None of the selected orders can be added to the Printing Queue."
+        : "None of the selected orders can be removed from the Printing Queue.",
+    );
+  }
+  const at = now();
+  const statements: any[] = [];
+  for (const o of eligible) {
+    statements.push(
+      stmt(
+        "UPDATE orders SET status=?, vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?",
+        targetStatus,
+        at,
+        o.id,
+      ),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        o.id,
+        targetStatus,
+        inQueue
+          ? "Added to Printing Queue (batch)."
+          : "Removed from Printing Queue. Reverted to Confirmed status (batch).",
+        u.email,
+        at,
+      ),
+      auditStmt(
+        u.email,
+        inQueue ? "BATCH_PRINT_QUEUE_ADD" : "BATCH_PRINT_QUEUE_REMOVE",
+        o.id,
+        { status: o.status },
+        { status: targetStatus },
+        req,
+      ),
+    );
+  }
+  await batch(statements);
+  return {
+    ok: true,
+    count: eligible.length,
+    status: targetStatus,
+    in_queue: inQueue,
+    message: inQueue
+      ? `Added ${eligible.length} order(s) to the Printing Queue.`
+      : `Removed ${eligible.length} order(s) from the Printing Queue (reverted to Confirmed).`,
+  };
 }
 
 export async function batchChangeStatus(

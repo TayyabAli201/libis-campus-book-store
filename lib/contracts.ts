@@ -131,6 +131,38 @@ export function getWhatsAppUrl(o: any): string {
   const message = getOrderWhatsAppMessage(o);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
+
+export function getVendorWhatsAppMessage(o: any, v?: any): string {
+  const vendorName = (v?.name || "Vendor").trim();
+  const ref = o?.reference || "Order";
+  const isOther = isOtherCityOrder(o);
+  const destination = isOther
+    ? `Other City (Courier to Student):\nRecipient: ${o?.name || "Student"}\nPhone: ${o?.phone || ""}\nAddress: ${o?.address || ""}, ${o?.city || ""}`
+    : `Lahore / Campus (Deliver batch to Bookstore Office)`;
+
+  let itemsStr = "";
+  if (Array.isArray(o?.items) && o.items.length > 0) {
+    itemsStr =
+      "Books to Print:\n" +
+      o.items
+        .map(
+          (it: any, idx: number) =>
+            `${idx + 1}. ${it.code || it.course_code || ""} - ${it.title} (Qty: ${it.quantity}${it.pages ? `, ${it.pages} pgs` : ""})`,
+        )
+        .join("\n") +
+      "\n\n";
+  }
+
+  const notesStr = o?.vendor_notes ? `Admin Instructions: ${o.vendor_notes}\n\n` : "";
+
+  return `Salam ${vendorName}, new printing order assigned:\n\nOrder Ref: ${ref}\nTotal Books: ${o?.total_books || o?.items?.length || 1}\n\n${itemsStr}${notesStr}${destination}\n\nPlease check your vendor portal to print and update status.\nThank you!`;
+}
+
+export function getVendorWhatsAppUrl(o: any, v: any): string {
+  const phone = formatWhatsAppPhone(v?.phone || "");
+  const message = getVendorWhatsAppMessage(o, v);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
 export const permissions = [
   "orders.read",
   "orders.update",
@@ -141,7 +173,7 @@ export const permissions = [
 export const transitions: Record<string, string[]> = {
   PAYMENT_PENDING: ["CANCELLED"],
   CONFIRMED: ["PROCESSING", "CANCELLED", "REFUND_REQUESTED"],
-  PROCESSING: ["SHIPPED", "CANCELLED", "REFUND_REQUESTED"],
+  PROCESSING: ["CONFIRMED", "SHIPPED", "CANCELLED", "REFUND_REQUESTED"],
   READY: ["PROCESSING", "SHIPPED", "CANCELLED", "REFUND_REQUESTED"],
   SHIPPED: ["DELIVERED", "PROCESSING", "REFUND_REQUESTED"],
   DELIVERED: ["REFUND_REQUESTED"],
@@ -274,12 +306,27 @@ export type User = {
   id: string;
   email: string;
   name: string;
-  role: "SUPER_ADMIN" | "CAMPUS_ADMIN" | "STUDENT";
+  role: "SUPER_ADMIN" | "CAMPUS_ADMIN" | "STUDENT" | "VENDOR";
   campus_id: string | null;
   campus_category?: string | null;
   must_change: number;
   permissions: string[];
+  vendor_id?: string | null;
+  vendor_name?: string | null;
+  vendor_phone?: string | null;
 };
+export interface Vendor {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address?: string | null;
+  active: boolean;
+  created_at: string;
+  assigned_orders_count?: number;
+  printing_orders_count?: number;
+}
 export type Quote = {
   id: string;
   items: (Book & { quantity: number })[];

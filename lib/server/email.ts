@@ -76,3 +76,93 @@ export async function sendPasswordResetEmail({
   console.log(`[PASSWORD RESET EMAIL DISPATCHED]\nTo: ${to}\nSubject: ${subject}\nVerification Code: ${code}\nReset Link: ${resetLink}\n`);
   return { success: true };
 }
+
+interface SendVendorOrderEmailParams {
+  vendor: { name: string; email: string };
+  order: any;
+  items: any[];
+  origin?: string;
+}
+
+export async function sendVendorOrderAssignedEmail({
+  vendor,
+  order,
+  items,
+  origin,
+}: SendVendorOrderEmailParams) {
+  const portalLink = `${origin || "http://127.0.0.1:5173"}/vendor/login`;
+  const subject = `[New Print Order] Reference: ${order.reference} - Campus Bookstore`;
+
+  const booksRows = (items || [])
+    .map(
+      (it: any, idx: number) =>
+        `<tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${idx + 1}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${it.code || it.course_code || ""}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${it.title}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">${it.pages || "—"}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${it.quantity}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const text = `Salam ${vendor.name},\n\nA new printing order (${order.reference}) has been assigned to you.\n\nTotal Books: ${order.total_books || items?.length || 1}\nDelivery Type: ${order.delivery_type}\n\nPlease login to your Vendor Portal to view complete details:\n${portalLink}\n\nCampus Bookstore`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+    <div style="background: #1e40af; color: #ffffff; padding: 20px 24px;">
+      <h2 style="margin: 0; font-size: 18px;">Campus Bookstore — Printing Order</h2>
+      <span style="font-size: 12px; opacity: 0.9;">Order Ref: ${order.reference}</span>
+    </div>
+    <div style="padding: 24px;">
+      <p style="margin-top: 0;">Salam <strong>${vendor.name}</strong>,</p>
+      <p>A new printing job has been assigned to you in the system:</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
+        <thead>
+          <tr style="background: #f1f5f9; text-align: left;">
+            <th style="padding: 8px 12px;">#</th>
+            <th style="padding: 8px 12px;">Code</th>
+            <th style="padding: 8px 12px;">Book Title</th>
+            <th style="padding: 8px 12px; text-align: center;">Pages</th>
+            <th style="padding: 8px 12px; text-align: center;">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${booksRows}
+        </tbody>
+      </table>
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalLink}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">Open Vendor Portal &rarr;</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    try {
+      const from = process.env.EMAIL_FROM || "Campus Bookstore <onboarding@resend.dev>";
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ from, to: [vendor.email], subject, html, text }),
+      });
+      if (res.ok) {
+        return { success: true };
+      }
+    } catch (e: any) {
+      console.error("Failed to send vendor email via Resend:", e.message);
+    }
+  }
+
+  console.log(`[VENDOR ORDER EMAIL LOGGED]\nTo: ${vendor.email}\nSubject: ${subject}\nPortal: ${portalLink}`);
+  return { success: true };
+}
+

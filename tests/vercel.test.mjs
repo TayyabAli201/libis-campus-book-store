@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createClient } from "@libsql/client";
 import { LibsqlDatabase } from "../lib/server/libsql-database.ts";
 import { createVercelBucket } from "../lib/server/vercel-bucket.ts";
-import { migrateTurso } from "../scripts/turso-migrations.mjs";
+import { migrateTurso, migrations } from "../scripts/turso-migrations.mjs";
 
 test("Turso schema migrations are repeatable and preserve existing catalog rows", async (t) => {
   const client = createClient({ url: ":memory:" });
@@ -21,7 +21,7 @@ test("Turso schema migrations are repeatable and preserve existing catalog rows"
     await db
       .prepare("SELECT COUNT(*) n FROM __bookstore_migrations")
       .first("n"),
-    8,
+    migrations.length,
   );
   assert.equal(
     (await db.prepare("SELECT * FROM books WHERE id=?").bind("book").first())

@@ -10,6 +10,7 @@ export const migrations = [
   "0005_password_resets.sql",
   "0006_binding_rate.sql",
   "0007_courier_tracking.sql",
+  "0008_vendor_management.sql",
 ];
 export async function migrateTurso(client, log = console.log) {
   await client.execute(
