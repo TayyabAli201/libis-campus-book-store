@@ -66,7 +66,7 @@ export function Providers({ children }: { children: ReactNode }) {
     });
   };
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <Context.Provider value={{ cart, setCart, add, user, ready }}>
         {children}
         <Toaster richColors position="top-center" duration={2500} />
