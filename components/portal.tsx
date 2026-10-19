@@ -3860,6 +3860,134 @@ const VENDOR_WORKFLOW_TABS: WorkflowTab[] = [
   { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
 ];
 
+const VENDOR_STAGES_CONFIG: {
+  id: string;
+  label: string;
+  title: string;
+  icon: LucideIcon;
+  iconSize: number;
+  subtext: (count: number) => string;
+  theme: {
+    activeBorder: string;
+    activeBg: string;
+    activeText: string;
+    activeIconBg: string;
+    activeIconColor: string;
+    indicator: string;
+    idleBorder: string;
+    idleBg: string;
+    idleText: string;
+    idleIconBg: string;
+    idleIconColor: string;
+  };
+}[] = [
+  {
+    id: "PROCESSING",
+    label: "Printing (Pending)",
+    title: "Orders Currently In Printing Queue (Urgent Action Required)",
+    icon: Printer,
+    iconSize: 24,
+    subtext: (c) => (c === 0 ? "Queue clear" : "Action needed (Print now)"),
+    theme: {
+      activeBorder: "#ef4444",
+      activeBg: "linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.04) 100%)",
+      activeText: "#dc2626",
+      activeIconBg: "#dc2626",
+      activeIconColor: "#ffffff",
+      indicator: "#ef4444",
+      idleBorder: "rgba(239, 68, 68, 0.35)",
+      idleBg: "rgba(254, 242, 242, 0.65)",
+      idleText: "#b91c1c",
+      idleIconBg: "rgba(239, 68, 68, 0.14)",
+      idleIconColor: "#dc2626",
+    },
+  },
+  {
+    id: "PRINTED",
+    label: "Printed / Ready",
+    title: "Orders Printed & Ready for Dispatch",
+    icon: CheckCircle2,
+    iconSize: 22,
+    subtext: (c) => (c === 0 ? "None ready" : "Ready for dispatch"),
+    theme: {
+      activeBorder: "#10b981",
+      activeBg: "linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(16, 185, 129, 0.04) 100%)",
+      activeText: "#059669",
+      activeIconBg: "#10b981",
+      activeIconColor: "#ffffff",
+      indicator: "#10b981",
+      idleBorder: "rgba(16, 185, 129, 0.3)",
+      idleBg: "rgba(240, 253, 244, 0.6)",
+      idleText: "#047857",
+      idleIconBg: "rgba(16, 185, 129, 0.14)",
+      idleIconColor: "#059669",
+    },
+  },
+  {
+    id: "SHIPPED",
+    label: "Shipped",
+    title: "Orders Shipped / Handed Over",
+    icon: Truck,
+    iconSize: 22,
+    subtext: (c) => (c === 0 ? "None in transit" : "In transit to student"),
+    theme: {
+      activeBorder: "#3b82f6",
+      activeBg: "linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, rgba(59, 130, 246, 0.04) 100%)",
+      activeText: "#2563eb",
+      activeIconBg: "#2563eb",
+      activeIconColor: "#ffffff",
+      indicator: "#3b82f6",
+      idleBorder: "rgba(59, 130, 246, 0.25)",
+      idleBg: "rgba(239, 246, 255, 0.55)",
+      idleText: "#1d4ed8",
+      idleIconBg: "rgba(37, 99, 235, 0.12)",
+      idleIconColor: "#2563eb",
+    },
+  },
+  {
+    id: "DELIVERED",
+    label: "Delivered",
+    title: "Delivered & Completed Orders",
+    icon: Package,
+    iconSize: 22,
+    subtext: (c) => (c === 0 ? "No completions yet" : "Successfully delivered"),
+    theme: {
+      activeBorder: "#8b5cf6",
+      activeBg: "linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(139, 92, 246, 0.04) 100%)",
+      activeText: "#7c3aed",
+      activeIconBg: "#7c3aed",
+      activeIconColor: "#ffffff",
+      indicator: "#8b5cf6",
+      idleBorder: "rgba(139, 92, 246, 0.25)",
+      idleBg: "rgba(250, 245, 255, 0.55)",
+      idleText: "#6d28d9",
+      idleIconBg: "rgba(124, 58, 237, 0.12)",
+      idleIconColor: "#7c3aed",
+    },
+  },
+  {
+    id: "ALL",
+    label: "All Orders",
+    title: "All Assigned Orders",
+    icon: ShoppingBag,
+    iconSize: 22,
+    subtext: (c) => (c === 0 ? "Total volume" : "Total assigned orders"),
+    theme: {
+      activeBorder: "#64748b",
+      activeBg: "linear-gradient(135deg, rgba(100, 116, 139, 0.14) 0%, rgba(100, 116, 139, 0.04) 100%)",
+      activeText: "var(--foreground)",
+      activeIconBg: "#475569",
+      activeIconColor: "#ffffff",
+      indicator: "#64748b",
+      idleBorder: "var(--border)",
+      idleBg: "var(--card)",
+      idleText: "var(--muted-foreground)",
+      idleIconBg: "rgba(100, 116, 139, 0.12)",
+      idleIconColor: "#64748b",
+    },
+  },
+];
+
 const VENDOR_DELIVERY_CHIPS = [
   { id: "all", label: "All Orders", icon: "🌐" },
   { id: "other", label: "Other Cities (Courier Dispatch)", icon: "📦" },
@@ -4468,13 +4596,13 @@ function Orders({
           className="notice dashboard-notice vendor-printing-notice"
           style={{
             marginBottom: 16,
-            background: "rgba(245, 158, 11, 0.1)",
-            border: "1px solid rgba(245, 158, 11, 0.35)",
-            borderRadius: 10,
-            padding: "12px 16px",
+            background: "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.02) 100%)",
+            border: "1.5px solid rgba(239, 68, 68, 0.35)",
+            borderRadius: 12,
+            padding: "13px 18px",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 14,
           }}
         >
           <span
@@ -4483,73 +4611,248 @@ function Orders({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
               borderRadius: "50%",
-              background: "rgba(245, 158, 11, 0.2)",
-              color: "#d97706",
+              background: "rgba(239, 68, 68, 0.15)",
+              color: "#dc2626",
               flexShrink: 0,
             }}
           >
-            <Bell size={18} />
+            <Printer size={20} />
           </span>
           <div style={{ flex: 1 }}>
-            <strong style={{ fontSize: "0.95rem", color: "var(--foreground)" }}>
-              {data.status_counts["PROCESSING"]}{" "}
-              {data.status_counts["PROCESSING"] === 1 ? "Order" : "Orders"} currently in your Printing Queue!
-            </strong>
-            <p style={{ margin: "2px 0 0", fontSize: "0.83rem", color: "var(--muted-foreground)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="vendor-urgent-dot" />
+              <strong style={{ fontSize: "0.96rem", color: "#b91c1c", fontWeight: 700 }}>
+                {data.status_counts["PROCESSING"]}{" "}
+                {data.status_counts["PROCESSING"] === 1 ? "Order" : "Orders"} waiting in your Printing Queue!
+              </strong>
+            </div>
+            <p style={{ margin: "3px 0 0", fontSize: "0.83rem", color: "var(--muted-foreground)" }}>
               Print the books for these orders. Mark them as "Printed" when ready, then dispatch Other City orders via courier or send Lahore/Campus batches to the Bookstore Office.
             </p>
           </div>
         </div>
       )}
 
-      <div className="orders-workflow-tabs-container" role="tablist" aria-label="Order Workflow Stages">
-        {(isVendor ? VENDOR_WORKFLOW_TABS : ORDER_WORKFLOW_TABS).map((tab) => {
-          const active = isTabActive(tab);
-          const count = getTabCount(tab);
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              title={tab.title || tab.label}
-              className={`orders-workflow-tab tab-${tab.color} ${active ? "active" : ""}`}
-              onClick={() => {
-                setPage(1);
-                setActiveTab(tab.id);
-                if (tab.id === "PROCESSING") {
-                  setStatusList(["PROCESSING"]);
-                  setPrintedFilter("0");
-                } else if (tab.id === "PRINTED") {
-                  setStatusList(["PROCESSING"]);
-                  setPrintedFilter("1");
-                } else if (tab.id === "ALL") {
-                  setStatusList([]);
-                  setPrintedFilter("");
-                } else {
-                  setStatusList([...tab.statuses]);
-                  setPrintedFilter("");
-                }
-              }}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-              {count !== undefined && (
-                <span
-                  className={`orders-tab-badge ${
-                    tab.urgent && !active && count > 0 ? "urgent" : ""
-                  }`}
+      {isVendor ? (
+        <div className="vendor-workflow-cards-grid" role="tablist" aria-label="Vendor Order Stages">
+          {VENDOR_STAGES_CONFIG.map((stage) => {
+            const active = activeTab === stage.id;
+            const count =
+              getTabCount({
+                id: stage.id,
+                statuses:
+                  stage.id === "PROCESSING" || stage.id === "PRINTED"
+                    ? ["PROCESSING"]
+                    : stage.id === "ALL"
+                      ? []
+                      : [stage.id],
+              } as any) ?? 0;
+            const StageIcon = stage.icon;
+            const isProcessingUrgent = stage.id === "PROCESSING" && count > 0;
+
+            const cardBorder = active
+              ? `2px solid ${stage.theme.activeBorder}`
+              : `1.5px solid ${stage.theme.idleBorder}`;
+
+            const cardBg = active
+              ? stage.theme.activeBg
+              : stage.theme.idleBg;
+
+            const iconBg = active
+              ? stage.theme.activeIconBg
+              : stage.theme.idleIconBg;
+
+            const iconColor = active
+              ? stage.theme.activeIconColor
+              : stage.theme.idleIconColor;
+
+            const textColor = active
+              ? stage.theme.activeText
+              : isProcessingUrgent
+                ? stage.theme.idleText
+                : stage.id === "PRINTED"
+                  ? stage.theme.idleText
+                  : stage.id === "SHIPPED"
+                    ? stage.theme.idleText
+                    : stage.id === "DELIVERED"
+                      ? stage.theme.idleText
+                      : "var(--foreground)";
+
+            return (
+              <button
+                key={stage.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                title={stage.title}
+                className={`vendor-stage-card ${active ? "active" : ""}`}
+                style={{
+                  border: cardBorder,
+                  background: cardBg,
+                }}
+                onClick={() => {
+                  setPage(1);
+                  setActiveTab(stage.id);
+                  if (stage.id === "PROCESSING") {
+                    setStatusList(["PROCESSING"]);
+                    setPrintedFilter("0");
+                  } else if (stage.id === "PRINTED") {
+                    setStatusList(["PROCESSING"]);
+                    setPrintedFilter("1");
+                  } else if (stage.id === "ALL") {
+                    setStatusList([]);
+                    setPrintedFilter("");
+                  } else {
+                    setStatusList([stage.id]);
+                    setPrintedFilter("");
+                  }
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    width: "100%",
+                  }}
                 >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    {isProcessingUrgent && <span className="vendor-urgent-dot" title="Action required: pending printing" />}
+                    <span
+                      style={{
+                        fontSize: "0.86rem",
+                        fontWeight: 700,
+                        color: textColor,
+                        letterSpacing: "0.2px",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {stage.label}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: iconBg,
+                      color: iconColor,
+                      flexShrink: 0,
+                      boxShadow: active ? "0 2px 8px rgba(0,0,0,0.12)" : undefined,
+                      transition: "all 0.18s ease",
+                    }}
+                  >
+                    <StageIcon size={stage.iconSize || 22} />
+                  </span>
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <strong
+                      style={{
+                        fontSize: "1.9rem",
+                        fontWeight: 800,
+                        lineHeight: 1.1,
+                        color: textColor,
+                      }}
+                    >
+                      {count}
+                    </strong>
+                    <span
+                      style={{
+                        fontSize: "0.76rem",
+                        color: "var(--muted-foreground)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {count === 1 ? "order" : "orders"}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: active ? stage.theme.activeText : "var(--muted-foreground)",
+                      marginTop: 3,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {stage.subtext(count)}
+                  </div>
+                </div>
+
+                {active && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: -2,
+                      left: "15%",
+                      right: "15%",
+                      height: 3,
+                      borderRadius: "3px 3px 0 0",
+                      background: stage.theme.indicator,
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="orders-workflow-tabs-container" role="tablist" aria-label="Order Workflow Stages">
+          {ORDER_WORKFLOW_TABS.map((tab) => {
+            const active = isTabActive(tab);
+            const count = getTabCount(tab);
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                title={tab.title || tab.label}
+                className={`orders-workflow-tab tab-${tab.color} ${active ? "active" : ""}`}
+                onClick={() => {
+                  setPage(1);
+                  setActiveTab(tab.id);
+                  if (tab.id === "PROCESSING") {
+                    setStatusList(["PROCESSING"]);
+                    setPrintedFilter("0");
+                  } else if (tab.id === "PRINTED") {
+                    setStatusList(["PROCESSING"]);
+                    setPrintedFilter("1");
+                  } else if (tab.id === "ALL") {
+                    setStatusList([]);
+                    setPrintedFilter("");
+                  } else {
+                    setStatusList([...tab.statuses]);
+                    setPrintedFilter("");
+                  }
+                }}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+                {count !== undefined && (
+                  <span
+                    className={`orders-tab-badge ${
+                      tab.urgent && !active && count > 0 ? "urgent" : ""
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="orders-delivery-chips-bar" aria-label="Delivery channel filters">
         {isVendor
