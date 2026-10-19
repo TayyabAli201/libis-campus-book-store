@@ -4171,6 +4171,12 @@ function Orders({
     allInQueue = false,
   ) => {
     if (!ids.length && !allInQueue) return;
+    if (isVendor && deliveryTypeList.length === 0) {
+      toast.error(
+        "Please select either 'Other Cities' or 'Qanchi Campus Lahore' before batch printing.",
+      );
+      return;
+    }
     setBatchPrinting(true);
     try {
       const res = await api("manage/orders/batch-vendor-print", {
@@ -4954,7 +4960,17 @@ function Orders({
             }}
           >
             <span>💡</span>
-            <span>Select <strong>Qanchi Campus</strong>, <strong>Lahore</strong>, or <strong>Other Cities</strong> to export</span>
+            <span>
+              {isVendor ? (
+                <>
+                  Select <strong>Other Cities</strong> or <strong>Qanchi Campus Lahore</strong> to export or batch print
+                </>
+              ) : (
+                <>
+                  Select <strong>Qanchi Campus</strong>, <strong>Lahore</strong>, or <strong>Other Cities</strong> to export
+                </>
+              )}
+            </span>
           </span>
         )}
       </div>
@@ -4995,28 +5011,23 @@ function Orders({
             setPage(1);
           }}
         />
-        {isPaymentConfirmedTab && <div className="toolbar-actions-divider" />}
-        {isPaymentConfirmedTab && (() => {
-          const isExportDisabled = deliveryTypeList.length === 0;
-          return (
-            <button
-              type="button"
-              className="btn compact toolbar-export-btn"
-              onClick={exportOrders}
-              disabled={exporting || loading || isExportDisabled}
-              title={
-                isExportDisabled
-                  ? "Select a delivery channel (Qanchi Campus, Lahore Rider, or Other Cities) to enable export"
-                  : "Export orders to Excel"
-              }
-            >
-              <span className="toolbar-btn-icon-circle">
-                <Download size={13} strokeWidth={2.4} className="toolbar-export-icon" />
-              </span>
-              <span>{exporting ? "Exporting…" : "Export Orders"}</span>
-            </button>
-          );
-        })()}
+        {isPaymentConfirmedTab && deliveryTypeList.length > 0 && (
+          <div className="toolbar-actions-divider" />
+        )}
+        {isPaymentConfirmedTab && deliveryTypeList.length > 0 && (
+          <button
+            type="button"
+            className="btn compact toolbar-export-btn"
+            onClick={exportOrders}
+            disabled={exporting || loading}
+            title="Export orders to Excel"
+          >
+            <span className="toolbar-btn-icon-circle">
+              <Download size={13} strokeWidth={2.4} className="toolbar-export-icon" />
+            </span>
+            <span>{exporting ? "Exporting…" : "Export Orders"}</span>
+          </button>
+        )}
         {isAdmin && !isVendor && activeTab === "CONFIRMED" && (() => {
           const sendToVendorCount =
             verifiedUnassignedOrders.length > 0
@@ -5045,7 +5056,7 @@ function Orders({
             </button>
           );
         })()}
-        {isVendor && activeTab === "PROCESSING" && (() => {
+        {isVendor && activeTab === "PROCESSING" && deliveryTypeList.length > 0 && (() => {
           const queueTotal = data?.total ?? currentRows.length;
           const isEnabled = queueTotal > 0 && !batchPrinting && !loading;
 
