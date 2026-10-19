@@ -7177,12 +7177,14 @@ function Vendors() {
                 e.preventDefault();
                 setBusy(true);
                 try {
+                  const perPageNum = Number(edit.per_page_rate);
+                  const bindingRateNum = Number(edit.binding_rate);
                   const payload: any = {
                     name: edit.name,
                     phone: edit.phone,
                     address: edit.address || null,
-                    per_page_rate: Number(edit.per_page_rate) || 1.6,
-                    binding_rate: Number(edit.binding_rate) || 30,
+                    per_page_rate: !isNaN(perPageNum) && perPageNum > 0 ? perPageNum : 1.6,
+                    binding_rate: !isNaN(bindingRateNum) && bindingRateNum >= 0 ? bindingRateNum : 30,
                   };
                   if (!edit.id) {
                     payload.email = edit.email;
@@ -7802,142 +7804,255 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
       </div>
 
       <Result loading={loading} error={error}>
-        {/* 6 Clickable Metric Cards */}
-        <div
-          className="metrics"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-            gap: 16,
-          }}
-        >
+        {/* 6 Clickable Metric Cards - 3 columns per row for clarity */}
+        <div className="metrics vendor-metrics-grid">
           {/* 1. Total Orders Assigned */}
           <a
             href="/vendor/orders?status=ALL"
-            className="metric metric-blue"
-            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            className="metric metric-blue vendor-metric-card"
             title="Click to view all assigned orders"
           >
-            <div className="metric-heading">
-              <span>Total Orders Assigned</span>
-              <span className="metric-icon">
-                <ShoppingBag size={19} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Total Orders Assigned
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "rgba(37, 99, 235, 0.1)",
+                  color: "#2563eb",
+                  flexShrink: 0,
+                }}
+              >
+                <ShoppingBag size={20} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.6rem" }}>{summary.total_orders}</strong>
-            <small style={{ color: "var(--muted-foreground)" }}>
-              View all orders & history →
-            </small>
+
+            <div>
+              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--foreground)", marginBottom: 6 }}>
+                {summary.total_orders}
+              </strong>
+              <div style={{ fontSize: "0.82rem", color: "#2563eb", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+                View all orders & history →
+              </div>
+            </div>
           </a>
 
           {/* 2. Orders in Printing Queue */}
           <a
             href="/vendor/orders?status=PROCESSING"
-            className="metric metric-amber"
-            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            className="metric metric-amber vendor-metric-card"
+            style={{
+              border: (summary.printing_orders || 0) > 0 ? "1px solid #fde68a" : undefined,
+              background: (summary.printing_orders || 0) > 0 ? "rgba(254, 243, 199, 0.35)" : undefined,
+            }}
             title="Click to view orders waiting to be printed"
           >
-            <div className="metric-heading">
-              <span>Printing (Pending)</span>
-              <span className="metric-icon">
-                <Printer size={19} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: (summary.printing_orders || 0) > 0 ? "#92400e" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Printing (Pending)
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "rgba(245, 158, 11, 0.14)",
+                  color: "#d97706",
+                  flexShrink: 0,
+                }}
+              >
+                <Printer size={20} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.6rem", color: summary.printing_orders ? "#b45309" : undefined }}>
-              {summary.printing_orders || 0}
-            </strong>
-            <small style={{ color: "var(--muted-foreground)" }}>
-              {(summary.printing_orders || 0) > 0 ? "Active print queue →" : "Print queue clear ✓"}
-            </small>
+
+            <div>
+              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.printing_orders || 0) > 0 ? "#b45309" : "var(--foreground)", marginBottom: 6 }}>
+                {summary.printing_orders || 0}
+              </strong>
+              <div style={{ fontSize: "0.82rem", color: (summary.printing_orders || 0) > 0 ? "#b45309" : "var(--muted-foreground)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+                {(summary.printing_orders || 0) > 0 ? "Active print queue →" : "Print queue clear ✓"}
+              </div>
+            </div>
           </a>
 
           {/* 3. Printed Orders */}
           <a
             href="/vendor/orders?status=PRINTED"
-            className="metric metric-emerald"
-            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            className="metric metric-emerald vendor-metric-card"
             title="Click to view printed orders ready for dispatch"
           >
-            <div className="metric-heading">
-              <span>Printed Orders</span>
-              <span className="metric-icon">
-                <CheckCircle2 size={19} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Printed Orders
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "rgba(16, 185, 129, 0.12)",
+                  color: "#059669",
+                  flexShrink: 0,
+                }}
+              >
+                <CheckCircle2 size={20} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.6rem", color: "#15803d" }}>
-              {summary.printed_orders || 0}
-            </strong>
-            <small style={{ color: "var(--muted-foreground)" }}>
-              Ready for dispatch / pickup →
-            </small>
+
+            <div>
+              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "#15803d", marginBottom: 6 }}>
+                {summary.printed_orders || 0}
+              </strong>
+              <div style={{ fontSize: "0.82rem", color: "#059669", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+                Ready for dispatch / pickup →
+              </div>
+            </div>
           </a>
 
           {/* 4. Total Earnings */}
           <a
             href="/vendor/ledger"
-            className="metric metric-blue"
-            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            className="metric metric-blue vendor-metric-card"
             title="Click to view payment ledger details"
           >
-            <div className="metric-heading">
-              <span>Total Earnings</span>
-              <span className="metric-icon">
-                <Coins size={19} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Total Earnings
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "rgba(37, 99, 235, 0.1)",
+                  color: "#2563eb",
+                  flexShrink: 0,
+                }}
+              >
+                <Coins size={20} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.5rem" }}>
-              Rs. {summary.total_earned.toLocaleString()}
-            </strong>
-            <small style={{ color: "var(--muted-foreground)" }}>
-              {summary.total_pages.toLocaleString()} pgs · {summary.total_books} books →
-            </small>
+
+            <div>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "#1d4ed8", marginBottom: 6 }}>
+                Rs. {summary.total_earned.toLocaleString()}
+              </strong>
+              <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                <span>{summary.total_pages.toLocaleString()} pages · {summary.total_books} books</span>
+                <span style={{ color: "#2563eb", fontWeight: 600 }}>→</span>
+              </div>
+            </div>
           </a>
 
           {/* 5. Total Received */}
           <a
             href="/vendor/ledger"
-            className="metric metric-emerald"
-            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            className="metric metric-emerald vendor-metric-card"
             title="Click to view payments received from Admin"
           >
-            <div className="metric-heading">
-              <span>Total Received</span>
-              <span className="metric-icon">
-                <CreditCard size={19} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Total Received
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "rgba(16, 185, 129, 0.12)",
+                  color: "#059669",
+                  flexShrink: 0,
+                }}
+              >
+                <CreditCard size={20} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
-              Rs. {summary.total_paid.toLocaleString()}
-            </strong>
-            <small style={{ color: "var(--muted-foreground)" }}>
-              Disbursed by Admin →
-            </small>
+
+            <div>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "#15803d", marginBottom: 6 }}>
+                Rs. {summary.total_paid.toLocaleString()}
+              </strong>
+              <div style={{ fontSize: "0.82rem", color: "#059669", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+                Disbursed by Admin →
+              </div>
+            </div>
           </a>
 
           {/* 6. Total Remaining / Pending Payment */}
           <a
             href="/vendor/ledger"
-            className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"}`}
-            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"} vendor-metric-card`}
+            style={{
+              border: summary.pending_balance > 0 ? "1px solid #fde68a" : undefined,
+              background: summary.pending_balance > 0 ? "rgba(254, 243, 199, 0.35)" : undefined,
+            }}
             title="Click to view payment ledger balance"
           >
-            <div className="metric-heading">
-              <span>Remaining Pending</span>
-              <span className="metric-icon">
-                <Receipt size={19} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: summary.pending_balance > 0 ? "#92400e" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Remaining Pending
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: summary.pending_balance > 0 ? "rgba(245, 158, 11, 0.14)" : "rgba(16, 185, 129, 0.12)",
+                  color: summary.pending_balance > 0 ? "#d97706" : "#059669",
+                  flexShrink: 0,
+                }}
+              >
+                <Receipt size={20} />
               </span>
             </div>
-            <strong
-              style={{
-                fontSize: "1.5rem",
-                color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
-              }}
-            >
-              Rs. {summary.pending_balance.toLocaleString()}
-            </strong>
-            <small style={{ color: "var(--muted-foreground)" }}>
-              {summary.pending_balance > 0 ? "Awaiting clearance from Admin →" : "All cleared ✓"}
-            </small>
+
+            <div>
+              <strong
+                style={{
+                  fontSize: "1.75rem",
+                  fontWeight: 700,
+                  lineHeight: 1.15,
+                  display: "block",
+                  color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
+                  marginBottom: 6,
+                }}
+              >
+                Rs. {summary.pending_balance.toLocaleString()}
+              </strong>
+              <div
+                style={{
+                  fontSize: "0.82rem",
+                  color: summary.pending_balance > 0 ? "#b45309" : "#059669",
+                  fontWeight: 550,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                {summary.pending_balance > 0 ? "Awaiting clearance from Admin →" : "All cleared ✓"}
+              </div>
+            </div>
           </a>
         </div>
 

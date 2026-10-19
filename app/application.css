@@ -1472,6 +1472,46 @@ footer {
   opacity: 0.8;
 }
 
+.vendor-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 20px 0 24px;
+}
+
+.vendor-metric-card {
+  text-decoration: none;
+  cursor: pointer;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  padding: 20px 22px !important;
+  min-height: 140px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.vendor-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
+  border-color: var(--primary) !important;
+}
+
+@media (max-width: 1024px) {
+  .vendor-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .vendor-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .chart-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
