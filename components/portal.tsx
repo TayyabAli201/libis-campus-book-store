@@ -4235,6 +4235,10 @@ function Orders({
   };
 
   const exportOrders = async () => {
+    if (!["CONFIRMED", "PROCESSING", "PRINTED", "SHIPPED", "DELIVERED"].includes(activeTab)) {
+      toast.error("Orders can only be exported after payment is confirmed.");
+      return;
+    }
     if (deliveryTypeList.length === 0) {
       toast.error(
         "Please select a specific delivery channel (Qanchi Campus, Lahore, or Other Cities) before exporting.",
@@ -4485,6 +4489,14 @@ function Orders({
       setBatchUpdating(false);
     }
   };
+
+  const isPaymentConfirmedTab = [
+    "CONFIRMED",
+    "PROCESSING",
+    "PRINTED",
+    "SHIPPED",
+    "DELIVERED",
+  ].includes(activeTab);
 
   const isTabActive = (tab: (typeof ORDER_WORKFLOW_TABS)[number]) => {
     return activeTab === tab.id;
@@ -4928,7 +4940,7 @@ function Orders({
                 </button>
               );
             })}
-        {deliveryTypeList.length === 0 && (
+        {isPaymentConfirmedTab && deliveryTypeList.length === 0 && (
           <span
             style={{
               fontSize: "0.78rem",
@@ -4983,8 +4995,8 @@ function Orders({
             setPage(1);
           }}
         />
-        <div className="toolbar-actions-divider" />
-        {(() => {
+        {isPaymentConfirmedTab && <div className="toolbar-actions-divider" />}
+        {isPaymentConfirmedTab && (() => {
           const isExportDisabled = deliveryTypeList.length === 0;
           return (
             <button
