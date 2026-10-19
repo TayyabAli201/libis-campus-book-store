@@ -3595,7 +3595,7 @@ const STATUS_ADVANCE_FLOW: Record<
   PROCESSING: {
     to: "SHIPPED",
     toLabel: "Shipped",
-    fromLabel: "Printing Queue",
+    fromLabel: "Printing (Pending)",
   },
   SHIPPED: {
     to: "DELIVERED",
@@ -3618,7 +3618,7 @@ const ORDER_WORKFLOW_TABS: WorkflowTab[] = [
   { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
   { id: "PAYMENT_PENDING", label: "Pending", title: "Pending Payment Verification", icon: "⏳", statuses: ["PAYMENT_PENDING"], urgent: true, color: "pending" },
   { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready for Printing Queue", icon: "📑", statuses: ["CONFIRMED"], color: "confirmed" },
-  { id: "PROCESSING", label: "Printing Queue", title: "Orders Currently in Printing Queue", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
+  { id: "PROCESSING", label: "Printing (Pending)", title: "Orders Currently in Printing (Pending)", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
   { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", icon: "📦", statuses: ["PROCESSING"], color: "confirmed" },
   { id: "SHIPPED", label: "Shipped", title: "Shipped / With Rider", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
   { id: "DELIVERED", label: "Delivered", title: "Delivered / Completed", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
@@ -3635,7 +3635,7 @@ const ORDER_DELIVERY_CHIPS = [
 ];
 
 const VENDOR_WORKFLOW_TABS: WorkflowTab[] = [
-  { id: "PROCESSING", label: "Printing Queue", title: "Orders Currently In Printing Queue", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
+  { id: "PROCESSING", label: "Printing (Pending)", title: "Orders Currently In Printing (Pending)", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
   { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", icon: "📦", statuses: ["PROCESSING"], color: "confirmed" },
   { id: "SHIPPED", label: "Shipped", title: "Orders Shipped / Handed Over", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
   { id: "DELIVERED", label: "Delivered", title: "Completed Orders", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
@@ -4512,11 +4512,11 @@ function Orders({
           );
         })()}
         {isVendor && activeTab === "PRINTED" && (() => {
-          const isOtherOnly =
-            deliveryTypeList.length === 1 && deliveryTypeList[0] === "other";
-          if (isOtherOnly) return null;
+          const isCampusLahoreSelected =
+            deliveryTypeList.includes("campus") || deliveryTypeList.includes("lahore");
+          if (!isCampusLahoreSelected) return null;
 
-          const printedTotal = data?.status_counts?.["PRINTED"] ?? data?.total ?? currentRows.length;
+          const printedTotal = data?.total ?? currentRows.length;
           const isEnabled = printedTotal > 0 && !batchDispatching && !loading;
 
           return (
@@ -4819,9 +4819,9 @@ function Orders({
                           padding: "2px 8px",
                           borderRadius: 9999,
                           cursor: "pointer",
-                          background: o.vendor_printed_at ? "rgba(22, 163, 74, 0.15)" : "var(--muted)",
-                          color: o.vendor_printed_at ? "#15803d" : "var(--muted-foreground)",
-                          border: o.vendor_printed_at ? "1px solid #86efac" : "1px solid var(--border)",
+                          background: o.vendor_printed_at ? "rgba(245, 158, 11, 0.12)" : "rgba(22, 163, 74, 0.12)",
+                          color: o.vendor_printed_at ? "#b45309" : "#15803d",
+                          border: o.vendor_printed_at ? "1px solid #fde68a" : "1px solid #86efac",
                           transition: "all 0.15s ease",
                           width: "fit-content",
                         }}
@@ -4843,18 +4843,19 @@ function Orders({
                           gap: 3,
                           fontSize: "0.70rem",
                           fontWeight: 500,
-                          padding: "1px 5px",
+                          padding: "2px 6px",
                           borderRadius: 4,
                           cursor: "pointer",
-                          background: "none",
-                          color: "var(--muted-foreground)",
-                          border: "1px dashed var(--border)",
+                          background: "rgba(239, 68, 68, 0.08)",
+                          color: "#dc2626",
+                          border: "1px dashed rgba(239, 68, 68, 0.45)",
+                          transition: "all 0.15s ease",
                           width: "fit-content",
                         }}
-                        title="Remove from Printing Queue (reverts to Confirmed)"
+                        title="Remove from Printing (reverts to Confirmed)"
                       >
-                        <XCircle size={10} />
-                        {queueBusyId === o.id ? "Reverting…" : "Remove from Queue"}
+                        <XCircle size={10} color="#dc2626" />
+                        {queueBusyId === o.id ? "Reverting…" : "Remove from Printing"}
                       </button>
                     </div>
                   )}
@@ -5826,9 +5827,9 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         }
                       }}
                       style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--destructive)" }}
-                      title="Remove from Printing Queue and send back to Confirmed status"
+                      title="Remove from Printing and send back to Confirmed status"
                     >
-                      <XCircle size={13} /> Remove from Queue
+                      <XCircle size={13} /> Remove from Printing
                     </button>
                   </>
                 )}
