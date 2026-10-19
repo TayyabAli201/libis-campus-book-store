@@ -667,7 +667,8 @@ export function Portal({
           <button
             className="btn compact"
             onClick={async () => {
-              await api("logout", {});
+              const portal = isVendor ? "vendor" : isAdmin ? "admin" : "campus";
+              await api("logout", { portal });
               location.href = base + "/login";
             }}
           >
@@ -4234,8 +4235,10 @@ function Orders({
   };
 
   const exportOrders = async () => {
-    if (isVendor && deliveryTypeList.length === 0) {
-      toast.error("Please select either 'Other Cities' or 'Qanchi Campus Lahore' before exporting.");
+    if (deliveryTypeList.length === 0) {
+      toast.error(
+        "Please select a specific delivery channel (Qanchi Campus, Lahore, or Other Cities) before exporting.",
+      );
       return;
     }
     setExporting(true);
@@ -4925,7 +4928,7 @@ function Orders({
                 </button>
               );
             })}
-        {isVendor && deliveryTypeList.length === 0 && (
+        {deliveryTypeList.length === 0 && (
           <span
             style={{
               fontSize: "0.78rem",
@@ -4939,7 +4942,7 @@ function Orders({
             }}
           >
             <span>💡</span>
-            <span>Select <strong>Other Cities</strong> or <strong>Qanchi Campus</strong> to export</span>
+            <span>Select <strong>Qanchi Campus</strong>, <strong>Lahore</strong>, or <strong>Other Cities</strong> to export</span>
           </span>
         )}
       </div>
@@ -4982,16 +4985,16 @@ function Orders({
         />
         <div className="toolbar-actions-divider" />
         {(() => {
-          const isVendorExportDisabled = isVendor && deliveryTypeList.length === 0;
+          const isExportDisabled = deliveryTypeList.length === 0;
           return (
             <button
               type="button"
               className="btn compact toolbar-export-btn"
               onClick={exportOrders}
-              disabled={exporting || loading || isVendorExportDisabled}
+              disabled={exporting || loading || isExportDisabled}
               title={
-                isVendorExportDisabled
-                  ? "Select 'Other Cities' or 'Qanchi Campus Lahore' to enable export"
+                isExportDisabled
+                  ? "Select a delivery channel (Qanchi Campus, Lahore Rider, or Other Cities) to enable export"
                   : "Export orders to Excel"
               }
             >

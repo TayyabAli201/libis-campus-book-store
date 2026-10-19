@@ -148,7 +148,9 @@ async function handle(req: Request) {
             ? "cbs_campus_session"
             : "cbs_admin_session";
       const h = new Headers();
-      h.append("Set-Cookie", cookie(req, "cbs_session", r.token, 8 * 3600));
+      if (b.portal === "admin") {
+        h.append("Set-Cookie", cookie(req, "cbs_session", r.token, 8 * 3600));
+      }
       h.append("Set-Cookie", cookie(req, cookieName, r.token, 8 * 3600));
       return ok({ must_change: r.must_change }, 200, h);
     }
@@ -272,20 +274,69 @@ async function handle(req: Request) {
       });
     }
     if (action === "logout" && method === "POST") {
-      const sid =
-        cookieValue(req, "cbs_session") ||
-        cookieValue(req, "cbs_vendor_session") ||
-        cookieValue(req, "cbs_admin_session") ||
-        cookieValue(req, "cbs_campus_session");
-      if (sid) {
-        await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
-      }
+      let b: any = {};
+      try {
+        b = await json(req);
+      } catch {}
+      const referer = req.headers.get("referer") || "";
+      const portal =
+        b?.portal ||
+        (referer.includes("/vendor")
+          ? "vendor"
+          : referer.includes("/campus")
+            ? "campus"
+            : referer.includes("/admin")
+              ? "admin"
+              : undefined);
+
       const h = new Headers();
-      h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
-      h.append("Set-Cookie", cookie(req, "cbs_admin_session", "", 0));
-      h.append("Set-Cookie", cookie(req, "cbs_campus_session", "", 0));
-      h.append("Set-Cookie", cookie(req, "cbs_vendor_session", "", 0));
-      return ok({ ok: true }, 200, h);
+      if (portal === "vendor") {
+        const sid = cookieValue(req, "cbs_vendor_session");
+        if (sid) {
+          await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
+        }
+        h.append("Set-Cookie", cookie(req, "cbs_vendor_session", "", 0));
+        const genericSid = cookieValue(req, "cbs_session");
+        if (genericSid && genericSid === sid) {
+          h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
+        }
+        return ok({ ok: true }, 200, h);
+      } else if (portal === "campus") {
+        const sid = cookieValue(req, "cbs_campus_session");
+        if (sid) {
+          await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
+        }
+        h.append("Set-Cookie", cookie(req, "cbs_campus_session", "", 0));
+        const genericSid = cookieValue(req, "cbs_session");
+        if (genericSid && genericSid === sid) {
+          h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
+        }
+        return ok({ ok: true }, 200, h);
+      } else if (portal === "admin") {
+        const sid =
+          cookieValue(req, "cbs_admin_session") ||
+          cookieValue(req, "cbs_session");
+        if (sid) {
+          await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
+        }
+        h.append("Set-Cookie", cookie(req, "cbs_admin_session", "", 0));
+        h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
+        return ok({ ok: true }, 200, h);
+      } else {
+        const sid =
+          cookieValue(req, "cbs_session") ||
+          cookieValue(req, "cbs_vendor_session") ||
+          cookieValue(req, "cbs_admin_session") ||
+          cookieValue(req, "cbs_campus_session");
+        if (sid) {
+          await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
+        }
+        h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
+        h.append("Set-Cookie", cookie(req, "cbs_admin_session", "", 0));
+        h.append("Set-Cookie", cookie(req, "cbs_campus_session", "", 0));
+        h.append("Set-Cookie", cookie(req, "cbs_vendor_session", "", 0));
+        return ok({ ok: true }, 200, h);
+      }
     }
     if (action === "profile" && method === "POST") {
       const u = await user(req, "profile");
