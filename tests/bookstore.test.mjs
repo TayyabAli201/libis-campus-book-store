@@ -59,6 +59,8 @@ const {
   setPrintingQueue,
   batchSetPrintingQueue,
   editOrderItems,
+  recordDuePayment,
+  updateDueNote,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -74,6 +76,7 @@ const {
 const {
   getVendorWhatsAppMessage,
   getVendorWhatsAppUrl,
+  getOrderWhatsAppMessage,
   formatWhatsAppPhone,
   isOtherCityOrder,
 } = await import("../lib/contracts.ts");
@@ -123,6 +126,7 @@ function database(t) {
     "0007_courier_tracking.sql",
     "0008_vendor_management.sql",
     "0009_vendor_ledger.sql",
+    "0010_due_payments.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -2365,6 +2369,209 @@ test("Admin Order Editing: adjust quantity, exclude books, auto-recalculate tota
     /Cannot edit items for order in Delivered status/,
   );
 });
+
+test("Partial Payment / Due Balance / Remaining Margin Management Scenario", async (t) => {
+  const sqlite = database(t);
+  const adminUser = admin;
+  const staffUser = {
+    id: "staff_1",
+    email: "staff@vu.edu.pk",
+    role: "ADMIN",
+    permissions: ["orders.update", "orders.read"],
+  };
+  const studentUser = {
+    id: "std_due_1",
+    email: "student@vu.edu.pk",
+    role: "STUDENT",
+    permissions: [],
+  };
+  const testReq = request;
+
+  // 1. Create a fresh book for this scenario
+  const bookRes = await saveBook(
+    bookInput("DUE-101", {
+      title: "Due Management Test Book",
+      pages: 200,
+      category: "D",
+      fixed_price: 170000, // Rs. 1700 (2 copies @ 1700 = 3400 + 100 delivery = 3500 total)
+    }),
+    adminUser,
+    testReq,
+  );
+  const bookId = bookRes.id;
+
+  // 2. Student places an order: 2 copies of DUE-101 (Rs. 3000 + Rs. 500 delivery = Rs. 3500 total)
+  const cart = {
+    name: "Ahmad Raza",
+    phone: "03001234567",
+    city: "Lahore",
+    address: "House 123, Street 4, Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 2 }],
+  };
+  const q = await quote(testReq, cart);
+  const totalBill = q.total; // 350000 cents (Rs. 3,500)
+  assert.equal(totalBill, 350000, "Total order bill is Rs. 3,500");
+
+  const slip = crypto.randomUUID();
+  const digest = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, digest, 340000); // Student sent Rs. 3,400 (Rs. 100 less)
+
+  const placed = await submitOrder(testReq, q.id, slip);
+
+  // 3. Super Admin reviews and approves with partial payment:
+  // Paid: 340000 (Rs. 3,400), Due: 10000 (Rs. 100)
+  const pendingOrd = await getOrder(testReq, placed.id, adminUser);
+  assert.equal(pendingOrd.status, "PAYMENT_PENDING");
+
+  const approveRes = await decidePayment(
+    testReq,
+    adminUser,
+    placed.id,
+    "approve",
+    "Verified partial payment",
+    pendingOrd.version,
+    340000,
+    "Rs. 100 pending - will collect on delivery",
+  );
+
+  assert.equal(approveRes.status, "CONFIRMED");
+  assert.equal(approveRes.amount_paid, 340000);
+  assert.equal(approveRes.due_amount, 10000);
+  assert.equal(approveRes.due_status, "DUE_PENDING");
+
+  // 4. Verify order state when retrieved by Super Admin
+  const confirmedOrd = await getOrder(testReq, placed.id, adminUser);
+  assert.equal(confirmedOrd.amount_paid, 340000);
+  assert.equal(confirmedOrd.due_amount, 10000);
+  assert.equal(confirmedOrd.due_status, "DUE_PENDING");
+  assert.equal(confirmedOrd.due_note, "Rs. 100 pending - will collect on delivery");
+  assert.equal(confirmedOrd.payment_logs.length, 1);
+  assert.equal(confirmedOrd.payment_logs[0].amount, 340000);
+  assert.equal(confirmedOrd.payment_logs[0].type, "ADVANCE");
+  assert.equal(confirmedOrd.payment_logs[0].actor, adminUser.email);
+
+  // 5. Verify Customer / Student view (Privacy):
+  // Customer sees amount_paid & due_amount for clear notice, but due_note and payment_logs are 100% stripped!
+  const studentView = await getOrder(testReq, placed.id);
+  assert.equal(studentView.amount_paid, 340000);
+  assert.equal(studentView.due_amount, 10000);
+  assert.equal(studentView.due_status, "DUE_PENDING");
+  assert.equal(studentView.due_note, undefined, "Private due note must be hidden from student");
+  assert.equal(studentView.payment_logs, undefined, "Private payment logs must be hidden from student");
+
+  // Public tracking view
+  const trackingView = await getOrder(testReq, placed.id, undefined, "tracking");
+  assert.equal(trackingView.amount_paid, 340000);
+  assert.equal(trackingView.due_amount, 10000);
+  assert.equal(trackingView.due_status, "DUE_PENDING");
+  assert.equal(trackingView.due_note, undefined);
+  assert.equal(trackingView.payment_logs, undefined);
+
+  // 6. Verify Non-Super Admin Staff restrictions (Privacy & RBAC):
+  // Non-superadmin cannot see due amounts in listOrders and cannot record due payments!
+  const staffList = await listOrders(staffUser);
+  for (const r of staffList.rows) {
+    assert.equal(r.amount_paid, undefined);
+    assert.equal(r.due_amount, undefined);
+    assert.equal(r.due_note, undefined);
+  }
+
+  await assert.rejects(
+    () => recordDuePayment(testReq, staffUser, placed.id, 10000, "Staff attempt"),
+    /Only Super Admin can record due payments/,
+    "Staff must be rejected with 403 when trying to record due payments",
+  );
+
+  await assert.rejects(
+    () => updateDueNote(testReq, staffUser, placed.id, "Staff note"),
+    /Only Super Admin can update due notes/,
+    "Staff must be rejected with 403 when trying to update due notes",
+  );
+
+  // 7. Verify WhatsApp Customer Notification includes remaining due
+  const waMsg = getOrderWhatsAppMessage(confirmedOrd);
+  assert.ok(waMsg.includes("Remaining Due: Rs. 100"), "WhatsApp message must notify customer of remaining due balance");
+  assert.ok(waMsg.includes("Advance Paid: Rs. 3,400"), "WhatsApp message must display advance paid");
+
+  // 8. Super Admin updates private due note
+  const updateNoteRes = await updateDueNote(
+    testReq,
+    adminUser,
+    placed.id,
+    "Student confirmed cash on delivery to rider",
+  );
+  assert.equal(updateNoteRes.ok, true);
+  const afterNoteOrd = await getOrder(testReq, placed.id, adminUser);
+  assert.equal(afterNoteOrd.due_note, "Student confirmed cash on delivery to rider");
+
+  // 9. Customer pays due balance: Super Admin records subsequent collection of Rs. 100 (10000 cents)
+  const collectRes = await recordDuePayment(
+    testReq,
+    adminUser,
+    placed.id,
+    10000,
+    "Cash received by delivery rider upon doorstep handover",
+  );
+  assert.equal(collectRes.ok, true);
+  assert.equal(collectRes.amount_paid, 350000);
+  assert.equal(collectRes.due_amount, 0);
+  assert.equal(collectRes.due_status, "PAID");
+
+  // 10. Verify order state after full clearance
+  const clearedOrd = await getOrder(testReq, placed.id, adminUser);
+  assert.equal(clearedOrd.amount_paid, 350000);
+  assert.equal(clearedOrd.due_amount, 0);
+  assert.equal(clearedOrd.due_status, "PAID");
+  assert.equal(clearedOrd.payment_logs.length, 2);
+  assert.equal(clearedOrd.payment_logs[1].amount, 10000);
+  assert.equal(clearedOrd.payment_logs[1].type, "FULL_PAYMENT");
+  assert.equal(clearedOrd.payment_logs[1].actor, adminUser.email);
+  assert.ok(clearedOrd.payment_logs[1].note.includes("Cash received by delivery rider"));
+
+  // 11. WhatsApp notification now does NOT contain pending due text since due_amount is 0
+  const clearedWaMsg = getOrderWhatsAppMessage(clearedOrd);
+  assert.ok(!clearedWaMsg.includes("Remaining Due:"), "WhatsApp message must not show remaining due once cleared");
+
+  // 12. Cannot record payment when balance is already 0
+  await assert.rejects(
+    () => recordDuePayment(testReq, adminUser, placed.id, 5000, "Extra pay"),
+    /already has no remaining due balance/,
+  );
+
+  // 13. Auto-recalculation when Super Admin edits items on a partially paid order
+  // Create another order, partially pay, then edit quantity
+  const slip2 = crypto.randomUUID();
+  const digest2 = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip2, hash(guest), "proof/" + slip2, digest2, 300000);
+
+  const placed2 = await submitOrder(testReq, (await quote(testReq, cart)).id, slip2);
+  const ord2Before = await getOrder(testReq, placed2.id, adminUser);
+  await decidePayment(testReq, adminUser, placed2.id, "approve", "Approved", ord2Before.version, 300000); // Paid 3000, Due 500
+
+  const ord2Paid = await getOrder(testReq, placed2.id, adminUser);
+  assert.equal(ord2Paid.due_amount, 50000); // 500 due
+
+  // Admin edits order: reduce quantity from 2 to 1 (new total: Rs. 1500 + 500 = Rs. 2000)
+  const itemToEdit = ord2Paid.items[0];
+  await editOrderItems(testReq, adminUser, placed2.id, [{ id: itemToEdit.id, quantity: 1 }], "Reduced qty");
+
+  const ord2AfterEdit = await getOrder(testReq, placed2.id, adminUser);
+  assert.equal(ord2AfterEdit.total, 180000); // Total is now 1800 (1 copy @ 1700 + 100 delivery)
+  // Paid was 3000, which exceeds 1800 -> due becomes 0, due_status becomes PAID
+  assert.equal(ord2AfterEdit.due_amount, 0);
+  assert.equal(ord2AfterEdit.due_status, "PAID");
+});
+
 
 
 

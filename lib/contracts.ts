@@ -83,6 +83,13 @@ export function getOrderWhatsAppMessage(o: any): string {
 
   // 1. Confirmed (For all types)
   if (status === "CONFIRMED") {
+    if (Number(o?.due_amount || 0) > 0) {
+      const advanceStr =
+        Number(o?.amount_paid || 0) > 0
+          ? ` Advance Paid: ${money(o.amount_paid)}.`
+          : "";
+      return `Salam ${studentName}, your payment has been verified. Your order is now confirmed and will be processed soon.${advanceStr} Remaining Due: ${money(o.due_amount)} (payable upon delivery / collection).`;
+    }
     return `Salam ${studentName}, your payment has been verified. Your order is now confirmed and will be processed soon.`;
   }
 

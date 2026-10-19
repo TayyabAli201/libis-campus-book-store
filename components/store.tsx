@@ -844,6 +844,36 @@ export function OrderTrackerCard({ o }: { o: any }) {
             {!o.tracking_only && o.status !== "DELIVERED" && <ReceiptButtons order={o} />}
           </div>
         </div>
+        {Number(o.due_amount || 0) > 0 && (
+          <div
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: "8px",
+              background: "rgba(245, 158, 11, 0.08)",
+              border: "1.5px solid #f59e0b",
+              fontSize: "0.84rem",
+              lineHeight: 1.45,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>ℹ️</span>
+            <div style={{ flex: 1 }}>
+              <strong style={{ color: "#b45309", display: "block", marginBottom: 3 }}>
+                Remaining Balance Notice:
+              </strong>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", margin: "4px 0 6px" }}>
+                <span>Advance Received: <strong>{money(o.amount_paid || 0, o.currency)}</strong></span>
+                <span>Remaining Due: <strong style={{ color: "#d97706" }}>{money(o.due_amount, o.currency)}</strong></span>
+              </div>
+              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--foreground)" }}>
+                Please pay the remaining balance of <strong>{money(o.due_amount, o.currency)}</strong> upon parcel delivery to the rider or at the campus pickup counter.
+              </p>
+            </div>
+          </div>
+        )}
         {(o.delivery_type === "lahore" || o.delivery_type === "other") && (
           <div
             style={{
@@ -2531,6 +2561,16 @@ export function printOrderReceiptSlip(order: any) {
           <dt>Grand total</dt>
           <dd>${escapeHtml(money(order.total, order.currency))}</dd>
         </div>
+        ${Number(order.due_amount || 0) > 0 ? `
+          <div style="border-top: 1px dashed #d1d5db; margin-top: 6px; padding-top: 6px;">
+            <dt style="font-size: 0.88rem; color: #4b5563;">Advance Paid</dt>
+            <dd style="font-size: 0.88rem; color: #16a34a; font-weight: 600;">${escapeHtml(money(order.amount_paid || 0, order.currency))}</dd>
+          </div>
+          <div style="background: #fffbeb; border: 1px solid #f59e0b; padding: 4px 8px; border-radius: 4px; margin-top: 4px;">
+            <dt style="color: #b45309; font-weight: 700;">Balance Due on Delivery</dt>
+            <dd style="color: #b45309; font-weight: 800; font-size: 1rem;">${escapeHtml(money(order.due_amount, order.currency))}</dd>
+          </div>
+        ` : ""}
       </dl>
     </div>
     ${order.delivery_type === "lahore" || order.delivery_type === "other" ? `

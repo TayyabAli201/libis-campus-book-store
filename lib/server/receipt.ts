@@ -241,6 +241,25 @@ export async function receipt(o: any) {
   const totalSize = Math.min(12, 113 / bold.widthOfTextAtSize(clean(total), 1));
   right(total, width - margin - 10, y - 59, totalSize, true, blue);
   y -= summaryHeight;
+
+  const hasDue = Number(o.due_amount || 0) > 0;
+  if (hasDue) {
+    ensure(55);
+    page.drawRectangle({
+      x: 323,
+      y: y - 48,
+      width: width - margin - 323,
+      height: 44,
+      color: rgb(1, 0.96, 0.9),
+      borderColor: rgb(0.95, 0.6, 0.1),
+      borderWidth: 1,
+    });
+    text("ADVANCE PAID:", 335, y - 20, 8, false, muted);
+    right(money(o.amount_paid || 0, o.currency), width - margin - 10, y - 20, 9, true);
+    text("DUE ON DELIVERY:", 335, y - 40, 8, true, rgb(0.85, 0.35, 0.05));
+    right(money(o.due_amount, o.currency), width - margin - 10, y - 40, 11, true, rgb(0.85, 0.35, 0.05));
+    y -= 56;
+  }
   if (o.instructions) {
     const instructionLines = wrap(o.instructions, content, 9);
     ensure(29 + instructionLines.length * 13);

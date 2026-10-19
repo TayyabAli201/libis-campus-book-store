@@ -7,6 +7,7 @@ import {
   type Book,
   STUDENT_CATEGORY,
   isOtherCityOrder,
+  money,
 } from "../contracts";
 import {
   all,
@@ -369,6 +370,13 @@ export async function getOrder(
       delivery: o.delivery,
       total: o.total,
       currency: o.currency,
+      ...(Number(o.due_amount || 0) > 0 || Number(o.amount_paid || 0) > 0
+        ? {
+            amount_paid: Number(o.amount_paid || 0),
+            due_amount: Number(o.due_amount || 0),
+            due_status: o.due_status || "NONE",
+          }
+        : {}),
       created_at: o.created_at,
       updated_at: o.updated_at,
       ...(o.courier_name ? { courier_name: o.courier_name } : {}),
@@ -451,6 +459,30 @@ export async function getOrder(
     for (const it of items) {
       delete (it as any).unit_price;
     }
+  }
+
+  if (u?.role === "SUPER_ADMIN") {
+    const paymentLogs = await all(
+      "SELECT * FROM order_payment_logs WHERE order_id=? ORDER BY created_at ASC",
+      o.id,
+    );
+    o.amount_paid = Number(o.amount_paid || 0);
+    o.due_amount = Number(o.due_amount || 0);
+    o.due_status = o.due_status || "NONE";
+    o.due_note = o.due_note || "";
+    o.payment_logs = paymentLogs;
+  } else if (u?.role === "STUDENT" || owned) {
+    o.amount_paid = Number(o.amount_paid || 0);
+    o.due_amount = Number(o.due_amount || 0);
+    o.due_status = o.due_status || "NONE";
+    delete o.due_note;
+    delete o.payment_logs;
+  } else {
+    delete o.amount_paid;
+    delete o.due_amount;
+    delete o.due_status;
+    delete o.due_note;
+    delete o.payment_logs;
   }
 
   return { ...o, items, history, tracking_only: false };
@@ -543,11 +575,21 @@ export async function listOrders(
     `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
     ...queryArgs,
   );
-  rows.forEach((o) => {
+  rows.forEach((o: any) => {
     delete o.owner;
     delete o.tracking_hash;
     delete o.quote_id;
     delete o.store_snapshot;
+    if (u.role !== "SUPER_ADMIN") {
+      delete o.amount_paid;
+      delete o.due_amount;
+      delete o.due_status;
+      delete o.due_note;
+    } else {
+      o.amount_paid = Number(o.amount_paid || 0);
+      o.due_amount = Number(o.due_amount || 0);
+      o.due_status = o.due_status || "NONE";
+    }
   });
   if (rows.length > 0) {
     const orderIds = rows.map((r: any) => r.id);
@@ -767,6 +809,8 @@ export async function decidePayment(
   action: string,
   note: string,
   version: number,
+  amountPaid?: number,
+  dueNote?: string,
 ) {
   const o = await getOrder(req, id, u);
   if (o.version !== version)
@@ -786,6 +830,12 @@ export async function decidePayment(
       "PAYMENT_PENDING",
     ),
   ];
+
+  let paid = o.total;
+  let due = 0;
+  let dueStatus = "PAID";
+  let dueNoteText = "";
+
   if (action === "approve") {
     statements.push(
       guard(
@@ -796,32 +846,78 @@ export async function decidePayment(
     );
     status = "CONFIRMED";
     payment = "VERIFIED";
+
+    const hasPaidAmount =
+      amountPaid !== undefined &&
+      amountPaid !== null &&
+      Number.isFinite(Number(amountPaid));
+    paid = hasPaidAmount ? Math.max(0, Math.round(Number(amountPaid))) : o.total;
+    due = Math.max(0, o.total - paid);
+    dueStatus = due > 0 ? "DUE_PENDING" : "PAID";
+    dueNoteText = typeof dueNote === "string" ? dueNote.trim() : "";
+
     // Settle reservations only for orders created before stock tracking was removed.
     if (state === "RESERVED") {
       statements.push(...movementStatements(o, items, "RELEASE", u.email));
       state = "RELEASED";
     }
-  } else if (action === "reject") {
-    if (!note) throw new AppError(400, "A rejection reason is required.");
-    status = "REJECTED";
-    payment = "REJECTED";
-    if (state === "RESERVED")
-      statements.push(...movementStatements(o, items, "RELEASE", u.email));
-    state = "RELEASED";
-  } else if (action === "request") {
-    if (!note)
-      throw new AppError(400, "Explain what the new slip should correct.");
-    payment = "NEW_SLIP_REQUESTED";
-  } else if (action === "manual") payment = "MANUAL_REVIEW";
-  else throw new AppError(400, "Invalid payment decision.");
+
+    statements.push(
+      stmt(
+        "UPDATE orders SET status=?,inventory_state=?,amount_paid=?,due_amount=?,due_status=?,due_note=?,version=version+1,updated_at=? WHERE id=?",
+        status,
+        state,
+        paid,
+        due,
+        dueStatus,
+        dueNoteText,
+        at,
+        o.id,
+      ),
+      stmt(
+        "INSERT INTO order_payment_logs(id,order_id,amount,type,note,actor,payment_date,created_at) VALUES(?,?,?,?,?,?,?,?)",
+        uid(),
+        o.id,
+        paid,
+        due > 0 ? "ADVANCE" : "FULL_PAYMENT",
+        dueNoteText || (due > 0 ? "Initial partial payment approved" : "Payment verified in full"),
+        u.email,
+        at,
+        at,
+      ),
+    );
+  } else {
+    if (action === "reject") {
+      if (!note) throw new AppError(400, "A rejection reason is required.");
+      status = "REJECTED";
+      payment = "REJECTED";
+      if (state === "RESERVED")
+        statements.push(...movementStatements(o, items, "RELEASE", u.email));
+      state = "RELEASED";
+    } else if (action === "request") {
+      if (!note)
+        throw new AppError(400, "Explain what the new slip should correct.");
+      payment = "NEW_SLIP_REQUESTED";
+    } else if (action === "manual") payment = "MANUAL_REVIEW";
+    else throw new AppError(400, "Invalid payment decision.");
+
+    statements.push(
+      stmt(
+        "UPDATE orders SET status=?,inventory_state=?,version=version+1,updated_at=? WHERE id=?",
+        status,
+        state,
+        at,
+        o.id,
+      ),
+    );
+  }
+
+  const historyNote =
+    action === "approve" && due > 0
+      ? `Payment review: VERIFIED (Partial). Received: ${money(paid)}, Due Balance: ${money(due)}.${dueNoteText ? ` Note: ${dueNoteText}` : ""}`
+      : `Payment review: ${payment}. ${note}`;
+
   statements.push(
-    stmt(
-      "UPDATE orders SET status=?,inventory_state=?,version=version+1,updated_at=? WHERE id=?",
-      status,
-      state,
-      at,
-      o.id,
-    ),
     stmt(
       "UPDATE payments SET status=?,reviewer=?,note=?,updated_at=? WHERE order_id=?",
       payment,
@@ -835,7 +931,7 @@ export async function decidePayment(
       uid(),
       o.id,
       status,
-      `Payment review: ${payment}. ${note}`,
+      historyNote,
       u.email,
       at,
     ),
@@ -844,12 +940,146 @@ export async function decidePayment(
       "PAYMENT_" + action.toUpperCase(),
       o.id,
       { status: o.payment_status },
-      { status: payment, note },
+      {
+        status: payment,
+        note,
+        amount_paid: paid,
+        due_amount: due,
+        due_status: dueStatus,
+      },
       req,
     ),
   );
   await batch(statements);
-  return { status, payment };
+  return {
+    status,
+    payment,
+    amount_paid: paid,
+    due_amount: due,
+    due_status: dueStatus,
+  };
+}
+
+export async function recordDuePayment(
+  req: Request,
+  u: User,
+  orderId: string,
+  amount: number,
+  note = "",
+) {
+  if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Only Super Admin can record due payments.");
+  }
+  const cleanAmount = Math.round(Number(amount));
+  if (!Number.isFinite(cleanAmount) || cleanAmount <= 0) {
+    throw new AppError(400, "Payment amount must be greater than 0.");
+  }
+
+  const o = await getOrder(req, orderId, u);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  if ((o.due_amount || 0) <= 0 && o.due_status === "PAID") {
+    throw new AppError(400, "This order already has no remaining due balance.");
+  }
+
+  const at = now();
+  const currentPaid = Number(o.amount_paid || 0);
+  const newAmountPaid = currentPaid + cleanAmount;
+  const newDueAmount = Math.max(0, Number(o.total || 0) - newAmountPaid);
+  const newDueStatus = newDueAmount === 0 ? "PAID" : "DUE_PENDING";
+  const cleanNote = (note || "").trim();
+
+  const statements = [
+    guard(
+      "EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)",
+      o.id,
+      o.version,
+    ),
+    stmt(
+      "UPDATE orders SET amount_paid=?, due_amount=?, due_status=?, version=version+1, updated_at=? WHERE id=?",
+      newAmountPaid,
+      newDueAmount,
+      newDueStatus,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_payment_logs(id,order_id,amount,type,note,actor,payment_date,created_at) VALUES(?,?,?,?,?,?,?,?)",
+      uid(),
+      o.id,
+      cleanAmount,
+      newDueAmount === 0 ? "FULL_PAYMENT" : "DUE_COLLECTION",
+      cleanNote ||
+        (newDueAmount === 0
+          ? "Remaining balance cleared"
+          : "Partial due collection"),
+      u.email,
+      at,
+      at,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,created_at,internal) VALUES(?,?,?,?,?,?,1)",
+      uid(),
+      o.id,
+      o.status,
+      `Due Payment Collected: ${money(cleanAmount)}. Remaining Due: ${money(newDueAmount)}.${cleanNote ? ` Note: ${cleanNote}` : ""}`,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "DUE_PAYMENT_COLLECTED",
+      o.id,
+      { amount_paid: currentPaid, due_amount: o.due_amount },
+      {
+        amount_paid: newAmountPaid,
+        due_amount: newDueAmount,
+        collected: cleanAmount,
+        note: cleanNote,
+      },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return {
+    ok: true,
+    amount_paid: newAmountPaid,
+    due_amount: newDueAmount,
+    due_status: newDueStatus,
+  };
+}
+
+export async function updateDueNote(
+  req: Request,
+  u: User,
+  orderId: string,
+  dueNote: string,
+) {
+  if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Only Super Admin can update due notes.");
+  }
+  const o = await getOrder(req, orderId, u);
+  const cleanNote = (dueNote || "").trim();
+  const at = now();
+  await batch([
+    stmt(
+      "UPDATE orders SET due_note=?, updated_at=? WHERE id=?",
+      cleanNote,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,created_at,internal) VALUES(?,?,?,?,?,?,1)",
+      uid(),
+      o.id,
+      o.status,
+      `Updated Due Note: ${cleanNote || "(empty)"}`,
+      u.email,
+      at,
+    ),
+  ]);
+  return { ok: true, due_note: cleanNote };
 }
 export async function changeStatus(
   req: Request,
@@ -1165,11 +1395,18 @@ export async function editOrderItems(
     );
   }
 
+  const newAmountPaid = Number(o.amount_paid || 0);
+  const newDueAmount = newAmountPaid > 0 ? Math.max(0, newTotal - newAmountPaid) : 0;
+  const newDueStatus = newAmountPaid > 0 ? (newDueAmount > 0 ? "DUE_PENDING" : "PAID") : (o.due_status || "NONE");
+
   statements.push(
     stmt(
-      "UPDATE orders SET subtotal=?, total=?, version=version+1, updated_at=? WHERE id=?",
+      "UPDATE orders SET subtotal=?, total=?, amount_paid=?, due_amount=?, due_status=?, version=version+1, updated_at=? WHERE id=?",
       newSubtotal,
       newTotal,
+      newAmountPaid,
+      newDueAmount,
+      newDueStatus,
       at,
       o.id,
     ),

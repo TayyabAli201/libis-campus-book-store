@@ -3527,6 +3527,682 @@ function AdminOrderBooksPanel({
   );
 }
 
+function SuperAdminDueManagementPanel({
+  o,
+  user,
+  onUpdated,
+}: {
+  o: any;
+  user: User;
+  onUpdated: () => Promise<void> | void;
+}) {
+  const isAdmin = user.role === "SUPER_ADMIN";
+  if (!isAdmin || !o) return null;
+
+  const total = Number(o.total || 0);
+  const amountPaid = Number(o.amount_paid || 0);
+  const dueAmount = Number(o.due_amount || 0);
+  const isDuePending = dueAmount > 0;
+
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recordAmount, setRecordAmount] = useState<string>("");
+  const [recordNote, setRecordNote] = useState("");
+  const [recording, setRecording] = useState(false);
+
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(o.due_note || "");
+  const [savingNote, setSavingNote] = useState(false);
+
+  useEffect(() => {
+    setNoteDraft(o.due_note || "");
+    if (dueAmount > 0) {
+      setRecordAmount(String(dueAmount / 100));
+    }
+  }, [o.due_note, dueAmount]);
+
+  const handleSaveNote = async () => {
+    setSavingNote(true);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "update_due_note",
+        due_note: noteDraft,
+      });
+      toast.success("Private due note saved.");
+      setEditingNote(false);
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanRupees = Number(recordAmount);
+    if (!cleanRupees || isNaN(cleanRupees) || cleanRupees <= 0) {
+      toast.error("Please enter a valid amount greater than 0.");
+      return;
+    }
+    const cleanCents = Math.round(cleanRupees * 100);
+    setRecording(true);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "record_due_payment",
+        amount: cleanCents,
+        note: recordNote,
+      });
+      toast.success("Payment collected and recorded!");
+      setRecordOpen(false);
+      setRecordNote("");
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setRecording(false);
+    }
+  };
+
+  const paymentLogs: any[] = o.payment_logs || [];
+
+  return (
+    <div
+      className="panel stack no-print"
+      style={{
+        border: isDuePending
+          ? "1.5px solid #f59e0b"
+          : "1px solid var(--border)",
+        background: isDuePending
+          ? "linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, var(--card) 100%)"
+          : "var(--card)",
+        padding: "16px",
+        borderRadius: 10,
+        gap: 14,
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Coins
+            size={20}
+            style={{ color: isDuePending ? "#d97706" : "#059669" }}
+          />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>
+                Due Balance & Margin Management
+              </h3>
+              <span
+                className="mono-pill"
+                style={{
+                  fontSize: "0.70rem",
+                  fontWeight: 700,
+                  background: "rgba(99, 102, 241, 0.12)",
+                  color: "#4f46e5",
+                  border: "1px solid #c7d2fe",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <ShieldCheck size={12} /> Super Admin Only
+              </span>
+            </div>
+            <p
+              style={{
+                margin: "2px 0 0",
+                fontSize: "0.80rem",
+                color: "var(--muted-foreground)",
+              }}
+            >
+              Private payment tracking, remaining dues & collection history
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {isDuePending ? (
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.78rem",
+                fontWeight: 700,
+                background: "rgba(245, 158, 11, 0.15)",
+                color: "#b45309",
+                border: "1.5px solid #fde68a",
+                padding: "3px 10px",
+              }}
+            >
+              ⚠️ Due Pending: {money(dueAmount)}
+            </span>
+          ) : (
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.78rem",
+                fontWeight: 700,
+                background: "rgba(22, 163, 74, 0.15)",
+                color: "#15803d",
+                border: "1.5px solid #86efac",
+                padding: "3px 10px",
+              }}
+            >
+              ✓ Payment Fully Cleared
+            </span>
+          )}
+          {isDuePending && (
+            <button
+              type="button"
+              className="btn compact primary"
+              onClick={() => {
+                setRecordAmount(String(dueAmount / 100));
+                setRecordOpen(true);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                padding: "4px 10px",
+                background: "#d97706",
+                borderColor: "#d97706",
+                color: "#fff",
+              }}
+            >
+              <Coins size={13} /> Collect Due Payment
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3 Metric Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "var(--muted)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted-foreground)",
+              fontWeight: 600,
+              textTransform: "uppercase",
+            }}
+          >
+            Total Bill
+          </div>
+          <div
+            style={{
+              fontSize: "1.2rem",
+              fontWeight: 800,
+              color: "var(--foreground)",
+              marginTop: 2,
+            }}
+          >
+            {money(total)}
+          </div>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted-foreground)",
+              marginTop: 2,
+            }}
+          >
+            Books + Delivery
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "rgba(16, 185, 129, 0.08)",
+            border: "1px solid rgba(16, 185, 129, 0.25)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "#047857",
+              fontWeight: 600,
+              textTransform: "uppercase",
+            }}
+          >
+            Amount Received (Paid)
+          </div>
+          <div
+            style={{
+              fontSize: "1.2rem",
+              fontWeight: 800,
+              color: "#059669",
+              marginTop: 2,
+            }}
+          >
+            {money(amountPaid)}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "#047857", marginTop: 2 }}>
+            Collected & verified
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: isDuePending
+              ? "rgba(239, 68, 68, 0.08)"
+              : "rgba(22, 163, 74, 0.08)",
+            border: isDuePending
+              ? "1.5px solid rgba(239, 68, 68, 0.3)"
+              : "1px solid rgba(22, 163, 74, 0.25)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: isDuePending ? "#b91c1c" : "#15803d",
+              fontWeight: 600,
+              textTransform: "uppercase",
+            }}
+          >
+            Remaining Due / Margin
+          </div>
+          <div
+            style={{
+              fontSize: "1.2rem",
+              fontWeight: 800,
+              color: isDuePending ? "#dc2626" : "#16a34a",
+              marginTop: 2,
+            }}
+          >
+            {money(dueAmount)}
+          </div>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: isDuePending ? "#b91c1c" : "#15803d",
+              marginTop: 2,
+            }}
+          >
+            {isDuePending ? "Pending collection" : "Zero balance"}
+          </div>
+        </div>
+      </div>
+
+      {/* Private Due Note */}
+      <div
+        style={{
+          padding: "10px 14px",
+          borderRadius: 8,
+          background: "var(--muted)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 6,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+              Private Admin Due Note
+            </span>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                color: "var(--muted-foreground)",
+              }}
+            >
+              (Hidden from customer & staff)
+            </span>
+          </div>
+          {!editingNote && (
+            <button
+              type="button"
+              className="btn compact"
+              onClick={() => {
+                setNoteDraft(o.due_note || "");
+                setEditingNote(true);
+              }}
+              style={{
+                fontSize: "0.74rem",
+                padding: "2px 8px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Pencil size={12} /> {o.due_note ? "Edit Note" : "+ Add Note"}
+            </button>
+          )}
+        </div>
+
+        {editingNote ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <textarea
+              rows={2}
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="e.g. Rs. 100 pending - will collect on delivery / next order"
+              style={{ fontSize: "0.85rem", width: "100%" }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn compact"
+                onClick={() => setEditingNote(false)}
+                disabled={savingNote}
+                style={{ fontSize: "0.76rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn compact primary"
+                onClick={handleSaveNote}
+                disabled={savingNote}
+                style={{ fontSize: "0.76rem" }}
+              >
+                {savingNote ? "Saving…" : "Save Note"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              fontSize: "0.85rem",
+              color: o.due_note ? "var(--foreground)" : "var(--muted-foreground)",
+              fontStyle: o.due_note ? "normal" : "italic",
+            }}
+          >
+            {o.due_note || "No private notes recorded yet."}
+          </div>
+        )}
+      </div>
+
+      {/* Payment History Log */}
+      {paymentLogs.length > 0 && (
+        <div style={{ marginTop: 2 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Receipt size={15} style={{ color: "var(--primary)" }} />
+              <strong style={{ fontSize: "0.88rem" }}>
+                Payment History & Installments Log
+              </strong>
+            </div>
+            <span
+              className="mono-pill"
+              style={{ fontSize: "0.72rem", fontWeight: 600 }}
+            >
+              {paymentLogs.length}{" "}
+              {paymentLogs.length === 1 ? "entry" : "entries"}
+            </span>
+          </div>
+
+          <div
+            style={{
+              overflowX: "auto",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "0.82rem",
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    background: "var(--muted)",
+                    borderBottom: "1px solid var(--border)",
+                    textAlign: "left",
+                  }}
+                >
+                  <th style={{ padding: "7px 10px", fontWeight: 600 }}>Date</th>
+                  <th
+                    style={{
+                      padding: "7px 10px",
+                      fontWeight: 600,
+                      textAlign: "right",
+                    }}
+                  >
+                    Amount Paid
+                  </th>
+                  <th style={{ padding: "7px 10px", fontWeight: 600 }}>Type</th>
+                  <th style={{ padding: "7px 10px", fontWeight: 600 }}>Note</th>
+                  <th style={{ padding: "7px 10px", fontWeight: 600 }}>
+                    Recorded By
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentLogs.map((log: any, idx: number) => {
+                  const typeLabel =
+                    log.type === "ADVANCE"
+                      ? "Advance Payment"
+                      : log.type === "FULL_PAYMENT"
+                        ? "Full Clearance"
+                        : "Due Collection";
+                  return (
+                    <tr
+                      key={log.id || idx}
+                      style={{
+                        borderBottom:
+                          idx < paymentLogs.length - 1
+                            ? "1px solid var(--border)"
+                            : "none",
+                        background:
+                          idx % 2 === 0 ? "transparent" : "var(--muted)",
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "7px 10px",
+                          color: "var(--muted-foreground)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {new Date(log.created_at || log.payment_date).toLocaleString()}
+                      </td>
+                      <td
+                        style={{
+                          padding: "7px 10px",
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: "#15803d",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {money(log.amount)}
+                      </td>
+                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            background:
+                              log.type === "ADVANCE"
+                                ? "rgba(37, 99, 235, 0.1)"
+                                : log.type === "FULL_PAYMENT"
+                                  ? "rgba(22, 163, 74, 0.15)"
+                                  : "rgba(245, 158, 11, 0.15)",
+                            color:
+                              log.type === "ADVANCE"
+                                ? "#1d4ed8"
+                                : log.type === "FULL_PAYMENT"
+                                  ? "#15803d"
+                                  : "#b45309",
+                          }}
+                        >
+                          {typeLabel}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          padding: "7px 10px",
+                          color: "var(--foreground)",
+                        }}
+                      >
+                        {log.note || "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "7px 10px",
+                          color: "var(--muted-foreground)",
+                          fontSize: "0.78rem",
+                        }}
+                      >
+                        {log.actor || "Super Admin"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Record Due Payment Modal */}
+      <Dialog open={recordOpen} onOpenChange={(v) => !v && !recording && setRecordOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Due Payment Collection</DialogTitle>
+            <DialogDescription>
+              Order {o.reference || o.id} · Customer: {o.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleRecordPayment} className="stack" style={{ gap: 14 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 10,
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "var(--muted)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Total Order Bill:</span>
+                <strong style={{ display: "block", fontSize: "0.95rem" }}>{money(total)}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Already Received:</span>
+                <strong style={{ display: "block", fontSize: "0.95rem", color: "#059669" }}>{money(amountPaid)}</strong>
+              </div>
+              <div style={{ gridColumn: "1 / -1", paddingTop: 6, borderTop: "1px dashed var(--border)" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Current Due Balance:</span>
+                <strong style={{ display: "block", fontSize: "1.1rem", color: "#dc2626" }}>{money(dueAmount)}</strong>
+              </div>
+            </div>
+
+            <Field label="Amount Collected Now (PKR)">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                required
+                value={recordAmount}
+                onChange={(e) => setRecordAmount(e.target.value)}
+                placeholder="e.g. 100"
+                style={{ fontSize: "0.95rem", fontWeight: 700 }}
+              />
+            </Field>
+
+            {(() => {
+              const entered = Math.round(Number(recordAmount || 0) * 100);
+              const remainingAfter = Math.max(0, dueAmount - entered);
+              return (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    background: remainingAfter === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                    border: `1px solid ${remainingAfter === 0 ? "#86efac" : "#fde68a"}`,
+                    fontSize: "0.82rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>Remaining Due After Collection:</span>
+                  <strong style={{ color: remainingAfter === 0 ? "#15803d" : "#b45309" }}>
+                    {money(remainingAfter)} {remainingAfter === 0 && "(Will mark as Fully Paid ✓)"}
+                  </strong>
+                </div>
+              );
+            })()}
+
+            <Field label="Collection Note / Payment Method">
+              <input
+                value={recordNote}
+                onChange={(e) => setRecordNote(e.target.value)}
+                placeholder="e.g. Cash collected by delivery rider, or Easypaisa transfer"
+                style={{ fontSize: "0.85rem" }}
+              />
+            </Field>
+
+            <div className="actions" style={{ marginTop: 4 }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={recording}
+                onClick={() => setRecordOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn primary"
+                disabled={recording || !recordAmount}
+                style={{ background: "#d97706" }}
+              >
+                {recording ? "Saving Payment…" : "Save Payment Record"}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function OrderModalPopup({
   id,
   user,
@@ -3546,17 +4222,34 @@ function OrderModalPopup({
   const [courierModalOpen, setCourierModalOpen] = useState(false);
   const [assignVendorOpen, setAssignVendorOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [partialPaidInput, setPartialPaidInput] = useState<string>("");
+  const [partialDueNote, setPartialDueNote] = useState<string>("");
+
+  useEffect(() => {
+    if (o && o.status === "PAYMENT_PENDING") {
+      const defaultVal = o.detected_amount ? o.detected_amount / 100 : o.total / 100;
+      setPartialPaidInput(String(defaultVal));
+      setPartialDueNote("");
+    }
+  }, [o?.id, o?.status, o?.total, o?.detected_amount]);
 
   const admin = user.role === "SUPER_ADMIN";
   const isVendor = user.role === "VENDOR";
   const canUpdate = admin || user.permissions.includes("orders.update");
 
-  const act = async (action: string, status?: string) => {
+  const act = async (
+    action: string,
+    status?: string,
+    amountPaid?: number,
+    dueNote?: string,
+  ) => {
     try {
       await api("manage/orders/" + id, {
         action,
         status,
         note,
+        amount_paid: amountPaid,
+        due_note: dueNote,
         version: o.version,
       });
       setNote("");
@@ -4054,6 +4747,7 @@ function OrderModalPopup({
                       )}
 
                       <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
+                      <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
 
                       <div className="print-only">
                         <OrderReceipt o={o} />
@@ -4315,6 +5009,81 @@ function OrderModalPopup({
                         </div>
                       </div>
 
+                      {admin && o.status === "PAYMENT_PENDING" && (
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "rgba(37, 99, 235, 0.05)",
+                            border: "1px solid rgba(37, 99, 235, 0.2)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                            margin: "4px 0",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.84rem", fontWeight: 600 }}>Amount Received / Paid (PKR):</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={partialPaidInput}
+                              onChange={(e) => setPartialPaidInput(e.target.value)}
+                              style={{ width: "130px", textAlign: "right", fontWeight: 700, padding: "5px 8px" }}
+                            />
+                          </div>
+
+                          {(() => {
+                            const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
+                            const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                            if (dueCents > 0) {
+                              return (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <div
+                                    style={{
+                                      padding: "8px 10px",
+                                      borderRadius: 6,
+                                      background: "rgba(245, 158, 11, 0.12)",
+                                      border: "1px solid #fde68a",
+                                      color: "#b45309",
+                                      fontSize: "0.82rem",
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <span>⚠️ Remaining Due Margin:</span>
+                                    <strong>{money(dueCents)}</strong>
+                                  </div>
+                                  <Field label="Private Due Note (Super Admin only)">
+                                    <input
+                                      value={partialDueNote}
+                                      onChange={(e) => setPartialDueNote(e.target.value)}
+                                      placeholder="e.g. Rs. 100 pending - will collect on delivery"
+                                      style={{ fontSize: "0.84rem" }}
+                                    />
+                                  </Field>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                style={{
+                                  fontSize: "0.78rem",
+                                  color: "#15803d",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <CheckCircle2 size={13} /> Full amount received ({money(enteredCents)}). No balance due.
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+
                       {o.payment_note && (
                         <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
                           <strong>Note:</strong> {o.payment_note}
@@ -4330,27 +5099,52 @@ function OrderModalPopup({
                           />
                         </Field>
                       )}
-                      {admin && o.status === "PAYMENT_PENDING" && (
-                        <div className="actions">
-                          {[
-                            ["approve", "Approve Payment"],
-                            ["reject", "Reject Payment"],
-                            ["request", "Request New Slip"],
-                            ["manual", "Manual Review"],
-                          ].map(([action, label]) => (
+                      {admin && o.status === "PAYMENT_PENDING" && (() => {
+                        const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
+                        const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                        const isPartial = dueCents > 0;
+                        return (
+                          <div className="actions">
                             <button
-                              key={action}
-                              className={
-                                "btn compact " +
-                                (action === "approve" ? "primary" : "")
+                              className="btn compact primary"
+                              style={{ background: isPartial ? "#d97706" : undefined }}
+                              onClick={() =>
+                                setDecision({
+                                  action: "approve",
+                                  label: isPartial
+                                    ? `Approve with Partial Payment (${money(dueCents)} Due)`
+                                    : "Approve Payment",
+                                  amount_paid: enteredCents,
+                                  due_amount: dueCents,
+                                  due_note: partialDueNote,
+                                })
                               }
-                              onClick={() => setDecision({ action, label })}
                             >
-                              {label}
+                              {isPartial
+                                ? `Approve Partial (${money(dueCents)} Due)`
+                                : "Approve Payment"}
                             </button>
-                          ))}
-                        </div>
-                      )}
+                            <button
+                              className="btn compact"
+                              onClick={() => setDecision({ action: "reject", label: "Reject Payment" })}
+                            >
+                              Reject Payment
+                            </button>
+                            <button
+                              className="btn compact"
+                              onClick={() => setDecision({ action: "request", label: "Request New Slip" })}
+                            >
+                              Request New Slip
+                            </button>
+                            <button
+                              className="btn compact"
+                              onClick={() => setDecision({ action: "manual", label: "Manual Review" })}
+                            >
+                              Manual Review
+                            </button>
+                          </div>
+                        );
+                      })()}
                       {admin && (
                         <button
                           className="btn compact"
@@ -4466,10 +5260,19 @@ function OrderModalPopup({
           title={decision?.label || "Update order"}
           description={
             decision?.action === "approve"
-              ? "Confirm only after checking the bank transaction. Approval confirms the order."
+              ? decision?.due_amount > 0
+                ? `Confirm approving order with partial payment of ${money(decision.amount_paid)}. A remaining balance of ${money(decision.due_amount)} will be recorded as pending due.`
+                : "Confirm only after checking the bank transaction. Approval confirms the order."
               : "This decision will be recorded in the order history and audit log."
           }
-          onConfirm={() => act(decision.action, decision.status)}
+          onConfirm={() =>
+            act(
+              decision.action,
+              decision.status,
+              decision.amount_paid,
+              decision.due_note,
+            )
+          }
         />
 
         <Confirm
@@ -6442,7 +7245,26 @@ function Orders({
                   </div>,
                   booksCell,
                   formatDateDMY(o.created_at),
-                  money(o.total),
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <strong>{money(o.total)}</strong>
+                    {isAdmin && Number(o.due_amount || 0) > 0 && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                          padding: "1px 5px",
+                          width: "fit-content",
+                        }}
+                        title={`Paid: ${money(o.amount_paid || 0)} · Due: ${money(o.due_amount)}`}
+                      >
+                        Due: {money(o.due_amount)}
+                      </span>
+                    )}
+                  </div>,
                   <Status value={o.payment_status} />,
                   <TableActionButton
                     onClick={() => setActiveOrderId(o.id)}
@@ -6488,7 +7310,26 @@ function Orders({
                   </div>,
                   booksCell,
                   formatDateDMY(o.created_at),
-                  money(o.total),
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <strong>{money(o.total)}</strong>
+                    {isAdmin && Number(o.due_amount || 0) > 0 && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                          padding: "1px 5px",
+                          width: "fit-content",
+                        }}
+                        title={`Paid: ${money(o.amount_paid || 0)} · Due: ${money(o.due_amount)}`}
+                      >
+                        Due: {money(o.due_amount)}
+                      </span>
+                    )}
+                  </div>,
                   statusCell,
                   <Status value={o.payment_status} />,
                   <TableActionButton
@@ -6764,16 +7605,34 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
     [decision, setDecision] = useState<any>(null),
     [courierModalOpen, setCourierModalOpen] = useState(false),
     [assignVendorOpen, setAssignVendorOpen] = useState(false),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [partialPaidInput, setPartialPaidInput] = useState<string>(""),
+    [partialDueNote, setPartialDueNote] = useState<string>("");
+
+  useEffect(() => {
+    if (o && o.status === "PAYMENT_PENDING") {
+      const defaultVal = o.detected_amount ? o.detected_amount / 100 : o.total / 100;
+      setPartialPaidInput(String(defaultVal));
+      setPartialDueNote("");
+    }
+  }, [o?.id, o?.status, o?.total, o?.detected_amount]);
+
   const admin = user.role === "SUPER_ADMIN",
     isVendor = user.role === "VENDOR",
     canUpdate = admin || isVendor || user.permissions.includes("orders.update");
-  const act = async (action: string, status?: string) => {
+  const act = async (
+    action: string,
+    status?: string,
+    amountPaid?: number,
+    dueNote?: string,
+  ) => {
     try {
       await api("manage/orders/" + id, {
         action,
         status,
         note,
+        amount_paid: amountPaid,
+        due_note: dueNote,
         version: o.version,
       });
       setNote("");
@@ -7186,6 +8045,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                 </div>
                 <div className="stack no-print">
                   <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
+                  <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
                   <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
                     <div>
                       <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
@@ -7449,6 +8309,81 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                     </div>
                   </div>
 
+                  {admin && o.status === "PAYMENT_PENDING" && (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(37, 99, 235, 0.05)",
+                        border: "1px solid rgba(37, 99, 235, 0.2)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                        margin: "4px 0",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.84rem", fontWeight: 600 }}>Amount Received / Paid (PKR):</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={partialPaidInput}
+                          onChange={(e) => setPartialPaidInput(e.target.value)}
+                          style={{ width: "130px", textAlign: "right", fontWeight: 700, padding: "5px 8px" }}
+                        />
+                      </div>
+
+                      {(() => {
+                        const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
+                        const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                        if (dueCents > 0) {
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              <div
+                                style={{
+                                  padding: "8px 10px",
+                                  borderRadius: 6,
+                                  background: "rgba(245, 158, 11, 0.12)",
+                                  border: "1px solid #fde68a",
+                                  color: "#b45309",
+                                  fontSize: "0.82rem",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span>⚠️ Remaining Due Margin:</span>
+                                <strong>{money(dueCents)}</strong>
+                              </div>
+                              <Field label="Private Due Note (Super Admin only)">
+                                <input
+                                  value={partialDueNote}
+                                  onChange={(e) => setPartialDueNote(e.target.value)}
+                                  placeholder="e.g. Rs. 100 pending - will collect on delivery"
+                                  style={{ fontSize: "0.84rem" }}
+                                />
+                              </Field>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            style={{
+                              fontSize: "0.78rem",
+                              color: "#15803d",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <CheckCircle2 size={13} /> Full amount received ({money(enteredCents)}). No balance due.
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {o.payment_note && (
                     <div className="notice info-text" style={{ margin: "2px 0 6px" }}>
                       <strong>Note:</strong> {o.payment_note}
@@ -7464,27 +8399,52 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       />
                     </Field>
                   )}
-                  {admin && o.status === "PAYMENT_PENDING" && (
-                    <div className="actions">
-                      {[
-                        ["approve", "Approve Payment"],
-                        ["reject", "Reject Payment"],
-                        ["request", "Request New Slip"],
-                        ["manual", "Manual Review"],
-                      ].map(([action, label]) => (
+                  {admin && o.status === "PAYMENT_PENDING" && (() => {
+                    const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
+                    const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                    const isPartial = dueCents > 0;
+                    return (
+                      <div className="actions">
                         <button
-                          key={action}
-                          className={
-                            "btn compact " +
-                            (action === "approve" ? "primary" : "")
+                          className="btn compact primary"
+                          style={{ background: isPartial ? "#d97706" : undefined }}
+                          onClick={() =>
+                            setDecision({
+                              action: "approve",
+                              label: isPartial
+                                ? `Approve with Partial Payment (${money(dueCents)} Due)`
+                                : "Approve Payment",
+                              amount_paid: enteredCents,
+                              due_amount: dueCents,
+                              due_note: partialDueNote,
+                            })
                           }
-                          onClick={() => setDecision({ action, label })}
                         >
-                          {label}
+                          {isPartial
+                            ? `Approve Partial (${money(dueCents)} Due)`
+                            : "Approve Payment"}
                         </button>
-                      ))}
-                    </div>
-                  )}
+                        <button
+                          className="btn compact"
+                          onClick={() => setDecision({ action: "reject", label: "Reject Payment" })}
+                        >
+                          Reject Payment
+                        </button>
+                        <button
+                          className="btn compact"
+                          onClick={() => setDecision({ action: "request", label: "Request New Slip" })}
+                        >
+                          Request New Slip
+                        </button>
+                        <button
+                          className="btn compact"
+                          onClick={() => setDecision({ action: "manual", label: "Manual Review" })}
+                        >
+                          Manual Review
+                        </button>
+                      </div>
+                    );
+                  })()}
                   {admin && (
                     <button
                       className="btn compact"
@@ -7595,10 +8555,19 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             title={decision?.label || "Update order"}
             description={
               decision?.action === "approve"
-                ? "Confirm only after checking the bank transaction. Approval confirms the order."
+                ? decision?.due_amount > 0
+                  ? `Confirm approving order with partial payment of ${money(decision.amount_paid)}. A remaining balance of ${money(decision.due_amount)} will be recorded as pending due.`
+                  : "Confirm only after checking the bank transaction. Approval confirms the order."
                 : "This decision will be recorded in the order history and audit log."
             }
-            onConfirm={() => act(decision.action, decision.status)}
+            onConfirm={() =>
+              act(
+                decision.action,
+                decision.status,
+                decision.amount_paid,
+                decision.due_note,
+              )
+            }
           />
 
           {courierModalOpen && (

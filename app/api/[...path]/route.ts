@@ -53,6 +53,8 @@ import {
   setPrintingQueue,
   batchSetPrintingQueue,
   editOrderItems,
+  recordDuePayment,
+  updateDueNote,
 } from "@/lib/server/orders";
 import {
   listVendors,
@@ -736,6 +738,8 @@ async function handle(req: Request) {
               "vendor_dispatch_office",
               "printing_queue",
               "edit_items",
+              "record_due_payment",
+              "update_due_note",
             ]),
             status: z.string().optional(),
             courier_name: z.string().trim().max(100).optional(),
@@ -745,6 +749,9 @@ async function handle(req: Request) {
             version: z.number().int().optional(),
             printed: z.boolean().optional(),
             in_queue: z.boolean().optional(),
+            amount: z.number().optional(),
+            amount_paid: z.number().optional(),
+            due_note: z.string().trim().max(2000).optional(),
             items: z
               .array(
                 z.object({
@@ -816,9 +823,32 @@ async function handle(req: Request) {
           );
         if (b.action === "remove_courier")
           return ok(await removeCourierTracking(req, u, id));
+        if (b.action === "record_due_payment") {
+          if (u.role !== "SUPER_ADMIN")
+            throw new AppError(403, "Only Super Admin can record due payments.");
+          if (b.amount === undefined || b.amount <= 0)
+            throw new AppError(400, "Valid payment amount required.");
+          return ok(await recordDuePayment(req, u, id, b.amount, b.note));
+        }
+        if (b.action === "update_due_note") {
+          if (u.role !== "SUPER_ADMIN")
+            throw new AppError(403, "Only Super Admin can update due notes.");
+          return ok(await updateDueNote(req, u, id, b.due_note || ""));
+        }
         if (u.role !== "SUPER_ADMIN")
           throw new AppError(403, "Only Super Admin may verify payments.");
-        return ok(await decidePayment(req, u, id, b.action, b.note, b.version!));
+        return ok(
+          await decidePayment(
+            req,
+            u,
+            id,
+            b.action,
+            b.note,
+            b.version!,
+            b.amount_paid,
+            b.due_note,
+          ),
+        );
       }
     }
     if (section === "reports" && method === "GET") {
