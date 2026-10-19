@@ -52,6 +52,7 @@ import {
   batchVendorDispatchOffice,
   setPrintingQueue,
   batchSetPrintingQueue,
+  editOrderItems,
 } from "@/lib/server/orders";
 import {
   listVendors,
@@ -734,6 +735,7 @@ async function handle(req: Request) {
               "vendor_print",
               "vendor_dispatch_office",
               "printing_queue",
+              "edit_items",
             ]),
             status: z.string().optional(),
             courier_name: z.string().trim().max(100).optional(),
@@ -743,8 +745,22 @@ async function handle(req: Request) {
             version: z.number().int().optional(),
             printed: z.boolean().optional(),
             in_queue: z.boolean().optional(),
+            items: z
+              .array(
+                z.object({
+                  id: z.string().trim(),
+                  quantity: z.number().int().min(1).max(500),
+                }),
+              )
+              .optional(),
           })
           .parse(await json(req));
+        if (b.action === "edit_items") {
+          if (!b.items || !b.items.length) {
+            throw new AppError(400, "Order must retain at least one book.");
+          }
+          return ok(await editOrderItems(req, u, id, b.items, b.note));
+        }
         if (b.action === "printing_queue") {
           return ok(await setPrintingQueue(req, u, id, b.in_queue !== false));
         }

@@ -16,6 +16,8 @@ import {
   UserRound,
   BarChart3,
   Plus,
+  Minus,
+  Pencil,
   Download,
   Upload,
   Copy,
@@ -2836,6 +2838,695 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
   );
 }
 
+function AdminOrderBooksPanel({
+  o,
+  user,
+  onUpdated,
+}: {
+  o: any;
+  user: User;
+  onUpdated: () => Promise<void> | void;
+}) {
+  const admin = user.role === "SUPER_ADMIN";
+  const canUpdate = admin || user.permissions?.includes("orders.update");
+  const isPrinted = !!o.vendor_printed_at;
+  const isLockedStatus = [
+    "PRINTED",
+    "SHIPPED",
+    "DELIVERED",
+    "CANCELLED",
+    "REJECTED",
+    "REFUND_REQUESTED",
+  ].includes(o.status);
+  const canEdit = canUpdate && !isPrinted && !isLockedStatus;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [itemsDraft, setItemsDraft] = useState<any[]>([]);
+  const [editNote, setEditNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const rawItems: any[] = o?.items || [];
+  const totalBooks = rawItems.reduce(
+    (sum: number, it: any) => sum + (it.quantity || 1),
+    0,
+  );
+  const totalPages = rawItems.reduce(
+    (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
+    0,
+  );
+
+  const startEditing = () => {
+    setItemsDraft(
+      rawItems.map((it: any) => ({
+        id: it.id,
+        code: it.code,
+        title: it.title,
+        pages: it.pages,
+        unit_price: Number(it.unit_price) || 0,
+        quantity: Number(it.quantity) || 1,
+      })),
+    );
+    setEditNote("");
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setItemsDraft([]);
+    setEditNote("");
+  };
+
+  const updateQuantity = (id: string, delta: number) => {
+    setItemsDraft((prev) =>
+      prev.map((it) => {
+        if (it.id !== id) return it;
+        const nextQty = Math.max(1, Math.min(100, (Number(it.quantity) || 1) + delta));
+        return { ...it, quantity: nextQty };
+      }),
+    );
+  };
+
+  const setDirectQuantity = (id: string, val: number) => {
+    const nextQty = Math.max(1, Math.min(100, isNaN(val) ? 1 : val));
+    setItemsDraft((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, quantity: nextQty } : it)),
+    );
+  };
+
+  const removeItem = (id: string) => {
+    if (itemsDraft.length <= 1) {
+      toast.error(
+        "Order must contain at least 1 book. If removing all books, please cancel or reject the order instead.",
+      );
+      return;
+    }
+    setItemsDraft((prev) => prev.filter((it) => it.id !== id));
+  };
+
+  const draftSubtotal = itemsDraft.reduce(
+    (sum, it) => sum + it.unit_price * it.quantity,
+    0,
+  );
+  const deliveryFee = Number(o?.delivery) || 0;
+  const draftTotal = draftSubtotal + deliveryFee;
+  const draftBooksCount = itemsDraft.reduce((sum, it) => sum + it.quantity, 0);
+
+  const hasChanges = (() => {
+    if (itemsDraft.length !== rawItems.length) return true;
+    for (const d of itemsDraft) {
+      const orig = rawItems.find((r: any) => r.id === d.id);
+      if (!orig || orig.quantity !== d.quantity) return true;
+    }
+    return false;
+  })();
+
+  const handleSave = async () => {
+    if (!hasChanges) {
+      setIsEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api(`manage/orders/${o.id}`, {
+        action: "edit_items",
+        items: itemsDraft.map((it) => ({
+          id: it.id,
+          quantity: it.quantity,
+        })),
+        note: editNote.trim(),
+      });
+      toast.success(res.message || "Order items and total updated successfully ✓");
+      notifyOrdersUpdated();
+      setIsEditing(false);
+      setConfirmOpen(false);
+      await onUpdated();
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="panel stack admin-order-books-panel"
+      style={{
+        borderRadius: 10,
+        border: isEditing ? "2px solid #2563eb" : "1px solid var(--border)",
+        background: "var(--card)",
+        padding: "16px",
+        position: "relative",
+        transition: "border-color 0.2s ease",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          paddingBottom: 12,
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: "rgba(37, 99, 235, 0.12)",
+              color: "#2563eb",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <BookOpen size={17} />
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>
+                Ordered Books
+              </h3>
+              <span
+                className="mono-pill"
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  background: "rgba(37, 99, 235, 0.12)",
+                  color: "#1d4ed8",
+                }}
+              >
+                {isEditing ? draftBooksCount : totalBooks}{" "}
+                {(isEditing ? draftBooksCount : totalBooks) === 1 ? "book" : "books"}
+              </span>
+            </div>
+            <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+              {isEditing
+                ? "Adjust quantity or exclude books. Totals update in real-time."
+                : `${totalPages > 0 ? `${totalPages.toLocaleString()} pages · ` : ""}Subtotal: ${money(o.subtotal || 0)}`}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          {isEditing ? (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn compact"
+                disabled={saving}
+                onClick={cancelEditing}
+              >
+                <X size={14} /> Discard
+              </button>
+              <button
+                type="button"
+                className="btn compact primary"
+                disabled={saving || !hasChanges}
+                onClick={() => setConfirmOpen(true)}
+                style={{ background: "#2563eb" }}
+              >
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          ) : canEdit ? (
+            <button
+              type="button"
+              className="btn compact"
+              onClick={startEditing}
+              title="Edit quantities or exclude books"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 600,
+              }}
+            >
+              <Pencil size={13} /> Edit Books / Qty
+            </button>
+          ) : (
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.72rem",
+                color: "var(--muted-foreground)",
+                background: "var(--muted)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              {isPrinted ? "🔒 Printed by Vendor" : `🔒 Locked (${o.status})`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Edit Mode Notice Banner */}
+      {isEditing && (
+        <div
+          style={{
+            padding: "9px 12px",
+            borderRadius: 6,
+            background: "rgba(59, 130, 246, 0.08)",
+            border: "1px solid rgba(59, 130, 246, 0.3)",
+            fontSize: "0.82rem",
+            color: "var(--foreground)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span>✏️</span>
+          <span>
+            <strong>Editing Mode:</strong> Adjust copies using <strong>[-]</strong> and{" "}
+            <strong>[+]</strong> or click <strong>🗑️</strong> to remove an accidental book.
+          </span>
+        </div>
+      )}
+
+      {/* Table */}
+      {(isEditing ? itemsDraft : rawItems).length === 0 ? (
+        <div
+          style={{
+            padding: "20px",
+            textAlign: "center",
+            fontSize: "0.85rem",
+            color: "var(--muted-foreground)",
+          }}
+        >
+          No books found in this order.
+        </div>
+      ) : (
+        <div
+          style={{
+            overflowX: "auto",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+          }}
+        >
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "0.85rem",
+            }}
+          >
+            <thead>
+              <tr
+                style={{
+                  background: "var(--muted)",
+                  borderBottom: "1px solid var(--border)",
+                  textAlign: "left",
+                }}
+              >
+                <th
+                  style={{
+                    padding: "8px 10px",
+                    fontWeight: 600,
+                    width: "32px",
+                    color: "var(--muted-foreground)",
+                  }}
+                >
+                  #
+                </th>
+                <th style={{ padding: "8px 10px", fontWeight: 600 }}>Code</th>
+                <th style={{ padding: "8px 10px", fontWeight: 600 }}>Book Title</th>
+                <th
+                  style={{
+                    padding: "8px 10px",
+                    fontWeight: 600,
+                    textAlign: "right",
+                  }}
+                >
+                  Price
+                </th>
+                <th
+                  style={{
+                    padding: "8px 10px",
+                    fontWeight: 600,
+                    textAlign: "center",
+                    width: isEditing ? "130px" : "60px",
+                  }}
+                >
+                  {isEditing ? "Quantity" : "Qty"}
+                </th>
+                <th
+                  style={{
+                    padding: "8px 10px",
+                    fontWeight: 600,
+                    textAlign: "right",
+                    width: "90px",
+                  }}
+                >
+                  Total
+                </th>
+                {isEditing && (
+                  <th
+                    style={{
+                      padding: "8px 10px",
+                      fontWeight: 600,
+                      textAlign: "center",
+                      width: "50px",
+                    }}
+                  >
+                    Action
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {(isEditing ? itemsDraft : rawItems).map((it: any, idx: number) => {
+                const unitPrice = Number(it.unit_price) || 0;
+                const qty = Number(it.quantity) || 1;
+                const lineTotal = unitPrice * qty;
+
+                return (
+                  <tr
+                    key={it.id || it.code || idx}
+                    style={{
+                      borderBottom:
+                        idx < (isEditing ? itemsDraft : rawItems).length - 1
+                          ? "1px solid var(--border)"
+                          : "none",
+                      background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                    }}
+                  >
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        color: "var(--muted-foreground)",
+                        fontSize: "0.8rem",
+                      }}
+                    >
+                      {idx + 1}
+                    </td>
+                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.78rem",
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        {it.code}
+                      </span>
+                    </td>
+                    <td style={{ padding: "8px 10px", fontWeight: 500 }}>
+                      <div>{it.title}</div>
+                      {it.pages ? (
+                        <span
+                          style={{
+                            fontSize: "0.74rem",
+                            color: "var(--muted-foreground)",
+                          }}
+                        >
+                          {it.pages} pages
+                        </span>
+                      ) : null}
+                    </td>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        whiteSpace: "nowrap",
+                        color: "var(--muted-foreground)",
+                      }}
+                    >
+                      {money(unitPrice)}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                      {isEditing ? (
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                            background: "var(--card)",
+                            padding: "2px 4px",
+                            borderRadius: 6,
+                            border: "1px solid var(--border)",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="btn compact icon-only"
+                            style={{ width: 24, height: 24, padding: 0 }}
+                            onClick={() => updateQuantity(it.id, -1)}
+                            disabled={qty <= 1}
+                            title="Decrease quantity"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={qty}
+                            onChange={(e) =>
+                              setDirectQuantity(it.id, parseInt(e.target.value, 10))
+                            }
+                            style={{
+                              width: 38,
+                              textAlign: "center",
+                              border: "none",
+                              background: "transparent",
+                              fontWeight: 700,
+                              fontSize: "0.86rem",
+                              color: "var(--foreground)",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn compact icon-only"
+                            style={{ width: 24, height: 24, padding: 0 }}
+                            onClick={() => updateQuantity(it.id, 1)}
+                            disabled={qty >= 100}
+                            title="Increase quantity"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "0.8rem",
+                            background: "rgba(37, 99, 235, 0.12)",
+                            color: "#1d4ed8",
+                            padding: "2px 7px",
+                          }}
+                        >
+                          ×{qty}
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {money(lineTotal)}
+                    </td>
+                    {isEditing && (
+                      <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                        <button
+                          type="button"
+                          className="btn compact icon-only danger-button"
+                          style={{ width: 26, height: 26, padding: 0 }}
+                          onClick={() => removeItem(it.id)}
+                          disabled={itemsDraft.length <= 1}
+                          title={
+                            itemsDraft.length <= 1
+                              ? "At least 1 book required"
+                              : `Exclude ${it.code} from order`
+                          }
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr
+                style={{
+                  background: "var(--muted)",
+                  borderTop: "1px solid var(--border)",
+                  fontWeight: 600,
+                  fontSize: "0.82rem",
+                }}
+              >
+                <td colSpan={3} style={{ padding: "8px 10px" }}>
+                  Subtotal:
+                </td>
+                <td
+                  colSpan={2}
+                  style={{
+                    padding: "8px 10px",
+                    textAlign: "center",
+                    color: "#1d4ed8",
+                    fontWeight: 700,
+                  }}
+                >
+                  {isEditing ? draftBooksCount : totalBooks} books
+                </td>
+                <td
+                  style={{
+                    padding: "8px 10px",
+                    textAlign: "right",
+                    color: "var(--foreground)",
+                    fontWeight: 700,
+                  }}
+                >
+                  {money(isEditing ? draftSubtotal : (o.subtotal || 0))}
+                </td>
+                {isEditing && <td />}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* Recalculation Summary Box when in Editing Mode */}
+      {isEditing && (
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 8,
+            background: "var(--muted)",
+            border: "1px solid var(--border)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+              Subtotal:
+            </span>
+            <span style={{ fontSize: "0.9rem" }}>
+              {money(o.subtotal || 0)} ➔ <strong>{money(draftSubtotal)}</strong>
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+              Delivery charges:
+            </span>
+            <span style={{ fontSize: "0.9rem" }}>{money(deliveryFee)}</span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingTop: 6,
+              borderTop: "1px dashed var(--border)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.92rem",
+                fontWeight: 700,
+                color: "var(--foreground)",
+              }}
+            >
+              New Grand Total:
+            </span>
+            <span
+              style={{
+                fontSize: "1.1rem",
+                fontWeight: 800,
+                color: "#16a34a",
+              }}
+            >
+              {money(o.total || 0)} ➔ {money(draftTotal)}
+            </span>
+          </div>
+
+          <div style={{ marginTop: 6 }}>
+            <input
+              type="text"
+              value={editNote}
+              onChange={(e) => setEditNote(e.target.value)}
+              placeholder="Reason for change (e.g. Student ordered 5 copies by mistake, adjusted to 1)"
+              className="toolbar-search-input"
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: "0.82rem",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              justifyContent: "flex-end",
+              marginTop: 4,
+            }}
+          >
+            <button
+              type="button"
+              className="btn compact"
+              disabled={saving}
+              onClick={cancelEditing}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn compact primary"
+              disabled={saving || !hasChanges}
+              onClick={() => setConfirmOpen(true)}
+              style={{ background: "#2563eb" }}
+            >
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      <Confirm
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Save Order Changes?"
+        description={`Order total will update from ${money(o.total || 0)} to ${money(draftTotal)}. The books list, vendor fulfillment, and order history will auto-update.`}
+        onConfirm={handleSave}
+      />
+    </div>
+  );
+}
+
 function OrderModalPopup({
   id,
   user,
@@ -3361,6 +4052,8 @@ function OrderModalPopup({
                           </div>
                         </div>
                       )}
+
+                      <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
 
                       <div className="print-only">
                         <OrderReceipt o={o} />
@@ -6492,6 +7185,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                   <OrderReceipt o={o} />
                 </div>
                 <div className="stack no-print">
+                  <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
                   <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
                     <div>
                       <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>

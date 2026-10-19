@@ -1060,6 +1060,164 @@ export async function removeCourierTracking(
   return { ok: true, removed: true, status: nextStatus };
 }
 
+export async function editOrderItems(
+  req: Request,
+  u: User,
+  id: string,
+  itemsPayload: Array<{ id: string; quantity: number }>,
+  note = "",
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "You do not have permission to edit orders.");
+  }
+
+  const o = await one<any>("SELECT * FROM orders WHERE id=?", id);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  if (["SHIPPED", "DELIVERED", "CANCELLED", "REJECTED", "REFUND_REQUESTED"].includes(o.status)) {
+    throw new AppError(400, `Cannot edit items for order in ${statuses[o.status] || o.status} status.`);
+  }
+
+  if (o.vendor_printed_at) {
+    throw new AppError(
+      400,
+      "This order has already been marked as printed by the vendor and cannot be modified.",
+    );
+  }
+
+  if (!Array.isArray(itemsPayload) || itemsPayload.length === 0) {
+    throw new AppError(400, "Order must retain at least one book.");
+  }
+
+  const currentItems = await all<any>("SELECT * FROM order_items WHERE order_id=?", id);
+  if (!currentItems.length) throw new AppError(400, "Order has no existing items.");
+
+  const currentItemMap = new Map<string, any>(currentItems.map((it: any) => [it.id, it]));
+
+  for (const p of itemsPayload) {
+    if (!currentItemMap.has(p.id)) {
+      throw new AppError(400, `Item with ID ${p.id} does not belong to this order.`);
+    }
+    if (!Number.isInteger(p.quantity) || p.quantity < 1 || p.quantity > 500) {
+      throw new AppError(400, "Each book quantity must be an integer between 1 and 500.");
+    }
+  }
+
+  const keptItemIds = new Set(itemsPayload.map((p) => p.id));
+  const removedItems = currentItems.filter((it: any) => !keptItemIds.has(it.id));
+  const changedItems: Array<{ code: string; title: string; oldQty: number; newQty: number }> = [];
+
+  for (const p of itemsPayload) {
+    const orig = currentItemMap.get(p.id);
+    if (orig && orig.quantity !== p.quantity) {
+      changedItems.push({ code: orig.code, title: orig.title, oldQty: orig.quantity, newQty: p.quantity });
+    }
+  }
+
+  if (removedItems.length === 0 && changedItems.length === 0) {
+    return {
+      ok: true,
+      subtotal: o.subtotal,
+      total: o.total,
+      message: "No changes made to order items.",
+    };
+  }
+
+  let newSubtotal = 0;
+  for (const p of itemsPayload) {
+    const orig = currentItemMap.get(p.id);
+    newSubtotal += Number(orig.unit_price) * p.quantity;
+  }
+  const newTotal = newSubtotal + Number(o.delivery);
+
+  const changeParts: string[] = [];
+  if (changedItems.length > 0) {
+    changeParts.push(
+      "Qty: " +
+        changedItems.map((c) => `${c.code} (${c.oldQty} → ${c.newQty})`).join(", "),
+    );
+  }
+  if (removedItems.length > 0) {
+    changeParts.push(
+      "Excluded: " + removedItems.map((r: any) => r.code).join(", "),
+    );
+  }
+
+  const noteText = `Admin adjusted items (${changeParts.join("; ")}). Total: Rs. ${Number(o.total).toLocaleString()} → Rs. ${Number(newTotal).toLocaleString()}.${note ? ` Note: ${note}` : ""}`;
+  const at = now();
+
+  const statements: any[] = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", o.id, o.version),
+  ];
+
+  for (const r of removedItems) {
+    statements.push(stmt("DELETE FROM order_items WHERE id=? AND order_id=?", r.id, o.id));
+  }
+
+  for (const p of itemsPayload) {
+    statements.push(
+      stmt(
+        "UPDATE order_items SET quantity=? WHERE id=? AND order_id=?",
+        p.quantity,
+        p.id,
+        o.id,
+      ),
+    );
+  }
+
+  statements.push(
+    stmt(
+      "UPDATE orders SET subtotal=?, total=?, version=version+1, updated_at=? WHERE id=?",
+      newSubtotal,
+      newTotal,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,created_at) VALUES(?,?,?,?,?,?)",
+      uid(),
+      o.id,
+      o.status,
+      noteText,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEMS_EDITED",
+      o.id,
+      {
+        subtotal: o.subtotal,
+        total: o.total,
+        items_count: currentItems.length,
+        items: currentItems.map((it: any) => ({ code: it.code, qty: it.quantity, unit_price: it.unit_price })),
+      },
+      {
+        subtotal: newSubtotal,
+        total: newTotal,
+        items_count: itemsPayload.length,
+        items: itemsPayload.map((p) => {
+          const orig = currentItemMap.get(p.id);
+          return { code: orig.code, qty: p.quantity, unit_price: orig.unit_price };
+        }),
+        removed: removedItems.map((r: any) => r.code),
+        note,
+      },
+      req,
+    ),
+  );
+
+  await batch(statements);
+
+  return {
+    ok: true,
+    subtotal: newSubtotal,
+    total: newTotal,
+    count: itemsPayload.length,
+    message: `Order updated successfully (${changeParts.join("; ")}). Total is now Rs. ${Number(newTotal).toLocaleString()}.`,
+  };
+}
+
 export async function vendorPrint(
   req: Request,
   u: User,

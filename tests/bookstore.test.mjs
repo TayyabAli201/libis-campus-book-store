@@ -58,6 +58,7 @@ const {
   batchVendorDispatchOffice,
   setPrintingQueue,
   batchSetPrintingQueue,
+  editOrderItems,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -2238,6 +2239,133 @@ test("Vendor Pricing Control, auto-calculation formula, retail price privacy, an
   assert.equal(ledgerAfterDelete.summary.pending_balance, 240);
   assert.equal(ledgerAfterDelete.payments.length, 0);
 });
+
+test("Admin Order Editing: adjust quantity, exclude books, auto-recalculate total, and enforce status locking", async (t) => {
+  const sqlite = database(t);
+  const { id: book1Id } = await saveBook(
+    bookInput("EDIT101", { title: "Edit Book One", pages: 100, active: true }),
+    admin,
+    request,
+  );
+  const { id: book2Id } = await saveBook(
+    bookInput("EDIT102", { title: "Edit Book Two", pages: 200, active: true }),
+    admin,
+    request,
+  );
+
+  const cart = {
+    name: "Hassan Ali",
+    phone: "03009988776",
+    city: "Lahore",
+    address: "Johar Town, Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: book1Id, quantity: 5 },
+      { id: book2Id, quantity: 2 },
+    ],
+  };
+
+  const q = await quote(request, cart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  const initialOrder = await getOrder(request, placed.id, admin);
+  assert.equal(initialOrder.items.length, 2);
+  const b1Item = initialOrder.items.find((it) => it.code === "EDIT101");
+  const b2Item = initialOrder.items.find((it) => it.code === "EDIT102");
+  assert.equal(b1Item.quantity, 5);
+  assert.equal(b2Item.quantity, 2);
+
+  const b1UnitPrice = b1Item.unit_price;
+  const b2UnitPrice = b2Item.unit_price;
+  const delivery = initialOrder.delivery;
+
+  // 1. Adjust quantity: change Book 1 from 5 copies to 1 copy
+  const edit1 = await editOrderItems(
+    request,
+    admin,
+    placed.id,
+    [
+      { id: b1Item.id, quantity: 1 },
+      { id: b2Item.id, quantity: 2 },
+    ],
+    "Student accidentally selected 5 copies",
+  );
+
+  assert.equal(edit1.ok, true);
+  const expectedSubtotal1 = (b1UnitPrice * 1) + (b2UnitPrice * 2);
+  assert.equal(edit1.subtotal, expectedSubtotal1);
+  assert.equal(edit1.total, expectedSubtotal1 + delivery);
+
+  const orderAfterEdit1 = await getOrder(request, placed.id, admin);
+  assert.equal(orderAfterEdit1.subtotal, expectedSubtotal1);
+  assert.equal(orderAfterEdit1.total, expectedSubtotal1 + delivery);
+  const updatedB1 = orderAfterEdit1.items.find((it) => it.code === "EDIT101");
+  assert.equal(updatedB1.quantity, 1);
+
+  // Check order history contains the audit note
+  const history1 = orderAfterEdit1.history;
+  const latestHistory1 = history1[history1.length - 1];
+  assert.ok(latestHistory1.note.includes("EDIT101 (5 → 1)"));
+  assert.ok(latestHistory1.note.includes("Student accidentally selected 5 copies"));
+
+  // 2. Exclude/Remove Book 2 completely from the order
+  const edit2 = await editOrderItems(
+    request,
+    admin,
+    placed.id,
+    [
+      { id: b1Item.id, quantity: 1 },
+    ],
+    "Customer cancelled second book",
+  );
+
+  assert.equal(edit2.ok, true);
+  const expectedSubtotal2 = b1UnitPrice * 1;
+  assert.equal(edit2.subtotal, expectedSubtotal2);
+  assert.equal(edit2.total, expectedSubtotal2 + delivery);
+
+  const orderAfterEdit2 = await getOrder(request, placed.id, admin);
+  assert.equal(orderAfterEdit2.items.length, 1);
+  assert.equal(orderAfterEdit2.items[0].code, "EDIT101");
+  assert.equal(orderAfterEdit2.items[0].quantity, 1);
+  assert.equal(orderAfterEdit2.subtotal, expectedSubtotal2);
+  assert.equal(orderAfterEdit2.total, expectedSubtotal2 + delivery);
+
+  // 3. Reject empty items (cannot remove all books)
+  await assert.rejects(
+    () => editOrderItems(request, admin, placed.id, [], "Remove all"),
+    /Order must retain at least one book/,
+  );
+
+  // 4. Reject unauthorized users (non-admin student/guest)
+  const studentUser = { id: "std_1", role: "STUDENT", permissions: [] };
+  await assert.rejects(
+    () => editOrderItems(request, studentUser, placed.id, [{ id: b1Item.id, quantity: 1 }]),
+    /permission/,
+  );
+
+  // 5. Status locking: When order is printed by vendor, editing must be blocked
+  sqlite.prepare("UPDATE orders SET vendor_printed_at=? WHERE id=?").run("2026-10-19 12:00:00", placed.id);
+  await assert.rejects(
+    () => editOrderItems(request, admin, placed.id, [{ id: b1Item.id, quantity: 2 }]),
+    /already been marked as printed by the vendor/,
+  );
+
+  // Clear vendor_printed_at and mark as DELIVERED -> terminal status locking
+  sqlite.prepare("UPDATE orders SET vendor_printed_at=NULL, status='DELIVERED' WHERE id=?").run(placed.id);
+  await assert.rejects(
+    () => editOrderItems(request, admin, placed.id, [{ id: b1Item.id, quantity: 2 }]),
+    /Cannot edit items for order in Delivered status/,
+  );
+});
+
 
 
 

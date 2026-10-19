@@ -1611,14 +1611,19 @@ function Checkout({ data }: { data: Catalog }) {
                   <button
                     type="button"
                     className={`delivery-option-card ${form.delivery_type === "lahore" ? "selected" : ""}`}
-                    onClick={() =>
+                    onClick={() => {
+                      const isComingFromCampus =
+                        form.delivery_type === "campus" ||
+                        form.address.toLowerCase().includes("campus") ||
+                        form.address.toLowerCase().includes("qanchi") ||
+                        form.address.startsWith("Pickup from");
                       setForm({
                         ...form,
                         delivery_type: "lahore",
                         city: "Lahore",
-                        address: form.address.startsWith("Pickup from") ? "" : form.address,
-                      })
-                    }
+                        address: isComingFromCampus ? "" : form.address,
+                      });
+                    }}
                   >
                     <div className="delivery-option-badge">{money(data.settings.delivery_lahore)} (Base)</div>
                     <div className="delivery-option-icon">
@@ -1633,14 +1638,23 @@ function Checkout({ data }: { data: Catalog }) {
                   <button
                     type="button"
                     className={`delivery-option-card ${form.delivery_type === "other" ? "selected" : ""}`}
-                    onClick={() =>
+                    onClick={() => {
+                      const isComingFromCampus =
+                        form.delivery_type === "campus" ||
+                        form.address.toLowerCase().includes("campus") ||
+                        form.address.toLowerCase().includes("qanchi") ||
+                        form.address.startsWith("Pickup from");
+                      const isCityLahoreOrCampus =
+                        form.city === "Lahore" ||
+                        form.city.toLowerCase().includes("campus") ||
+                        form.city.toLowerCase().includes("qanchi");
                       setForm({
                         ...form,
                         delivery_type: "other",
-                        city: form.city === "Lahore" || form.city.includes("Campus") ? "" : form.city,
-                        address: form.address.startsWith("Pickup from") ? "" : form.address,
-                      })
-                    }
+                        city: isCityLahoreOrCampus ? "" : form.city,
+                        address: isComingFromCampus ? "" : form.address,
+                      });
+                    }}
                   >
                     <div className="delivery-option-badge">{money(data.settings.delivery_other)} (Base)</div>
                     <div className="delivery-option-icon">
