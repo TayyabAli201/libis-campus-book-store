@@ -1528,6 +1528,7 @@ footer {
 .row-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   font-size: 0.78rem;
 }
@@ -1583,12 +1584,16 @@ footer {
   border-color: var(--destructive);
 }
 
-.row-actions button:not([role="switch"]),
-.row-actions a {
+.row-actions button:not([role="switch"]):not(.btn),
+.row-actions a:not(.btn) {
   color: var(--primary);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.row-actions .btn {
+  text-decoration: none;
 }
 
 .editor-dialog {

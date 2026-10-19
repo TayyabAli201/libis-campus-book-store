@@ -5019,79 +5019,41 @@ function Orders({
               );
 
               const vendorBooksCell = (
-                <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 170, maxWidth: 300 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    flexWrap: "nowrap",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={booksTooltip}
+                >
+                  <span
+                    className="mono-pill"
+                    style={{
+                      fontWeight: 700,
+                      fontSize: "0.76rem",
+                      background: "rgba(59, 130, 246, 0.12)",
+                      color: "#1d4ed8",
+                      padding: "3px 8px",
+                    }}
+                  >
+                    {booksCount} {booksCount === 1 ? "book" : "books"}
+                  </span>
+                  {totalPages > 0 && (
                     <span
                       className="mono-pill"
                       style={{
-                        fontWeight: 700,
-                        fontSize: "0.76rem",
-                        background: "rgba(59, 130, 246, 0.12)",
-                        color: "#1d4ed8",
-                        padding: "2px 7px",
+                        fontWeight: 600,
+                        fontSize: "0.74rem",
+                        background: "var(--muted)",
+                        color: "var(--foreground)",
+                        padding: "3px 8px",
                       }}
                     >
-                      {booksCount} {booksCount === 1 ? "book" : "books"}
+                      {totalPages.toLocaleString()} pages
                     </span>
-                    {totalPages > 0 && (
-                      <span
-                        className="mono-pill"
-                        style={{
-                          fontWeight: 600,
-                          fontSize: "0.74rem",
-                          background: "var(--muted)",
-                          color: "var(--foreground)",
-                          padding: "2px 7px",
-                        }}
-                      >
-                        {totalPages.toLocaleString()} pages
-                      </span>
-                    )}
-                  </div>
-                  {orderItems.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      {orderItems.map((it: any, idx: number) => (
-                        <div
-                          key={it.id || it.code || idx}
-                          style={{
-                            fontSize: "0.78rem",
-                            lineHeight: 1.3,
-                            color: "var(--foreground)",
-                            display: "flex",
-                            alignItems: "baseline",
-                            gap: 4,
-                          }}
-                        >
-                          <span style={{ color: "var(--muted-foreground)", fontSize: "0.72rem" }}>•</span>
-                          {it.code && (
-                            <span style={{ fontWeight: 600, color: "var(--primary)", whiteSpace: "nowrap" }}>
-                              [{it.code}]
-                            </span>
-                          )}
-                          <span
-                            style={{
-                              flex: "1 1 auto",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                            title={it.title}
-                          >
-                            {it.title}
-                          </span>
-                          {it.quantity > 1 && (
-                            <span className="mono-pill" style={{ fontSize: "0.68rem", padding: "1px 4px", fontWeight: 700 }}>
-                              ×{it.quantity}
-                            </span>
-                          )}
-                          {it.pages ? (
-                            <span style={{ fontSize: "0.70rem", color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
-                              ({it.pages}p)
-                            </span>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
                   )}
                 </div>
               );
@@ -7015,14 +6977,14 @@ function Vendors() {
             const waHref = waNumber ? `https://wa.me/${waNumber}` : null;
             return [
               <div key={`vendor-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <strong style={{ fontSize: "0.95rem" }}>{v.name}</strong>
-                <span className="mono small-text" style={{ color: "var(--muted-foreground)" }}>
+                <strong style={{ fontSize: "0.93rem" }}>{v.name}</strong>
+                <span className="mono small-text" style={{ color: "var(--muted-foreground)", fontSize: "0.78rem" }}>
                   {v.email}
                 </span>
               </div>,
 
-              <div key={`contact-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span>{v.phone || "—"}</span>
+              <div key={`contact-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
+                <span className="mono" style={{ fontSize: "0.84rem" }}>{v.phone || "—"}</span>
                 {waHref && (
                   <a
                     href={waHref}
@@ -7030,13 +6992,16 @@ function Vendors() {
                     rel="noreferrer"
                     className="btn compact"
                     style={{
-                      padding: "2px 6px",
+                      padding: "2px 7px",
                       height: 24,
-                      fontSize: "0.75rem",
+                      fontSize: "0.74rem",
                       gap: 4,
                       color: "#16a34a",
                       borderColor: "rgba(22, 163, 74, 0.3)",
                       background: "rgba(22, 163, 74, 0.08)",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
                     }}
                     title={`Open WhatsApp chat with ${v.name}`}
                   >
@@ -7047,33 +7012,35 @@ function Vendors() {
               </div>,
 
               <div key={`rates-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <strong style={{ fontSize: "0.88rem" }}>
-                  Rs. {Number(v.per_page_rate ?? 1.6).toFixed(2)}{" "}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                  <strong style={{ fontSize: "0.88rem" }}>Rs. {Number(v.per_page_rate ?? 1.6).toFixed(2)}</strong>
                   <span className="small-text muted">/ page</span>
-                </strong>
-                <span className="small-text muted">
-                  Rs. {Number(v.binding_rate ?? 30).toFixed(2)} / book binding
-                </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                  <span style={{ fontSize: "0.82rem", color: "var(--muted-foreground)" }}>Rs. {Number(v.binding_rate ?? 30).toFixed(2)}</span>
+                  <span className="small-text muted">/ binding</span>
+                </div>
               </div>,
 
-              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
-                  <span className="muted" style={{ minWidth: 55 }}>Generated:</span>
+              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 160 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem" }}>
+                  <span className="muted">Generated:</span>
                   <strong>Rs. {Number(v.total_earnings || 0).toLocaleString()}</strong>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
-                  <span className="muted" style={{ minWidth: 55 }}>Paid:</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem" }}>
+                  <span className="muted">Paid:</span>
                   <span style={{ color: "#15803d", fontWeight: 600 }}>
                     Rs. {Number(v.total_paid || 0).toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
-                  <span className="muted" style={{ minWidth: 55 }}>Balance:</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem" }}>
+                  <span className="muted">Balance:</span>
                   <span
                     className="mono-pill"
                     style={{
                       fontSize: "0.72rem",
                       fontWeight: 700,
+                      padding: "2px 6px",
                       background: (v.pending_balance || 0) > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(22, 163, 74, 0.12)",
                       color: (v.pending_balance || 0) > 0 ? "#b45309" : "#15803d",
                     }}
@@ -7083,7 +7050,7 @@ function Vendors() {
                 </div>
               </div>,
 
-              <div key={`workload-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <div key={`workload-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
                 <span
                   className="mono-pill"
                   style={{
@@ -7106,7 +7073,7 @@ function Vendors() {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 4,
-                  padding: "2px 8px",
+                  padding: "3px 9px",
                   borderRadius: 999,
                   fontSize: "0.75rem",
                   fontWeight: 600,
@@ -7117,22 +7084,39 @@ function Vendors() {
                 {v.active ? "Active" : "Disabled"}
               </span>,
 
-              <div className="row-actions" key={`act-${v.id}`}>
+              <div
+                className="row-actions"
+                key={`act-${v.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "nowrap",
+                }}
+              >
                 <button
                   type="button"
-                  className="btn compact primary"
+                  className="btn compact"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 4,
-                    fontSize: "0.74rem",
-                    padding: "3px 8px",
+                    gap: 5,
+                    fontSize: "0.75rem",
+                    padding: "4px 9px",
+                    borderRadius: 6,
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    border: "1px solid #1d4ed8",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                    cursor: "pointer",
                   }}
                   onClick={() => setLedgerVendor(v)}
                   title={`Open payment ledger and record disbursements for ${v.name}`}
                 >
-                  <Receipt size={12} />
-                  Ledger
+                  <Receipt size={13} color="#ffffff" strokeWidth={2.2} />
+                  <span style={{ color: "#ffffff", textDecoration: "none", fontWeight: 600 }}>Ledger</span>
                 </button>
                 <button
                   onClick={() =>
@@ -7167,12 +7151,20 @@ function Vendors() {
       </Result>
 
       <Dialog open={!!edit} onOpenChange={(v) => !v && setEdit(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent
+          style={{
+            maxWidth: 660,
+            width: "95vw",
+            maxHeight: "92vh",
+            overflowY: "auto",
+            padding: "22px 26px",
+          }}
+        >
+          <DialogHeader style={{ marginBottom: 10 }}>
+            <DialogTitle style={{ fontSize: "1.2rem" }}>
               {edit?.id ? "Edit Vendor Partner" : "Add Vendor Partner"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription style={{ fontSize: "0.84rem" }}>
               {edit?.id
                 ? "Update vendor contact details, pricing rates, or set a new password."
                 : "Create a new printing vendor partner with portal credentials and custom printing rates."}
@@ -7180,7 +7172,7 @@ function Vendors() {
           </DialogHeader>
           {edit && (
             <form
-              className="stack"
+              style={{ display: "flex", flexDirection: "column", gap: 13 }}
               onSubmit={async (e) => {
                 e.preventDefault();
                 setBusy(true);
@@ -7215,87 +7207,112 @@ function Vendors() {
                 }
               }}
             >
-              <Field label="Vendor / Press name">
-                <input
-                  required
-                  placeholder="e.g. Royal Print Solutions"
-                  value={edit.name}
-                  onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-                />
-              </Field>
-
-              <Field
-                label="WhatsApp / Phone number"
-                hint="Used for 1-click WhatsApp order dispatch"
-              >
-                <input
-                  required
-                  placeholder="0300 1234567 or +923001234567"
-                  value={edit.phone}
-                  onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
-                />
-              </Field>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field
-                  label="Per Page Rate (Rs.)"
-                  hint="Auto-calculation rate per printed page (default: 1.60)"
-                >
+              {/* Row 1: Name and WhatsApp Phone */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <Field label="Vendor / Press name">
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
                     required
-                    placeholder="1.60"
-                    value={edit.per_page_rate}
-                    onChange={(e) => setEdit({ ...edit, per_page_rate: e.target.value })}
+                    placeholder="e.g. Royal Print Solutions"
+                    value={edit.name}
+                    onChange={(e) => setEdit({ ...edit, name: e.target.value })}
                   />
                 </Field>
 
                 <Field
-                  label="Binding Cost (Rs. per book)"
-                  hint="Auto-calculation cost per bound book (default: 30.00)"
+                  label="WhatsApp / Phone number"
+                  hint="Used for 1-click WhatsApp order dispatch"
                 >
                   <input
-                    type="number"
-                    step="0.5"
-                    min="0"
                     required
-                    placeholder="30.00"
-                    value={edit.binding_rate}
-                    onChange={(e) => setEdit({ ...edit, binding_rate: e.target.value })}
+                    placeholder="0300 1234567 or +923001234567"
+                    value={edit.phone}
+                    onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
                   />
                 </Field>
               </div>
 
-              <Field
-                label="Login email address"
-                hint={edit.id ? "Email cannot be changed after creation." : "Used by the vendor to sign in at /vendor/login"}
-              >
-                <input
-                  type="email"
-                  required
-                  disabled={!!edit.id}
-                  placeholder="vendor@example.com"
-                  value={edit.email}
-                  onChange={(e) => setEdit({ ...edit, email: e.target.value })}
-                />
-              </Field>
+              {/* Row 2: Login email and password */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <Field
+                  label="Login email address"
+                  hint={edit.id ? "Email cannot be changed." : "Used to sign in at /vendor/login"}
+                >
+                  <input
+                    type="email"
+                    required
+                    disabled={!!edit.id}
+                    placeholder="vendor@example.com"
+                    value={edit.email}
+                    onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+                  />
+                </Field>
 
-              <Field
-                label={edit.id ? "Change password (optional)" : "Portal login password"}
-                hint={edit.id ? "Leave blank to keep existing password." : "Minimum 6 characters"}
-              >
-                <input
-                  type="password"
-                  required={!edit.id}
-                  minLength={6}
-                  placeholder={edit.id ? "•••••••• (unchanged)" : "At least 6 characters"}
-                  value={edit.password}
-                  onChange={(e) => setEdit({ ...edit, password: e.target.value })}
-                />
-              </Field>
+                <Field
+                  label={edit.id ? "Change password (optional)" : "Portal login password"}
+                  hint={edit.id ? "Leave blank to keep existing." : "Min 6 characters"}
+                >
+                  <input
+                    type="password"
+                    required={!edit.id}
+                    minLength={6}
+                    placeholder={edit.id ? "•••••••• (unchanged)" : "At least 6 characters"}
+                    value={edit.password}
+                    onChange={(e) => setEdit({ ...edit, password: e.target.value })}
+                  />
+                </Field>
+              </div>
 
+              {/* Row 3: Pricing Rates (Per Page & Binding Cost) */}
+              <div
+                style={{
+                  background: "var(--secondary)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "10px 14px 12px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)" }}>
+                    Printing Rates (Hidden From Vendor)
+                  </span>
+                  <span className="small-text muted" style={{ fontSize: "0.75rem" }}>
+                    Used for auto-calculating vendor earnings
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <Field
+                    label="Per Page Rate (Rs.)"
+                    hint="Default: Rs. 1.60 / page"
+                  >
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      placeholder="1.60"
+                      value={edit.per_page_rate}
+                      onChange={(e) => setEdit({ ...edit, per_page_rate: e.target.value })}
+                    />
+                  </Field>
+
+                  <Field
+                    label="Binding Cost (Rs. per book)"
+                    hint="Default: Rs. 30.00 / book"
+                  >
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      required
+                      placeholder="30.00"
+                      value={edit.binding_rate}
+                      onChange={(e) => setEdit({ ...edit, binding_rate: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {/* Row 4: Address */}
               <Field label="Press / Workshop address" hint="Physical location or city notes">
                 <input
                   placeholder="e.g. Shop # 4, Urdu Bazaar, Lahore"
@@ -7304,19 +7321,42 @@ function Vendors() {
                 />
               </Field>
 
-              {edit.id && (
-                <div className="toggle-row">
-                  <span>Vendor portal access active</span>
-                  <Switch
-                    checked={edit.active}
-                    onCheckedChange={(v) => setEdit({ ...edit, active: v })}
-                  />
-                </div>
-              )}
+              {/* Row 5: Footer Actions & Active Toggle */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: edit.id ? "space-between" : "flex-end",
+                  gap: 12,
+                  paddingTop: 10,
+                  borderTop: "1px solid var(--border)",
+                  marginTop: 2,
+                }}
+              >
+                {edit.id ? (
+                  <div className="toggle-row" style={{ margin: 0 }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 550 }}>Portal access active</span>
+                    <Switch
+                      checked={edit.active}
+                      onCheckedChange={(v) => setEdit({ ...edit, active: v })}
+                    />
+                  </div>
+                ) : null}
 
-              <button className="btn primary" disabled={busy}>
-                {busy ? "Saving…" : edit.id ? "Save vendor" : "Create vendor partner"}
-              </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setEdit(null)}
+                    disabled={busy}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn primary" disabled={busy}>
+                    {busy ? "Saving…" : edit.id ? "Save vendor" : "Create vendor partner"}
+                  </button>
+                </div>
+              </div>
             </form>
           )}
         </DialogContent>
@@ -7984,36 +8024,23 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                           )}
                         </td>
                         <td style={{ padding: "10px 12px" }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 280 }}>
-                            <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                              <span className="mono-pill" style={{ fontSize: "0.72rem", fontWeight: 700 }}>
-                                {booksCount} {booksCount === 1 ? "book" : "books"}
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              flexWrap: "nowrap",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={(items || []).map((it: any) => `• ${it.title}${it.quantity > 1 ? ` (×${it.quantity})` : ""}`).join("\n")}
+                          >
+                            <span className="mono-pill" style={{ fontSize: "0.74rem", fontWeight: 700, background: "rgba(59, 130, 246, 0.12)", color: "#1d4ed8", padding: "2px 7px" }}>
+                              {booksCount} {booksCount === 1 ? "book" : "books"}
+                            </span>
+                            {pagesCount > 0 && (
+                              <span className="mono-pill" style={{ fontSize: "0.74rem", fontWeight: 600, padding: "2px 7px" }}>
+                                {pagesCount.toLocaleString()} pages
                               </span>
-                              {pagesCount > 0 && (
-                                <span className="mono-pill" style={{ fontSize: "0.72rem" }}>
-                                  {pagesCount} pgs
-                                </span>
-                              )}
-                            </div>
-                            {items.slice(0, 2).map((it: any, i: number) => (
-                              <div
-                                key={it.id || i}
-                                style={{
-                                  fontSize: "0.76rem",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  color: "var(--muted-foreground)",
-                                }}
-                                title={it.title}
-                              >
-                                • {it.title} {it.quantity > 1 ? `(×${it.quantity})` : ""}
-                              </div>
-                            ))}
-                            {items.length > 2 && (
-                              <div style={{ fontSize: "0.72rem", color: "var(--primary)" }}>
-                                + {items.length - 2} more...
-                              </div>
                             )}
                           </div>
                         </td>
