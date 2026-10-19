@@ -4234,6 +4234,10 @@ function Orders({
   };
 
   const exportOrders = async () => {
+    if (isVendor && deliveryTypeList.length === 0) {
+      toast.error("Please select either 'Other Cities' or 'Qanchi Campus Lahore' before exporting.");
+      return;
+    }
     setExporting(true);
     try {
       const statusParam = statusList.join(",");
@@ -4921,6 +4925,23 @@ function Orders({
                 </button>
               );
             })}
+        {isVendor && deliveryTypeList.length === 0 && (
+          <span
+            style={{
+              fontSize: "0.78rem",
+              color: "var(--muted-foreground)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "4px 10px",
+              borderRadius: 14,
+              background: "var(--muted)",
+            }}
+          >
+            <span>💡</span>
+            <span>Select <strong>Other Cities</strong> or <strong>Qanchi Campus</strong> to export</span>
+          </span>
+        )}
       </div>
 
       <div className="toolbar orders-toolbar">
@@ -4960,18 +4981,27 @@ function Orders({
           }}
         />
         <div className="toolbar-actions-divider" />
-        <button
-          type="button"
-          className="btn compact toolbar-export-btn"
-          onClick={exportOrders}
-          disabled={exporting || loading}
-          title="Export orders to Excel"
-        >
-          <span className="toolbar-btn-icon-circle">
-            <Download size={13} strokeWidth={2.4} className="toolbar-export-icon" />
-          </span>
-          <span>{exporting ? "Exporting…" : "Export Orders"}</span>
-        </button>
+        {(() => {
+          const isVendorExportDisabled = isVendor && deliveryTypeList.length === 0;
+          return (
+            <button
+              type="button"
+              className="btn compact toolbar-export-btn"
+              onClick={exportOrders}
+              disabled={exporting || loading || isVendorExportDisabled}
+              title={
+                isVendorExportDisabled
+                  ? "Select 'Other Cities' or 'Qanchi Campus Lahore' to enable export"
+                  : "Export orders to Excel"
+              }
+            >
+              <span className="toolbar-btn-icon-circle">
+                <Download size={13} strokeWidth={2.4} className="toolbar-export-icon" />
+              </span>
+              <span>{exporting ? "Exporting…" : "Export Orders"}</span>
+            </button>
+          );
+        })()}
         {isAdmin && !isVendor && activeTab === "CONFIRMED" && (() => {
           const sendToVendorCount =
             verifiedUnassignedOrders.length > 0
