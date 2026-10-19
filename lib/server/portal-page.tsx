@@ -45,12 +45,12 @@ export async function PortalPage({
     (portal === "vendor" && u.role !== "VENDOR")
   )
     redirect("/" + portal + "/login");
-  const section = segments[0] || (portal === "vendor" ? "orders" : "dashboard");
+  const section = segments[0] || "dashboard";
   if (section === "inventory") redirect("/" + portal + "/books");
   if (section === "payments") redirect("/" + portal + "/orders?status=PAYMENT_PENDING");
   if (portal === "vendor") {
-    if (!["orders", "profile"].includes(section)) {
-      redirect("/vendor/orders");
+    if (!["dashboard", "orders", "ledger", "profile"].includes(section)) {
+      redirect("/vendor/dashboard");
     }
   } else if (
     ![

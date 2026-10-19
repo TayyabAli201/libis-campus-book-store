@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { all, one, stmt, batch, now, uid, AppError, auditStmt } from "./db";
 import { passwordHash, verifyPassword } from "./security";
-import type { User, Vendor } from "@/lib/contracts";
+import type { User, Vendor, VendorLedger } from "@/lib/contracts";
 import { getVendorWhatsAppMessage, getVendorWhatsAppUrl, isOtherCityOrder } from "@/lib/contracts";
 import { sendVendorOrderAssignedEmail } from "./email";
 
@@ -11,6 +11,8 @@ const vendorSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(120),
   password: z.string().min(6, "Password must be at least 6 characters").max(100),
   address: z.string().trim().max(250).optional().nullable(),
+  per_page_rate: z.coerce.number().min(0.01).max(1000).optional().default(1.60),
+  binding_rate: z.coerce.number().min(0).max(10000).optional().default(30.00),
 });
 
 export async function listVendors(u: User): Promise<Vendor[]> {
@@ -22,23 +24,57 @@ export async function listVendors(u: User): Promise<Vendor[]> {
     `SELECT 
       v.*,
       (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = v.id) AS assigned_orders_count,
-      (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = v.id AND o.status = 'PROCESSING') AS printing_orders_count
+      (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = v.id AND o.status = 'PROCESSING') AS printing_orders_count,
+      (SELECT COALESCE(SUM(amount), 0) FROM vendor_payments vp WHERE vp.vendor_id = v.id) AS total_paid
     FROM vendors v
     ORDER BY v.name ASC`
   );
 
-  return rows.map((r) => ({
-    id: r.id,
-    user_id: r.user_id,
-    name: r.name,
-    phone: r.phone,
-    email: r.email,
-    address: r.address || null,
-    active: Boolean(r.active),
-    created_at: r.created_at,
-    assigned_orders_count: Number(r.assigned_orders_count || 0),
-    printing_orders_count: Number(r.printing_orders_count || 0),
-  }));
+  const orderAggs = await all<any>(
+    `SELECT 
+      o.vendor_id,
+      COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
+      COALESCE(SUM(oi.quantity), 0) AS total_books
+     FROM orders o
+     JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.vendor_id IS NOT NULL
+     GROUP BY o.vendor_id`
+  );
+
+  const aggByVendor = new Map<string, { total_pages: number; total_books: number }>();
+  for (const ag of orderAggs) {
+    aggByVendor.set(ag.vendor_id, {
+      total_pages: Number(ag.total_pages || 0),
+      total_books: Number(ag.total_books || 0),
+    });
+  }
+
+  return rows.map((r) => {
+    const perPageRate = Number(r.per_page_rate ?? 1.60);
+    const bindingRate = Number(r.binding_rate ?? 30.00);
+    const agg = aggByVendor.get(r.id) || { total_pages: 0, total_books: 0 };
+    const totalEarnings = Math.round((agg.total_pages * perPageRate) + (agg.total_books * bindingRate));
+    const totalPaid = Number(r.total_paid || 0);
+    const pendingBalance = totalEarnings - totalPaid;
+
+    return {
+      id: r.id,
+      user_id: r.user_id,
+      name: r.name,
+      phone: r.phone,
+      email: r.email,
+      address: r.address || null,
+      active: Boolean(r.active),
+      created_at: r.created_at,
+      per_page_rate: perPageRate,
+      binding_rate: bindingRate,
+      assigned_orders_count: Number(r.assigned_orders_count || 0),
+      printing_orders_count: Number(r.printing_orders_count || 0),
+      total_earnings: totalEarnings,
+      total_paid: totalPaid,
+      pending_balance: pendingBalance,
+    };
+  });
 }
 
 export async function createVendor(
@@ -86,14 +122,16 @@ export async function createVendor(
       createdAt,
     ),
     stmt(
-      `INSERT INTO vendors(id, user_id, name, phone, email, address, active, created_at)
-       VALUES(?, ?, ?, ?, ?, ?, 1, ?)`,
+      `INSERT INTO vendors(id, user_id, name, phone, email, address, active, per_page_rate, binding_rate, created_at)
+       VALUES(?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       vendorId,
       userId,
       parsed.name,
       parsed.phone,
       normalizedEmail,
       parsed.address || null,
+      parsed.per_page_rate,
+      parsed.binding_rate,
       createdAt,
     ),
     auditStmt(
@@ -101,7 +139,7 @@ export async function createVendor(
       "CREATE_VENDOR",
       vendorId,
       undefined,
-      { name: parsed.name, email: normalizedEmail, phone: parsed.phone },
+      { name: parsed.name, email: normalizedEmail, phone: parsed.phone, per_page_rate: parsed.per_page_rate, binding_rate: parsed.binding_rate },
       req,
     ),
   ];
@@ -119,8 +157,13 @@ export async function createVendor(
       address: parsed.address || null,
       active: true,
       created_at: createdAt,
+      per_page_rate: parsed.per_page_rate,
+      binding_rate: parsed.binding_rate,
       assigned_orders_count: 0,
       printing_orders_count: 0,
+      total_earnings: 0,
+      total_paid: 0,
+      pending_balance: 0,
     },
   };
 }
@@ -141,6 +184,8 @@ export async function updateVendor(
     address: z.string().trim().max(250).optional().nullable(),
     active: z.boolean().optional(),
     password: z.string().min(6).max(100).optional(),
+    per_page_rate: z.coerce.number().min(0.01).max(1000).optional(),
+    binding_rate: z.coerce.number().min(0).max(10000).optional(),
   });
 
   const body = schema.parse(raw);
@@ -155,14 +200,18 @@ export async function updateVendor(
   const newPhone = body.phone ?? vendor.phone;
   const newAddress = body.address !== undefined ? body.address : vendor.address;
   const newActive = body.active !== undefined ? (body.active ? 1 : 0) : vendor.active;
+  const newPerPageRate = body.per_page_rate !== undefined ? Number(body.per_page_rate) : Number(vendor.per_page_rate ?? 1.60);
+  const newBindingRate = body.binding_rate !== undefined ? Number(body.binding_rate) : Number(vendor.binding_rate ?? 30.00);
 
   statements.push(
     stmt(
-      `UPDATE vendors SET name = ?, phone = ?, address = ?, active = ? WHERE id = ?`,
+      `UPDATE vendors SET name = ?, phone = ?, address = ?, active = ?, per_page_rate = ?, binding_rate = ? WHERE id = ?`,
       newName,
       newPhone,
       newAddress,
       newActive,
+      newPerPageRate,
+      newBindingRate,
       id,
     ),
   );
@@ -189,7 +238,14 @@ export async function updateVendor(
       "UPDATE_VENDOR",
       id,
       vendor,
-      { name: newName, phone: newPhone, active: newActive, passwordUpdated: !!body.password },
+      {
+        name: newName,
+        phone: newPhone,
+        active: newActive,
+        per_page_rate: newPerPageRate,
+        binding_rate: newBindingRate,
+        passwordUpdated: !!body.password,
+      },
       req,
     ),
   );
@@ -227,6 +283,200 @@ export async function deleteVendor(
     stmt("DELETE FROM vendors WHERE id = ?", id),
     stmt("DELETE FROM users WHERE id = ?", vendor.user_id),
     auditStmt(u.email, "DELETE_VENDOR", id, vendor, undefined, req),
+  ]);
+
+  return { ok: true };
+}
+
+export async function getVendorLedger(
+  u: User,
+  vendorId?: string,
+): Promise<VendorLedger> {
+  let targetVendorId = vendorId;
+  if (u.role === "VENDOR") {
+    targetVendorId = u.vendor_id || u.id;
+  } else if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Access denied.");
+  }
+
+  if (!targetVendorId) {
+    throw new AppError(400, "Vendor ID is required.");
+  }
+
+  const v = await one<any>("SELECT * FROM vendors WHERE id = ?", targetVendorId);
+  if (!v) {
+    throw new AppError(404, "Vendor not found.");
+  }
+
+  const perPageRate = Number(v.per_page_rate ?? 1.60);
+  const bindingRate = Number(v.binding_rate ?? 30.00);
+
+  // Compute order statistics and earnings
+  const orderStats = await one<any>(
+    `SELECT 
+      COUNT(DISTINCT o.id) AS total_orders,
+      COUNT(DISTINCT CASE WHEN o.status = 'PROCESSING' AND o.vendor_printed_at IS NULL THEN o.id END) AS printing_orders,
+      COUNT(DISTINCT CASE WHEN o.vendor_printed_at IS NOT NULL THEN o.id END) AS printed_orders,
+      COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
+      COALESCE(SUM(oi.quantity), 0) AS total_books
+     FROM orders o
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.vendor_id = ?`,
+    targetVendorId,
+  );
+
+  const totalPages = Number(orderStats?.total_pages || 0);
+  const totalBooks = Number(orderStats?.total_books || 0);
+  const totalOrders = Number(orderStats?.total_orders || 0);
+  const totalEarnings = Math.round((totalPages * perPageRate) + (totalBooks * bindingRate));
+
+  // Compute payments and ledger entries
+  const payments = await all<any>(
+    `SELECT vp.*, v.name AS vendor_name 
+     FROM vendor_payments vp
+     JOIN vendors v ON v.id = vp.vendor_id
+     WHERE vp.vendor_id = ?
+     ORDER BY vp.payment_date DESC, vp.created_at DESC`,
+    targetVendorId,
+  );
+
+  const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const pendingBalance = totalEarnings - totalPaid;
+  const summary = {
+    total_orders: totalOrders,
+    total_pages: totalPages,
+    total_books: totalBooks,
+    printing_orders: Number(orderStats?.printing_orders || 0),
+    printed_orders: Number(orderStats?.printed_orders || 0),
+    per_page_rate: perPageRate,
+    binding_rate: bindingRate,
+    total_earned: totalEarnings,
+    total_paid: totalPaid,
+    pending_balance: pendingBalance,
+  };
+
+  return {
+    vendor: {
+      id: v.id,
+      user_id: v.user_id,
+      name: v.name,
+      phone: v.phone,
+      email: v.email,
+      address: v.address || null,
+      active: Boolean(v.active),
+      created_at: v.created_at,
+      per_page_rate: perPageRate,
+      binding_rate: bindingRate,
+      assigned_orders_count: totalOrders,
+      printing_orders_count: Number(orderStats?.printing_orders || 0),
+      total_earnings: totalEarnings,
+      total_paid: totalPaid,
+      pending_balance: pendingBalance,
+    },
+    summary,
+    total_earnings: totalEarnings,
+    total_paid: totalPaid,
+    pending_balance: pendingBalance,
+    total_orders: totalOrders,
+    payments: payments.map((p) => ({
+      id: p.id,
+      vendor_id: p.vendor_id,
+      vendor_name: p.vendor_name,
+      amount: Number(p.amount || 0),
+      payment_date: p.payment_date,
+      payment_method: p.payment_method,
+      reference: p.reference || null,
+      notes: p.notes || null,
+      created_by: p.created_by,
+      created_at: p.created_at,
+    })),
+  };
+}
+
+const paymentSchema = z.object({
+  vendor_id: z.string().min(1, "Vendor is required"),
+  amount: z.coerce.number().int().positive("Amount must be greater than 0"),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date (YYYY-MM-DD)"),
+  payment_method: z.string().trim().min(1, "Payment method is required").default("Bank Transfer"),
+  reference: z.string().trim().max(100).optional().nullable(),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
+
+export async function createVendorPayment(
+  req: Request,
+  u: User,
+  raw: unknown,
+): Promise<{ ok: boolean; payment: any }> {
+  if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Only Super Admin can record vendor payments.");
+  }
+
+  const parsed = paymentSchema.parse(raw);
+  const v = await one<any>("SELECT id, name FROM vendors WHERE id = ?", parsed.vendor_id);
+  if (!v) {
+    throw new AppError(404, "Vendor not found.");
+  }
+
+  const paymentId = uid();
+  const createdAt = now();
+
+  await batch([
+    stmt(
+      `INSERT INTO vendor_payments(id, vendor_id, amount, payment_date, payment_method, reference, notes, created_by, created_at)
+       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      paymentId,
+      parsed.vendor_id,
+      parsed.amount,
+      parsed.payment_date,
+      parsed.payment_method,
+      parsed.reference || null,
+      parsed.notes || null,
+      u.email,
+      createdAt,
+    ),
+    auditStmt(
+      u.email,
+      "RECORD_VENDOR_PAYMENT",
+      paymentId,
+      undefined,
+      { vendor_name: v.name, amount: parsed.amount, reference: parsed.reference },
+      req,
+    ),
+  ]);
+
+  return {
+    ok: true,
+    payment: {
+      id: paymentId,
+      vendor_id: parsed.vendor_id,
+      amount: parsed.amount,
+      payment_date: parsed.payment_date,
+      payment_method: parsed.payment_method,
+      reference: parsed.reference || null,
+      notes: parsed.notes || null,
+      created_by: u.email,
+      created_at: createdAt,
+    },
+  };
+}
+
+export async function deleteVendorPayment(
+  req: Request,
+  u: User,
+  paymentId: string,
+): Promise<{ ok: boolean }> {
+  if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Only Super Admin can delete vendor payment records.");
+  }
+
+  const payment = await one<any>("SELECT * FROM vendor_payments WHERE id = ?", paymentId);
+  if (!payment) {
+    throw new AppError(404, "Payment record not found.");
+  }
+
+  await batch([
+    stmt("DELETE FROM vendor_payments WHERE id = ?", paymentId),
+    auditStmt(u.email, "DELETE_VENDOR_PAYMENT", paymentId, payment, undefined, req),
   ]);
 
   return { ok: true };

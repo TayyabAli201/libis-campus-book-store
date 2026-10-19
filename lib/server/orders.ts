@@ -407,6 +407,52 @@ export async function getOrder(
   delete o.quote_id;
   o.store = JSON.parse(o.store_snapshot);
   delete o.store_snapshot;
+
+  if (u?.role === "VENDOR") {
+    const v = await one<any>(
+      "SELECT per_page_rate, binding_rate FROM vendors WHERE id = ?",
+      u.vendor_id || u.id,
+    );
+    const perPageRate = Number(v?.per_page_rate ?? 1.60);
+    const bindingRate = Number(v?.binding_rate ?? 30.00);
+
+    const orderPages = items.reduce(
+      (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
+      0,
+    );
+    const orderBooks = items.reduce(
+      (sum: number, it: any) => sum + (it.quantity || 1),
+      0,
+    );
+    const vendorPrice = Math.round(
+      (orderPages * perPageRate) + (orderBooks * bindingRate),
+    );
+
+    o.vendor_price = vendorPrice;
+    o.vendor_pages = orderPages;
+    o.vendor_books = orderBooks;
+    o.vendor_rate_breakdown = {
+      per_page_rate: perPageRate,
+      binding_rate: bindingRate,
+      total_pages: orderPages,
+      total_books: orderBooks,
+      pages_amount: Math.round(orderPages * perPageRate),
+      binding_amount: Math.round(orderBooks * bindingRate),
+      total_vendor_price: vendorPrice,
+      formula: `(${orderPages} pages × Rs. ${perPageRate}) + (${orderBooks} books × Rs. ${bindingRate}) = Rs. ${vendorPrice}`,
+    };
+
+    delete o.subtotal;
+    delete o.total;
+    delete o.delivery;
+    delete o.slip_id;
+    delete o.detected_amount;
+    delete o.ocr_status;
+    for (const it of items) {
+      delete (it as any).unit_price;
+    }
+  }
+
   return { ...o, items, history, tracking_only: false };
 }
 export async function listOrders(
@@ -583,6 +629,93 @@ export async function listOrders(
   status_counts["PROCESSING"] = unprintedRow?.cnt || 0;
   status_counts["PRINTED"] = printedRow?.cnt || 0;
 
+  let vendor_overview: any = null;
+  if (u.role === "VENDOR") {
+    const vendorId = u.vendor_id || u.id;
+    const v = await one<any>(
+      "SELECT per_page_rate, binding_rate FROM vendors WHERE id = ?",
+      vendorId,
+    );
+    const perPageRate = Number(v?.per_page_rate ?? 1.60);
+    const bindingRate = Number(v?.binding_rate ?? 30.00);
+
+    for (const r of rows) {
+      const items = (r as any).items || [];
+      const orderPages = items.reduce(
+        (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
+        0,
+      );
+      const orderBooks = items.reduce(
+        (sum: number, it: any) => sum + (it.quantity || 1),
+        0,
+      );
+      const vendorPrice = Math.round(
+        (orderPages * perPageRate) + (orderBooks * bindingRate),
+      );
+
+      (r as any).vendor_price = vendorPrice;
+      (r as any).vendor_pages = orderPages;
+      (r as any).vendor_books = orderBooks;
+      (r as any).vendor_rate_breakdown = {
+        per_page_rate: perPageRate,
+        binding_rate: bindingRate,
+        total_pages: orderPages,
+        total_books: orderBooks,
+        pages_amount: Math.round(orderPages * perPageRate),
+        binding_amount: Math.round(orderBooks * bindingRate),
+        total_vendor_price: vendorPrice,
+        formula: `(${orderPages} pages × Rs. ${perPageRate}) + (${orderBooks} books × Rs. ${bindingRate}) = Rs. ${vendorPrice}`,
+      };
+
+      // 100% Privacy: Delete retail customer prices and payment slip info
+      delete (r as any).subtotal;
+      delete (r as any).total;
+      delete (r as any).delivery;
+      delete (r as any).payment_status;
+      delete (r as any).slip_id;
+      delete (r as any).detected_amount;
+      delete (r as any).ocr_status;
+      for (const it of items) {
+        delete (it as any).unit_price;
+      }
+    }
+
+    const vendorAggregate = await one<any>(
+      `SELECT 
+        COUNT(DISTINCT o.id) AS total_assigned,
+        COUNT(DISTINCT CASE WHEN o.status = 'PROCESSING' AND o.vendor_printed_at IS NULL THEN o.id END) AS printing_queue_count,
+        COUNT(DISTINCT CASE WHEN o.vendor_printed_at IS NOT NULL THEN o.id END) AS printed_count,
+        COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
+        COALESCE(SUM(oi.quantity), 0) AS total_books
+       FROM orders o
+       LEFT JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.vendor_id = ?`,
+      vendorId,
+    );
+
+    const totalPagesAll = Number(vendorAggregate?.total_pages || 0);
+    const totalBooksAll = Number(vendorAggregate?.total_books || 0);
+    const totalEarningsAll = Math.round((totalPagesAll * perPageRate) + (totalBooksAll * bindingRate));
+
+    const totalPaidRow = await one<any>(
+      "SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments WHERE vendor_id = ?",
+      vendorId,
+    );
+    const totalPaidAll = Number(totalPaidRow?.total_paid || 0);
+    const pendingBalanceAll = totalEarningsAll - totalPaidAll;
+
+    vendor_overview = {
+      total_assigned: Number(vendorAggregate?.total_assigned || 0),
+      printing_queue_count: Number(vendorAggregate?.printing_queue_count || 0),
+      printed_count: Number(vendorAggregate?.printed_count || 0),
+      total_earnings: totalEarningsAll,
+      total_paid: totalPaidAll,
+      pending_balance: pendingBalanceAll,
+      per_page_rate: perPageRate,
+      binding_rate: bindingRate,
+    };
+  }
+
   return {
     rows,
     total: total?.n || 0,
@@ -590,6 +723,7 @@ export async function listOrders(
     page,
     pageSize,
     status_counts,
+    ...(vendor_overview ? { vendor_overview } : {}),
   };
 }
 export function movementStatements(

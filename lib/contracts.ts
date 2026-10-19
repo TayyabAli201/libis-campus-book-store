@@ -324,8 +324,49 @@ export interface Vendor {
   address?: string | null;
   active: boolean;
   created_at: string;
+  per_page_rate?: number;
+  binding_rate?: number;
   assigned_orders_count?: number;
   printing_orders_count?: number;
+  total_earnings?: number;
+  total_paid?: number;
+  pending_balance?: number;
+}
+
+export interface VendorPayment {
+  id: string;
+  vendor_id: string;
+  vendor_name?: string;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  reference?: string | null;
+  notes?: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface VendorLedgerSummary {
+  total_orders: number;
+  total_pages: number;
+  total_books: number;
+  printing_orders?: number;
+  printed_orders?: number;
+  per_page_rate: number;
+  binding_rate: number;
+  total_earned: number;
+  total_paid: number;
+  pending_balance: number;
+}
+
+export interface VendorLedger {
+  vendor: Vendor;
+  summary: VendorLedgerSummary;
+  total_earnings?: number;
+  total_paid?: number;
+  pending_balance?: number;
+  total_orders?: number;
+  payments: VendorPayment[];
 }
 export type Quote = {
   id: string;

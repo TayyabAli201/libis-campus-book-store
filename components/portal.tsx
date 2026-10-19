@@ -48,6 +48,7 @@ import {
   Printer,
   RotateCcw,
   XCircle,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -105,6 +106,9 @@ import {
   isLahoreOrder,
   type User,
   type Vendor,
+  type VendorPayment,
+  type VendorLedger,
+  type VendorLedgerSummary,
   type Book,
   type StoreSettings,
 } from "@/lib/contracts";
@@ -114,6 +118,7 @@ const Charts = dynamic(() => import("./report-charts"), {
 const nav = [
   ["dashboard", "Overview", LayoutDashboard, "reports.read"],
   ["orders", "Orders", ShoppingBag, "orders.read"],
+  ["ledger", "Payment Ledger", Receipt, "vendor"],
   ["books", "Books", Library, "books.read"],
   ["pricing", "Pricing management", Coins, "admin"],
   ["campuses", "Campuses", Building2, "admin"],
@@ -591,7 +596,7 @@ export function Portal({
         <SidebarHeader>
           <a
             className="brand portal-brand"
-            href={base + (isVendor ? "/orders" : "/dashboard")}
+            href={base + "/dashboard"}
             style={{
               display: "flex",
               alignItems: "center",
@@ -611,8 +616,14 @@ export function Portal({
             {nav
               .filter((n) => {
                 if (isVendor) {
-                  return n[0] === "orders" || n[0] === "profile";
+                  return (
+                    n[0] === "dashboard" ||
+                    n[0] === "orders" ||
+                    n[0] === "ledger" ||
+                    n[0] === "profile"
+                  );
                 }
+                if (n[0] === "ledger") return false;
                 return (
                   isAdmin ||
                   n[3] === "profile" ||
@@ -706,6 +717,10 @@ export function Portal({
           )}
           {section === "profile" ? (
             <Profile user={user} base={base} />
+          ) : isVendor && section === "dashboard" ? (
+            <VendorDashboard user={user} base={base} />
+          ) : isVendor && section === "ledger" ? (
+            <VendorLedgerView user={user} />
           ) : section === "books" ? (
             <Books readOnly={!isAdmin} />
           ) : section === "pricing" ? (
@@ -3368,6 +3383,23 @@ function OrderModalPopup({
                             {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
                           </strong>
                         </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total pages:</span>
+                          <strong style={{ fontSize: "0.95rem" }}>
+                            {Number(o.vendor_pages ?? (o.items?.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0) || 0)).toLocaleString()} pages
+                          </strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: "1px dashed var(--border)" }}>
+                          <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--foreground)" }}>Vendor Earning:</span>
+                          <strong style={{ fontSize: "1.1rem", color: "#15803d" }}>
+                            Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                          </strong>
+                        </div>
+                        {o.vendor_rate_breakdown?.formula && (
+                          <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)", background: "rgba(22, 163, 74, 0.08)", padding: "5px 8px", borderRadius: 6, border: "1px dashed rgba(22, 163, 74, 0.25)" }}>
+                            Calculation: {o.vendor_rate_breakdown.formula}
+                          </div>
+                        )}
                         {o.vendor_notes && (
                           <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
                             <span style={{ color: "var(--muted-foreground)" }}>Special Notes: </span>
@@ -4399,7 +4431,8 @@ function Orders({
     ? [
         "Order",
         "Student",
-        "Books",
+        "Books & Pages",
+        "Vendor Earning",
         "Date",
         "Status",
         "Logistics & Action",
@@ -4979,14 +5012,117 @@ function Orders({
             );
 
             if (isVendor) {
+              const orderItems: any[] = o.items || [];
+              const totalPages = Number(
+                o.vendor_pages ??
+                orderItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0)
+              );
+
               const vendorBooksCell = (
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div style={{ whiteSpace: "nowrap" }} title={`${booksCount} book(s)`}>
-                    <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
-                    <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
-                      {booksCount === 1 ? "book" : "books"}
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 170, maxWidth: 300 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "0.76rem",
+                        background: "rgba(59, 130, 246, 0.12)",
+                        color: "#1d4ed8",
+                        padding: "2px 7px",
+                      }}
+                    >
+                      {booksCount} {booksCount === 1 ? "book" : "books"}
                     </span>
+                    {totalPages > 0 && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "0.74rem",
+                          background: "var(--muted)",
+                          color: "var(--foreground)",
+                          padding: "2px 7px",
+                        }}
+                      >
+                        {totalPages.toLocaleString()} pages
+                      </span>
+                    )}
                   </div>
+                  {orderItems.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      {orderItems.map((it: any, idx: number) => (
+                        <div
+                          key={it.id || it.code || idx}
+                          style={{
+                            fontSize: "0.78rem",
+                            lineHeight: 1.3,
+                            color: "var(--foreground)",
+                            display: "flex",
+                            alignItems: "baseline",
+                            gap: 4,
+                          }}
+                        >
+                          <span style={{ color: "var(--muted-foreground)", fontSize: "0.72rem" }}>•</span>
+                          {it.code && (
+                            <span style={{ fontWeight: 600, color: "var(--primary)", whiteSpace: "nowrap" }}>
+                              [{it.code}]
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              flex: "1 1 auto",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={it.title}
+                          >
+                            {it.title}
+                          </span>
+                          {it.quantity > 1 && (
+                            <span className="mono-pill" style={{ fontSize: "0.68rem", padding: "1px 4px", fontWeight: 700 }}>
+                              ×{it.quantity}
+                            </span>
+                          )}
+                          {it.pages ? (
+                            <span style={{ fontSize: "0.70rem", color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
+                              ({it.pages}p)
+                            </span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+
+              const vendorEarningCell = (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 3, cursor: "help", minWidth: 120 }}
+                  title={`Formula: (${totalPages} pages × Rs. ${o.vendor_per_page_rate ?? 1.6}) + (${booksCount} books × Rs. ${o.vendor_binding_rate ?? 30}) = Rs. ${Number(o.vendor_price || 0).toLocaleString()}`}
+                >
+                  <strong style={{ fontSize: "0.96rem", color: "#15803d" }}>
+                    Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                  </strong>
+                  <span
+                    className="mono-pill"
+                    style={{
+                      fontSize: "0.68rem",
+                      background: "rgba(22, 163, 74, 0.08)",
+                      color: "#166534",
+                      border: "1px dashed rgba(22, 163, 74, 0.3)",
+                      padding: "1px 6px",
+                      width: "fit-content",
+                    }}
+                  >
+                    ({totalPages}p × {o.vendor_per_page_rate ?? 1.6} + {booksCount}b × {o.vendor_binding_rate ?? 30})
+                  </span>
+                </div>
+              );
+
+              const vendorStatusCell = (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Status value={o.status} />
                   {o.status === "PROCESSING" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <button
@@ -5059,8 +5195,9 @@ function Orders({
                   )}
                 </div>,
                 vendorBooksCell,
+                vendorEarningCell,
                 formatDateDMY(o.created_at),
-                <Status value={o.status} />,
+                vendorStatusCell,
                 isOther ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {o.courier_name && o.courier_tracking_id ? (
@@ -6059,6 +6196,23 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
                       </strong>
                     </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total pages:</span>
+                      <strong style={{ fontSize: "0.95rem" }}>
+                        {Number(o.vendor_pages ?? (o.items?.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0) || 0)).toLocaleString()} pages
+                      </strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: "1px dashed var(--border)" }}>
+                      <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--foreground)" }}>Vendor Earning:</span>
+                      <strong style={{ fontSize: "1.1rem", color: "#15803d" }}>
+                        Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                      </strong>
+                    </div>
+                    {o.vendor_rate_breakdown?.formula && (
+                      <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)", background: "rgba(22, 163, 74, 0.08)", padding: "5px 8px", borderRadius: 6, border: "1px dashed rgba(22, 163, 74, 0.25)" }}>
+                        Calculation: {o.vendor_rate_breakdown.formula}
+                      </div>
+                    )}
                     {o.vendor_notes && (
                       <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
                         <span style={{ color: "var(--muted-foreground)" }}>Special Notes: </span>
@@ -6669,6 +6823,7 @@ function Vendors() {
   const { data, error, loading, reload } = useData<any[]>("manage/vendors");
   const [edit, setEdit] = useState<any>(null);
   const [remove, setRemove] = useState<any>(null);
+  const [ledgerVendor, setLedgerVendor] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -6682,6 +6837,18 @@ function Vendors() {
   );
   const totalAssigned = vendors.reduce(
     (sum, v) => sum + (Number(v.assigned_orders_count) || 0),
+    0,
+  );
+  const totalEarningsGenerated = vendors.reduce(
+    (sum, v) => sum + (Number(v.total_earnings) || 0),
+    0,
+  );
+  const totalPaidToVendors = vendors.reduce(
+    (sum, v) => sum + (Number(v.total_paid) || 0),
+    0,
+  );
+  const totalPendingBalance = vendors.reduce(
+    (sum, v) => sum + (Number(v.pending_balance) || 0),
     0,
   );
 
@@ -6701,8 +6868,8 @@ function Vendors() {
       <div
         className="metrics vendors-metrics"
         style={{
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+          gap: 14,
           marginBottom: 20,
         }}
       >
@@ -6728,15 +6895,39 @@ function Vendors() {
           <small>Orders in active print batches</small>
         </div>
 
-        <div className="metric metric-emerald">
+        <div className="metric metric-blue">
           <div className="metric-heading">
-            <span>Total Assigned</span>
+            <span>Total Generated</span>
             <span className="metric-icon">
-              <Package size={19} />
+              <Coins size={19} />
             </span>
           </div>
-          <strong>{totalAssigned}</strong>
-          <small>Cumulative vendor orders</small>
+          <strong>Rs. {totalEarningsGenerated.toLocaleString()}</strong>
+          <small>Total order printing cost</small>
+        </div>
+
+        <div className="metric metric-emerald">
+          <div className="metric-heading">
+            <span>Total Paid</span>
+            <span className="metric-icon">
+              <CheckCircle2 size={19} />
+            </span>
+          </div>
+          <strong style={{ color: "#15803d" }}>Rs. {totalPaidToVendors.toLocaleString()}</strong>
+          <small>Disbursed to all vendors</small>
+        </div>
+
+        <div className={`metric ${totalPendingBalance > 0 ? "metric-amber" : "metric-emerald"}`}>
+          <div className="metric-heading">
+            <span>Pending Balance</span>
+            <span className="metric-icon">
+              <Receipt size={19} />
+            </span>
+          </div>
+          <strong style={{ color: totalPendingBalance > 0 ? "#b45309" : "#15803d" }}>
+            Rs. {totalPendingBalance.toLocaleString()}
+          </strong>
+          <small>{totalPendingBalance > 0 ? "Remaining payable" : "All cleared"}</small>
         </div>
       </div>
 
@@ -6760,6 +6951,8 @@ function Vendors() {
                 email: "",
                 password: "",
                 address: "",
+                per_page_rate: 1.6,
+                binding_rate: 30,
                 active: true,
               })
             }
@@ -6811,7 +7004,8 @@ function Vendors() {
           headers={[
             "Vendor Partner",
             "Contact & WhatsApp",
-            "Press / Address",
+            "Pricing Rates",
+            "Ledger & Balance",
             "Active Workload",
             "Portal Access",
             "Actions",
@@ -6852,7 +7046,42 @@ function Vendors() {
                 )}
               </div>,
 
-              v.address || <span style={{ color: "var(--muted-foreground)" }}>—</span>,
+              <div key={`rates-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <strong style={{ fontSize: "0.88rem" }}>
+                  Rs. {Number(v.per_page_rate ?? 1.6).toFixed(2)}{" "}
+                  <span className="small-text muted">/ page</span>
+                </strong>
+                <span className="small-text muted">
+                  Rs. {Number(v.binding_rate ?? 30).toFixed(2)} / book binding
+                </span>
+              </div>,
+
+              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
+                  <span className="muted" style={{ minWidth: 55 }}>Generated:</span>
+                  <strong>Rs. {Number(v.total_earnings || 0).toLocaleString()}</strong>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
+                  <span className="muted" style={{ minWidth: 55 }}>Paid:</span>
+                  <span style={{ color: "#15803d", fontWeight: 600 }}>
+                    Rs. {Number(v.total_paid || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
+                  <span className="muted" style={{ minWidth: 55 }}>Balance:</span>
+                  <span
+                    className="mono-pill"
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      background: (v.pending_balance || 0) > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(22, 163, 74, 0.12)",
+                      color: (v.pending_balance || 0) > 0 ? "#b45309" : "#15803d",
+                    }}
+                  >
+                    Rs. {Number(v.pending_balance || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>,
 
               <div key={`workload-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <span
@@ -6890,6 +7119,22 @@ function Vendors() {
 
               <div className="row-actions" key={`act-${v.id}`}>
                 <button
+                  type="button"
+                  className="btn compact primary"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: "0.74rem",
+                    padding: "3px 8px",
+                  }}
+                  onClick={() => setLedgerVendor(v)}
+                  title={`Open payment ledger and record disbursements for ${v.name}`}
+                >
+                  <Receipt size={12} />
+                  Ledger
+                </button>
+                <button
                   onClick={() =>
                     setEdit({
                       id: v.id,
@@ -6897,6 +7142,8 @@ function Vendors() {
                       phone: v.phone,
                       email: v.email,
                       address: v.address || "",
+                      per_page_rate: v.per_page_rate ?? 1.6,
+                      binding_rate: v.binding_rate ?? 30,
                       active: !!v.active,
                       password: "",
                     })
@@ -6927,8 +7174,8 @@ function Vendors() {
             </DialogTitle>
             <DialogDescription>
               {edit?.id
-                ? "Update vendor contact details or set a new password."
-                : "Create a new printing vendor partner with portal credentials."}
+                ? "Update vendor contact details, pricing rates, or set a new password."
+                : "Create a new printing vendor partner with portal credentials and custom printing rates."}
             </DialogDescription>
           </DialogHeader>
           {edit && (
@@ -6942,6 +7189,8 @@ function Vendors() {
                     name: edit.name,
                     phone: edit.phone,
                     address: edit.address || null,
+                    per_page_rate: Number(edit.per_page_rate) || 1.6,
+                    binding_rate: Number(edit.binding_rate) || 30,
                   };
                   if (!edit.id) {
                     payload.email = edit.email;
@@ -6986,6 +7235,38 @@ function Vendors() {
                   onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
                 />
               </Field>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field
+                  label="Per Page Rate (Rs.)"
+                  hint="Auto-calculation rate per printed page (default: 1.60)"
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="1.60"
+                    value={edit.per_page_rate}
+                    onChange={(e) => setEdit({ ...edit, per_page_rate: e.target.value })}
+                  />
+                </Field>
+
+                <Field
+                  label="Binding Cost (Rs. per book)"
+                  hint="Auto-calculation cost per bound book (default: 30.00)"
+                >
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    required
+                    placeholder="30.00"
+                    value={edit.binding_rate}
+                    onChange={(e) => setEdit({ ...edit, binding_rate: e.target.value })}
+                  />
+                </Field>
+              </div>
 
               <Field
                 label="Login email address"
@@ -7041,6 +7322,14 @@ function Vendors() {
         </DialogContent>
       </Dialog>
 
+      {ledgerVendor && (
+        <VendorLedgerModal
+          vendor={ledgerVendor}
+          onClose={() => setLedgerVendor(null)}
+          onUpdated={() => reload()}
+        />
+      )}
+
       <Confirm
         open={!!remove}
         onClose={() => setRemove(null)}
@@ -7057,6 +7346,939 @@ function Vendors() {
         }}
       />
     </>
+  );
+}
+
+function VendorLedgerModal({
+  vendor,
+  onClose,
+  onUpdated,
+}: {
+  vendor: any;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const { data: ledger, error, loading, reload } = useData<VendorLedger>(
+    `manage/vendor-ledger?vendor_id=${vendor.id}`,
+  );
+  const [amount, setAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+
+  const summary = ledger?.summary || {
+    total_orders: 0,
+    total_pages: 0,
+    total_books: 0,
+    per_page_rate: vendor.per_page_rate ?? 1.6,
+    binding_rate: vendor.binding_rate ?? 30,
+    total_earned: vendor.total_earnings ?? 0,
+    total_paid: vendor.total_paid ?? 0,
+    pending_balance: vendor.pending_balance ?? 0,
+  };
+
+  const handleCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAmount = Number(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      toast.error("Enter a valid payment amount greater than 0");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api("manage/vendor-payments", {
+        vendor_id: vendor.id,
+        amount: parsedAmount,
+        payment_date: paymentDate,
+        payment_method: paymentMethod,
+        reference: reference.trim() || null,
+        notes: notes.trim() || null,
+      });
+      toast.success(`Payment of Rs. ${parsedAmount.toLocaleString()} recorded for ${vendor.name}`);
+      setAmount("");
+      setReference("");
+      setNotes("");
+      await reload();
+      onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      await api(`manage/vendor-payments/${paymentId}`, {}, "DELETE");
+      toast.success("Payment entry deleted.");
+      setDeletingPaymentId(null);
+      await reload();
+      onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent style={{ maxWidth: 840, maxHeight: "90vh", overflowY: "auto" }}>
+        <DialogHeader>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div>
+              <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "1.2rem" }}>
+                <Receipt size={20} style={{ color: "var(--primary)" }} />
+                <span>Vendor Ledger — {vendor.name}</span>
+              </DialogTitle>
+              <DialogDescription style={{ marginTop: 4 }}>
+                Financial balance, auto-calculated order earnings, and payment disbursements.
+              </DialogDescription>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <span className="mono-pill" style={{ fontSize: "0.76rem" }}>
+                Per page: Rs. {Number(summary.per_page_rate).toFixed(2)}
+              </span>
+              <span className="mono-pill" style={{ fontSize: "0.76rem" }}>
+                Binding: Rs. {Number(summary.binding_rate).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <Result loading={loading} error={error}>
+          {/* Summary Cards */}
+          <div
+            className="metrics"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 12,
+              margin: "12px 0 20px",
+            }}
+          >
+            <div className="metric metric-blue">
+              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                Total Generated (Orders)
+              </span>
+              <strong style={{ fontSize: "1.35rem", margin: "4px 0" }}>
+                Rs. {summary.total_earned.toLocaleString()}
+              </strong>
+              <small style={{ color: "var(--muted-foreground)" }}>
+                {summary.total_orders} orders · {summary.total_pages.toLocaleString()} pgs · {summary.total_books} bks
+              </small>
+            </div>
+
+            <div className="metric metric-emerald">
+              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                Total Amount Paid
+              </span>
+              <strong style={{ fontSize: "1.35rem", margin: "4px 0", color: "#15803d" }}>
+                Rs. {summary.total_paid.toLocaleString()}
+              </strong>
+              <small style={{ color: "var(--muted-foreground)" }}>
+                {ledger?.payments?.length || 0} recorded disbursements
+              </small>
+            </div>
+
+            <div className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"}`}>
+              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                Remaining Pending
+              </span>
+              <strong
+                style={{
+                  fontSize: "1.35rem",
+                  margin: "4px 0",
+                  color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
+                }}
+              >
+                Rs. {summary.pending_balance.toLocaleString()}
+              </strong>
+              <small style={{ color: "var(--muted-foreground)" }}>
+                {summary.pending_balance > 0 ? "Outstanding balance payable" : "All accounts fully settled"}
+              </small>
+            </div>
+          </div>
+
+          {/* Record New Payment Form */}
+          <div
+            style={{
+              padding: 16,
+              borderRadius: 8,
+              border: "1px solid var(--border)",
+              background: "var(--muted)",
+              marginBottom: 20,
+            }}
+          >
+            <h4 style={{ margin: "0 0 12px", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: 6 }}>
+              <Plus size={16} /> Record Payment to {vendor.name}
+            </h4>
+            <form onSubmit={handleCreatePayment}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Amount (Rs.) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    placeholder="e.g. 100000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Payment Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                  >
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Easypaisa">Easypaisa</option>
+                    <option value="JazzCash">JazzCash</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Transaction Ref #
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Meezan #9812739"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div style={{ flex: "1 1 auto" }}>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Notes / Description (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Paid 1 Lakh for batch #45 printing orders"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={saving || !amount}
+                  className="btn primary compact"
+                  style={{ height: 38, padding: "0 16px", whiteSpace: "nowrap" }}
+                >
+                  {saving ? "Saving…" : "Save Payment"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Payment History Table */}
+          <div>
+            <h4 style={{ margin: "0 0 10px", fontSize: "0.95rem" }}>
+              Disbursement History ({ledger?.payments?.length || 0})
+            </h4>
+            {(!ledger?.payments || ledger.payments.length === 0) ? (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--muted-foreground)", background: "var(--card)", borderRadius: 8, border: "1px dashed var(--border)" }}>
+                No payment disbursements recorded for this vendor yet.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Date</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Amount</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Method</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Reference</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Notes</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Recorded By</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledger.payments.map((p, idx) => (
+                      <tr
+                        key={p.id || idx}
+                        style={{
+                          borderBottom: idx < ledger.payments.length - 1 ? "1px solid var(--border)" : "none",
+                          background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                        }}
+                      >
+                        <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                          {formatDateDMY(p.payment_date)}
+                        </td>
+                        <td style={{ padding: "8px 10px", fontWeight: 700, color: "#15803d", whiteSpace: "nowrap" }}>
+                          Rs. {Number(p.amount).toLocaleString()}
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>
+                          <span className="mono-pill" style={{ fontSize: "0.72rem" }}>
+                            {p.payment_method}
+                          </span>
+                        </td>
+                        <td style={{ padding: "8px 10px", color: "var(--muted-foreground)" }}>
+                          {p.reference || "—"}
+                        </td>
+                        <td style={{ padding: "8px 10px", color: "var(--muted-foreground)" }}>
+                          {p.notes || "—"}
+                        </td>
+                        <td style={{ padding: "8px 10px", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                          {p.created_by}
+                        </td>
+                        <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingPaymentId(p.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#dc2626",
+                              cursor: "pointer",
+                              padding: "4px",
+                            }}
+                            title="Delete this payment record"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Result>
+
+        {deletingPaymentId && (
+          <Confirm
+            open={!!deletingPaymentId}
+            onClose={() => setDeletingPaymentId(null)}
+            title="Delete payment entry?"
+            description="Are you sure you want to delete this payment record? The vendor's remaining pending balance will increase accordingly."
+            onConfirm={() => handleDeletePayment(deletingPaymentId)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VendorDashboard({ user, base }: { user: User; base: string }) {
+  const { data: ledger, error: ledgerError, loading: ledgerLoading, reload: reloadLedger } =
+    useData<VendorLedger>("manage/vendor-ledger");
+  const { data: ordersData, error: ordersError, loading: ordersLoading, reload: reloadOrders } =
+    useData<any>("manage/orders?pageSize=6");
+
+  const summary = ledger?.summary || {
+    total_orders: 0,
+    total_pages: 0,
+    total_books: 0,
+    printing_orders: 0,
+    printed_orders: 0,
+    per_page_rate: 1.6,
+    binding_rate: 30,
+    total_earned: 0,
+    total_paid: 0,
+    pending_balance: 0,
+  };
+
+  const recentOrders: any[] = ordersData?.rows || [];
+  const loading = ledgerLoading || ordersLoading;
+  const error = ledgerError || ordersError;
+
+  return (
+    <div className="stack" style={{ gap: 20 }}>
+      {/* Top Welcome & Rate Banner */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12,
+          padding: "16px 20px",
+          borderRadius: 8,
+          background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08))",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.25rem", display: "flex", alignItems: "center", gap: 8 }}>
+            <Factory size={22} style={{ color: "var(--primary)" }} />
+            Printing Vendor Dashboard
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: "0.86rem", color: "var(--muted-foreground)" }}>
+            Welcome back! Here is your printing workload overview and payment ledger.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", fontWeight: 700, fontSize: "0.78rem" }}>
+            Per Page: Rs. {Number(summary.per_page_rate).toFixed(2)}
+          </span>
+          <span className="mono-pill" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#047857", fontWeight: 700, fontSize: "0.78rem" }}>
+            Binding: Rs. {Number(summary.binding_rate).toFixed(2)} / book
+          </span>
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => {
+              reloadLedger();
+              reloadOrders();
+            }}
+            disabled={loading}
+            title="Refresh Dashboard"
+          >
+            <RefreshCw size={13} className={loading ? "refresh-spinning" : undefined} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <Result loading={loading} error={error}>
+        {/* 6 Clickable Metric Cards */}
+        <div
+          className="metrics"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+            gap: 16,
+          }}
+        >
+          {/* 1. Total Orders Assigned */}
+          <a
+            href="/vendor/orders?status=ALL"
+            className="metric metric-blue"
+            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            title="Click to view all assigned orders"
+          >
+            <div className="metric-heading">
+              <span>Total Orders Assigned</span>
+              <span className="metric-icon">
+                <ShoppingBag size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.6rem" }}>{summary.total_orders}</strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              View all orders & history →
+            </small>
+          </a>
+
+          {/* 2. Orders in Printing Queue */}
+          <a
+            href="/vendor/orders?status=PROCESSING"
+            className="metric metric-amber"
+            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            title="Click to view orders waiting to be printed"
+          >
+            <div className="metric-heading">
+              <span>Printing (Pending)</span>
+              <span className="metric-icon">
+                <Printer size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.6rem", color: summary.printing_orders ? "#b45309" : undefined }}>
+              {summary.printing_orders || 0}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {(summary.printing_orders || 0) > 0 ? "Active print queue →" : "Print queue clear ✓"}
+            </small>
+          </a>
+
+          {/* 3. Printed Orders */}
+          <a
+            href="/vendor/orders?status=PRINTED"
+            className="metric metric-emerald"
+            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            title="Click to view printed orders ready for dispatch"
+          >
+            <div className="metric-heading">
+              <span>Printed Orders</span>
+              <span className="metric-icon">
+                <CheckCircle2 size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.6rem", color: "#15803d" }}>
+              {summary.printed_orders || 0}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              Ready for dispatch / pickup →
+            </small>
+          </a>
+
+          {/* 4. Total Earnings */}
+          <a
+            href="/vendor/ledger"
+            className="metric metric-blue"
+            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            title="Click to view payment ledger details"
+          >
+            <div className="metric-heading">
+              <span>Total Earnings</span>
+              <span className="metric-icon">
+                <Coins size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.5rem" }}>
+              Rs. {summary.total_earned.toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {summary.total_pages.toLocaleString()} pgs · {summary.total_books} books →
+            </small>
+          </a>
+
+          {/* 5. Total Received */}
+          <a
+            href="/vendor/ledger"
+            className="metric metric-emerald"
+            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            title="Click to view payments received from Admin"
+          >
+            <div className="metric-heading">
+              <span>Total Received</span>
+              <span className="metric-icon">
+                <CreditCard size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
+              Rs. {summary.total_paid.toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              Disbursed by Admin →
+            </small>
+          </a>
+
+          {/* 6. Total Remaining / Pending Payment */}
+          <a
+            href="/vendor/ledger"
+            className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"}`}
+            style={{ textDecoration: "none", cursor: "pointer", display: "block" }}
+            title="Click to view payment ledger balance"
+          >
+            <div className="metric-heading">
+              <span>Remaining Pending</span>
+              <span className="metric-icon">
+                <Receipt size={19} />
+              </span>
+            </div>
+            <strong
+              style={{
+                fontSize: "1.5rem",
+                color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
+              }}
+            >
+              Rs. {summary.pending_balance.toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {summary.pending_balance > 0 ? "Awaiting clearance from Admin →" : "All cleared ✓"}
+            </small>
+          </a>
+        </div>
+
+        {/* Quick Action Navigation Buttons */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <a
+            href="/vendor/orders?status=PROCESSING"
+            className="btn primary"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 18px" }}
+          >
+            <Printer size={16} /> Open Printing Queue ({summary.printing_orders || 0})
+          </a>
+          <a
+            href="/vendor/ledger"
+            className="btn"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 18px" }}
+          >
+            <Receipt size={16} /> View Payment Ledger
+          </a>
+        </div>
+
+        {/* Recent Orders Overview Table */}
+        <div className="panel stack" style={{ gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1.05rem" }}>Recent Printing Orders</h3>
+              <p style={{ margin: "2px 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                Latest orders assigned with auto-calculated printing earnings
+              </p>
+            </div>
+            <a href="/vendor/orders?status=ALL" className="btn compact">
+              View all orders ({summary.total_orders}) →
+            </a>
+          </div>
+
+          {recentOrders.length === 0 ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--muted-foreground)", border: "1px dashed var(--border)", borderRadius: 8 }}>
+              No orders assigned yet.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                <thead>
+                  <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Order ID</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Student Info</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Books & Pages</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Vendor Earning</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Date</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Status</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600, textAlign: "right" }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.map((o, idx) => {
+                    const items: any[] = o.items || [];
+                    const booksCount = Number(
+                      o.total_books ??
+                      items.reduce((s: number, it: any) => s + (it.quantity || 1), 0)
+                    );
+                    const pagesCount = Number(
+                      o.vendor_pages ??
+                      items.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0)
+                    );
+                    return (
+                      <tr
+                        key={o.id || idx}
+                        style={{
+                          borderBottom: idx < recentOrders.length - 1 ? "1px solid var(--border)" : "none",
+                          background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                        }}
+                      >
+                        <td style={{ padding: "10px 12px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                          <a href={`/vendor/orders/${o.id}`} style={{ color: "var(--primary)", textDecoration: "none" }}>
+                            {o.reference || `#${o.id.slice(0, 8)}`}
+                          </a>
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <strong>{o.name}</strong>
+                          {o.phone && (
+                            <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                              {o.phone}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 280 }}>
+                            <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                              <span className="mono-pill" style={{ fontSize: "0.72rem", fontWeight: 700 }}>
+                                {booksCount} {booksCount === 1 ? "book" : "books"}
+                              </span>
+                              {pagesCount > 0 && (
+                                <span className="mono-pill" style={{ fontSize: "0.72rem" }}>
+                                  {pagesCount} pgs
+                                </span>
+                              )}
+                            </div>
+                            {items.slice(0, 2).map((it: any, i: number) => (
+                              <div
+                                key={it.id || i}
+                                style={{
+                                  fontSize: "0.76rem",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  color: "var(--muted-foreground)",
+                                }}
+                                title={it.title}
+                              >
+                                • {it.title} {it.quantity > 1 ? `(×${it.quantity})` : ""}
+                              </div>
+                            ))}
+                            {items.length > 2 && (
+                              <div style={{ fontSize: "0.72rem", color: "var(--primary)" }}>
+                                + {items.length - 2} more...
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          <strong style={{ fontSize: "0.95rem", color: "#15803d" }}>
+                            Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                          </strong>
+                          <div style={{ fontSize: "0.70rem", color: "var(--muted-foreground)" }}>
+                            ({pagesCount}p × {summary.per_page_rate} + {booksCount}b × {summary.binding_rate})
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontSize: "0.82rem" }}>
+                          {formatDateDMY(o.created_at)}
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <Status value={o.status} />
+                        </td>
+                        <td style={{ padding: "10px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
+                          <a
+                            href={`/vendor/orders/${o.id}`}
+                            className="btn compact"
+                            style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                          >
+                            View
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Result>
+    </div>
+  );
+}
+
+function VendorLedgerView({ user }: { user: User }) {
+  const { data: ledger, error, loading, reload } = useData<VendorLedger>("manage/vendor-ledger");
+
+  const summary = ledger?.summary || {
+    total_orders: 0,
+    total_pages: 0,
+    total_books: 0,
+    per_page_rate: 1.6,
+    binding_rate: 30,
+    total_earned: 0,
+    total_paid: 0,
+    pending_balance: 0,
+  };
+
+  const payments = ledger?.payments || [];
+
+  return (
+    <div className="stack" style={{ gap: 20 }}>
+      {/* Rate Banner */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12,
+          padding: "14px 18px",
+          borderRadius: 8,
+          background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08))",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.15rem", display: "flex", alignItems: "center", gap: 8 }}>
+            <Receipt size={20} style={{ color: "var(--primary)" }} />
+            Payment Ledger & Earnings
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: "0.84rem", color: "var(--muted-foreground)" }}>
+            Earnings are automatically calculated per order. Track all payments received from administration.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", fontWeight: 700, fontSize: "0.78rem" }}>
+            Per Page: Rs. {Number(summary.per_page_rate).toFixed(2)}
+          </span>
+          <span className="mono-pill" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#047857", fontWeight: 700, fontSize: "0.78rem" }}>
+            Binding: Rs. {Number(summary.binding_rate).toFixed(2)} / book
+          </span>
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => reload()}
+            disabled={loading}
+            title="Refresh Ledger"
+          >
+            <RefreshCw size={13} className={loading ? "refresh-spinning" : undefined} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <Result loading={loading} error={error}>
+        {/* 3 Main Financial Summary Cards */}
+        <div
+          className="metrics"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 16,
+          }}
+        >
+          <div className="metric metric-blue">
+            <div className="metric-heading">
+              <span>Total Earned</span>
+              <span className="metric-icon">
+                <Coins size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.6rem", color: "var(--foreground)" }}>
+              Rs. {summary.total_earned.toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {summary.total_pages.toLocaleString()} pages · {summary.total_books} books ({summary.total_orders} orders)
+            </small>
+          </div>
+
+          <div className="metric metric-emerald">
+            <div className="metric-heading">
+              <span>Total Received</span>
+              <span className="metric-icon">
+                <CreditCard size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.6rem", color: "#15803d" }}>
+              Rs. {summary.total_paid.toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {payments.length} payment disbursement{payments.length !== 1 ? "s" : ""} received
+            </small>
+          </div>
+
+          <div className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"}`}>
+            <div className="metric-heading">
+              <span>Remaining Balance</span>
+              <span className="metric-icon">
+                <Clock size={19} />
+              </span>
+            </div>
+            <strong
+              style={{
+                fontSize: "1.6rem",
+                color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
+              }}
+            >
+              Rs. {summary.pending_balance.toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {summary.pending_balance > 0 ? "Pending payment from Admin" : "All accounts cleared ✓"}
+            </small>
+          </div>
+        </div>
+
+        {/* Calculation formula explanation */}
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "var(--muted)",
+            border: "1px solid var(--border)",
+            fontSize: "0.84rem",
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: 2 }}>
+            📐 Auto-Calculation Formula:
+          </strong>
+          <span>
+            Total Earning = (Total Order Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + (Total Books × Rs. {Number(summary.binding_rate).toFixed(2)} Binding)
+          </span>
+          <div style={{ marginTop: 4, color: "var(--muted-foreground)", fontSize: "0.78rem" }}>
+            * Rates are configured by Bookstore Administration. Any rate changes immediately recalculate your total earnings.
+          </div>
+        </div>
+
+        {/* Payments History Table */}
+        <div className="panel stack" style={{ gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ margin: 0, fontSize: "1rem" }}>
+              Payment Receipts History ({payments.length})
+            </h3>
+            <span className="small-text muted">Disbursements recorded by Admin</span>
+          </div>
+
+          {payments.length === 0 ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--muted-foreground)", border: "1px dashed var(--border)", borderRadius: 8 }}>
+              <Receipt size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+              <p style={{ margin: 0, fontWeight: 500 }}>No payments recorded yet</p>
+              <p style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>
+                When the administration records a payment disbursement for your press, it will appear here.
+              </p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                <thead>
+                  <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Payment Date</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Amount Received</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Payment Method</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Reference / TxID</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Description / Notes</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p, idx) => (
+                    <tr
+                      key={p.id || idx}
+                      style={{
+                        borderBottom: idx < payments.length - 1 ? "1px solid var(--border)" : "none",
+                        background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                      }}
+                    >
+                      <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                        {formatDateDMY(p.payment_date)}
+                      </td>
+                      <td style={{ padding: "10px 12px", fontWeight: 700, color: "#15803d", whiteSpace: "nowrap", fontSize: "0.95rem" }}>
+                        Rs. {Number(p.amount).toLocaleString()}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span className="mono-pill" style={{ fontSize: "0.75rem" }}>
+                          {p.payment_method}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "var(--muted-foreground)" }}>
+                        {p.reference || "—"}
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "var(--muted-foreground)" }}>
+                        {p.notes || "—"}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "2px 8px",
+                            borderRadius: 9999,
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            background: "rgba(22, 163, 74, 0.12)",
+                            color: "#15803d",
+                          }}
+                        >
+                          <CheckCircle2 size={11} /> Received
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Result>
+    </div>
   );
 }
 

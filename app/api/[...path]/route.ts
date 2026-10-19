@@ -60,6 +60,9 @@ import {
   deleteVendor,
   assignOrderToVendor,
   batchAssignOrdersToVendor,
+  getVendorLedger,
+  createVendorPayment,
+  deleteVendorPayment,
 } from "@/lib/server/vendors";
 import { upload } from "@/lib/server/uploads";
 import { bootstrap } from "@/lib/server/seed";
@@ -1027,6 +1030,21 @@ async function handle(req: Request) {
       }
       if (method === "DELETE" && id) {
         return ok(await deleteVendor(req, u, id));
+      }
+    }
+    if (section === "vendor-ledger" || section === "vendor-payments") {
+      const u = await user(req);
+      const url = new URL(req.url);
+      if (method === "GET") {
+        const vendorId = url.searchParams.get("vendor_id") || undefined;
+        return ok(await getVendorLedger(u, vendorId));
+      }
+      if (method === "POST") {
+        const body = await json(req);
+        return ok(await createVendorPayment(req, u, body));
+      }
+      if (method === "DELETE" && id) {
+        return ok(await deleteVendorPayment(req, u, id));
       }
     }
     if (section === "settings") {

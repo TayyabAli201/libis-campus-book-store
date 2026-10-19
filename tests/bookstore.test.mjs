@@ -66,6 +66,9 @@ const {
   deleteVendor,
   assignOrderToVendor,
   batchAssignOrdersToVendor,
+  getVendorLedger,
+  createVendorPayment,
+  deleteVendorPayment,
 } = await import("../lib/server/vendors.ts");
 const {
   getVendorWhatsAppMessage,
@@ -118,6 +121,7 @@ function database(t) {
     "0006_binding_rate.sql",
     "0007_courier_tracking.sql",
     "0008_vendor_management.sql",
+    "0009_vendor_ledger.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -2101,6 +2105,138 @@ test("Super Admin status update to SHIPPED auto-stamps vendor_printed_at and ven
   assert.equal(afterShip.status, "SHIPPED");
   assert.ok(afterShip.vendor_printed_at, "vendor_printed_at must be auto-stamped when marked Shipped");
   assert.ok(afterShip.vendor_dispatched_at, "vendor_dispatched_at must be auto-stamped for Lahore/Campus orders");
+});
+
+test("Vendor Pricing Control, auto-calculation formula, retail price privacy, and payment ledger system", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/test");
+  const adminUser = {
+    id: "admin",
+    name: "QA Admin",
+    email: "qa@example.invalid",
+    role: "SUPER_ADMIN",
+    campus_id: null,
+    permissions: ["orders.update", "orders.manage"],
+  };
+
+  // 1. Admin creates vendor with custom rates: 1.60 Rs per page, 30 Rs binding
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Ledger Press",
+    phone: "03001234999",
+    email: "ledgerpress@example.com",
+    password: "Password123!",
+    per_page_rate: 1.60,
+    binding_rate: 30.00,
+  });
+  const vendorId = vRes.vendor.id;
+  assert.equal(vRes.vendor.per_page_rate, 1.60);
+  assert.equal(vRes.vendor.binding_rate, 30.00);
+
+  const vendorUser = {
+    id: vRes.vendor.user_id,
+    name: "Ledger Press",
+    email: "ledgerpress@example.com",
+    role: "VENDOR",
+    vendor_id: vendorId,
+    permissions: [],
+  };
+
+  // 2. Create a book with 100 pages
+  const { id: bookId } = await saveBook(bookInput("LEDGER-100", { pages: 100 }), adminUser, request);
+
+  // 3. Customer places order: 1 book of 100 pages
+  const cartData = {
+    name: "Ledger Student",
+    phone: "03219988776",
+    city: "Lahore",
+    address: "House 10, Lahore",
+    delivery_type: "campus",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 1 }],
+  };
+  const q = await quote(request, cartData);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const ord = await getOrder(request, placed.id, adminUser);
+  await decidePayment(request, adminUser, placed.id, "approve", "Approved", ord.version);
+
+  // 4. Admin assigns order to vendor
+  await assignOrderToVendor(testReq, adminUser, placed.id, vendorId);
+
+  // 5. Vendor views order: Formula = (100 * 1.6) + 30 = 190 Rs
+  const vendorOrd = await getOrder(testReq, placed.id, vendorUser);
+  assert.equal(vendorOrd.vendor_price, 190);
+  assert.equal(vendorOrd.vendor_pages, 100);
+  assert.equal(vendorOrd.vendor_books, 1);
+  assert.equal(vendorOrd.vendor_rate_breakdown.formula, "(100 pages × Rs. 1.6) + (1 books × Rs. 30) = Rs. 190");
+
+  // 6. 100% Privacy check: vendor never sees retail price or slip info
+  assert.equal(vendorOrd.subtotal, undefined);
+  assert.equal(vendorOrd.total, undefined);
+  assert.equal(vendorOrd.delivery, undefined);
+  assert.equal(vendorOrd.slip_id, undefined);
+  assert.equal(vendorOrd.detected_amount, undefined);
+  assert.equal(vendorOrd.items[0].unit_price, undefined);
+
+  // 7. Vendor lists orders: check vendor_overview
+  const vendorList = await listOrders(vendorUser);
+  assert.ok(vendorList.vendor_overview);
+  assert.equal(vendorList.vendor_overview.total_assigned, 1);
+  assert.equal(vendorList.vendor_overview.printing_queue_count, 1);
+  assert.equal(vendorList.vendor_overview.total_earnings, 190);
+  assert.equal(vendorList.vendor_overview.total_paid, 0);
+  assert.equal(vendorList.vendor_overview.pending_balance, 190);
+
+  // 8. Dynamic Rate Update: Admin updates vendor per_page_rate to 2.00 Rs and binding to 40 Rs
+  await updateVendor(testReq, adminUser, vendorId, {
+    per_page_rate: 2.00,
+    binding_rate: 40.00,
+  });
+
+  // Check that vendor order price immediately recalculates: (100 * 2.00) + 40 = 240 Rs
+  const updatedVendorOrd = await getOrder(testReq, placed.id, vendorUser);
+  assert.equal(updatedVendorOrd.vendor_price, 240);
+  assert.equal(updatedVendorOrd.vendor_rate_breakdown.formula, "(100 pages × Rs. 2) + (1 books × Rs. 40) = Rs. 240");
+
+  // 9. Payment Ledger: Admin checks vendor ledger
+  const initialLedger = await getVendorLedger(adminUser, vendorId);
+  assert.equal(initialLedger.summary.total_earned, 240);
+  assert.equal(initialLedger.summary.total_paid, 0);
+  assert.equal(initialLedger.summary.pending_balance, 240);
+  assert.equal(initialLedger.payments.length, 0);
+
+  // 10. Admin records a payment to vendor: e.g. Paid Rs. 100
+  const paymentEntry = await createVendorPayment(testReq, adminUser, {
+    vendor_id: vendorId,
+    amount: 100,
+    payment_date: "2026-10-19",
+    payment_method: "Bank Transfer",
+    reference: "TXN-12345",
+    notes: "Advance payment for printing",
+  });
+  assert.equal(paymentEntry.ok, true);
+  assert.ok(paymentEntry.payment.id);
+
+  // 11. Vendor checks own ledger
+  const vendorLedgerAfterPay = await getVendorLedger(vendorUser);
+  assert.equal(vendorLedgerAfterPay.summary.total_earned, 240);
+  assert.equal(vendorLedgerAfterPay.summary.total_paid, 100);
+  assert.equal(vendorLedgerAfterPay.summary.pending_balance, 140);
+  assert.equal(vendorLedgerAfterPay.payments.length, 1);
+  assert.equal(vendorLedgerAfterPay.payments[0].amount, 100);
+  assert.equal(vendorLedgerAfterPay.payments[0].payment_method, "Bank Transfer");
+
+  // 12. Admin deletes payment entry
+  await deleteVendorPayment(testReq, adminUser, paymentEntry.payment.id);
+  const ledgerAfterDelete = await getVendorLedger(adminUser, vendorId);
+  assert.equal(ledgerAfterDelete.summary.total_paid, 0);
+  assert.equal(ledgerAfterDelete.summary.pending_balance, 240);
+  assert.equal(ledgerAfterDelete.payments.length, 0);
 });
 
 
