@@ -2636,6 +2636,190 @@ function BulkAssignVendorModal({
   );
 }
 
+function VendorOrderBooksPanel({ o }: { o: any }) {
+  const items: any[] = o?.items || [];
+  const totalBooks =
+    o?.total_books ??
+    items.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+  const totalPages = items.reduce(
+    (s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1),
+    0,
+  );
+
+  const isCampus =
+    o?.delivery_type === "campus" ||
+    (o?.city && o.city.toLowerCase().includes("campus")) ||
+    (o?.address && o.address.toLowerCase().includes("campus"));
+  const isOther =
+    o?.delivery_type === "other" ||
+    (!isCampus && o?.city && !o.city.toLowerCase().includes("lahore"));
+
+  return (
+    <div className="panel stack" style={{ gap: 14 }}>
+      {/* Student & Destination summary */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          padding: "12px 14px",
+          borderRadius: 8,
+          background: "var(--muted)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <span style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 700 }}>
+              Student / Customer
+            </span>
+            <div style={{ fontSize: "1.02rem", fontWeight: 700, color: "var(--foreground)", marginTop: 2 }}>
+              {o?.name || "Customer"}
+            </div>
+            {o?.phone && (
+              <div style={{ fontSize: "0.84rem", color: "var(--muted-foreground)", marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
+                <span>📱 {o.phone}</span>
+              </div>
+            )}
+          </div>
+          <div>
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                padding: "3px 8px",
+                background: isCampus
+                  ? "rgba(37, 99, 235, 0.12)"
+                  : isOther
+                    ? "rgba(234, 88, 12, 0.12)"
+                    : "rgba(16, 185, 129, 0.12)",
+                color: isCampus ? "#1d4ed8" : isOther ? "#c2410c" : "#047857",
+                border: `1px solid ${isCampus ? "#93c5fd" : isOther ? "#fdba74" : "#86efac"}`,
+              }}
+            >
+              {isCampus
+                ? "🏛️ Qanchi Campus (Pickup)"
+                : isOther
+                  ? `📦 ${o?.city || "Other City"} (Courier)`
+                  : "🛵 Lahore Route"}
+            </span>
+          </div>
+        </div>
+
+        {o?.address && !isCampus && (
+          <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", paddingTop: 6, borderTop: "1px dashed var(--border)" }}>
+            <strong>Delivery Address: </strong>
+            <span>{o.address}{o.city ? `, ${o.city}` : ""}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Ordered Books list */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <BookOpen size={16} style={{ color: "var(--primary)" }} />
+            <h3 style={{ margin: 0, fontSize: "0.96rem" }}>Ordered Books to Print</h3>
+          </div>
+          <span
+            className="mono-pill"
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              background: "rgba(37, 99, 235, 0.1)",
+              color: "#2563eb",
+            }}
+          >
+            {totalBooks} {totalBooks === 1 ? "book" : "books"}
+          </span>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="empty-state" style={{ padding: "16px", textAlign: "center", fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+            No books found for this order.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+              <thead>
+                <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                  <th style={{ padding: "8px 10px", fontWeight: 600, width: "36px", color: "var(--muted-foreground)" }}>#</th>
+                  <th style={{ padding: "8px 10px", fontWeight: 600 }}>Code</th>
+                  <th style={{ padding: "8px 10px", fontWeight: 600 }}>Book Title</th>
+                  <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "right" }}>Pages</th>
+                  <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "center", width: "60px" }}>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it: any, idx: number) => (
+                  <tr
+                    key={it.id || it.code || idx}
+                    style={{
+                      borderBottom: idx < items.length - 1 ? "1px solid var(--border)" : "none",
+                      background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                    }}
+                  >
+                    <td style={{ padding: "9px 10px", color: "var(--muted-foreground)", fontSize: "0.8rem" }}>
+                      {idx + 1}
+                    </td>
+                    <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.78rem",
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        {it.code}
+                      </span>
+                    </td>
+                    <td style={{ padding: "9px 10px", fontWeight: 500, color: "var(--foreground)" }}>
+                      {it.title}
+                    </td>
+                    <td style={{ padding: "9px 10px", textAlign: "right", color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
+                      {it.pages ? `${it.pages} p.` : "—"}
+                    </td>
+                    <td style={{ padding: "9px 10px", textAlign: "center" }}>
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.8rem",
+                          background: "rgba(37, 99, 235, 0.12)",
+                          color: "#1d4ed8",
+                          padding: "2px 7px",
+                        }}
+                      >
+                        ×{it.quantity || 1}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: "var(--muted)", borderTop: "1px solid var(--border)", fontWeight: 600, fontSize: "0.82rem" }}>
+                  <td colSpan={3} style={{ padding: "8px 10px" }}>
+                    Total to Print:
+                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--foreground)" }}>
+                    {totalPages > 0 ? `${totalPages.toLocaleString()} pages` : "—"}
+                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "center", color: "#1d4ed8", fontWeight: 700 }}>
+                    {totalBooks}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OrderModalPopup({
   id,
   user,
@@ -2990,7 +3174,7 @@ function OrderModalPopup({
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <strong style={{ fontSize: "0.92rem" }}>Printing Queue</strong>
+                        <strong style={{ fontSize: "0.92rem" }}>Printing (Pending)</strong>
                         <span
                           className="mono-pill"
                           style={{
@@ -3000,13 +3184,13 @@ function OrderModalPopup({
                             color: o.vendor_printed_at ? "#15803d" : "#b45309",
                           }}
                         >
-                          {o.vendor_printed_at ? "Printed ✓" : "In Printing Queue"}
+                          {o.vendor_printed_at ? "Printed ✓" : "Printing (Pending)"}
                         </span>
                       </div>
                       <p className="small-text muted" style={{ margin: "2px 0 0" }}>
                         {o.vendor_printed_at
                           ? `Marked as printed (${formatDateDMY(o.vendor_printed_at)}). Ready for dispatch or pickup.`
-                          : "Order is in the active printing queue waiting for printing."}
+                          : "Order is in printing pending status waiting for printing."}
                       </p>
                     </div>
                   </div>
@@ -3123,7 +3307,9 @@ function OrderModalPopup({
 
               <div className="checkout-grid order-modal-grid">
                 <div className="stack">
-                  {!isVendor && (
+                  {isVendor ? (
+                    <VendorOrderBooksPanel o={o} />
+                  ) : (
                     <>
                       {/* Direct Online Payment Slip View */}
                       {o.slip_id && (
@@ -5838,7 +6024,11 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
           )}
 
           <div className="checkout-grid">
-            {!isVendor && (
+            {isVendor ? (
+              <div className="stack no-print">
+                <VendorOrderBooksPanel o={o} />
+              </div>
+            ) : (
               <>
                 <div className="print-only">
                   <OrderReceipt o={o} />
