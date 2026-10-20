@@ -887,20 +887,40 @@ export function Loading() {
   );
 }
 export function Status({ value, label }: { value: string; label?: string }) {
+  const norm = (value || "").toUpperCase();
+  let statusClass = "status-default";
+
+  if (
+    ["VERIFIED", "CONFIRMED", "DELIVERED", "AMOUNT_MATCHED", "PAID"].includes(
+      norm,
+    )
+  ) {
+    statusClass = "status-good";
+  } else if (["PROCESSING", "PRINTED", "PRINTING"].includes(norm)) {
+    statusClass = "status-purple";
+  } else if (["SHIPPED"].includes(norm)) {
+    statusClass = "status-info";
+  } else if (
+    [
+      "PENDING",
+      "PAYMENT_PENDING",
+      "MANUAL_REVIEW",
+      "DUE_PENDING",
+      "PARTIALLY_PAID",
+      "NEW_SLIP_REQUESTED",
+    ].includes(norm)
+  ) {
+    statusClass = "status-warn";
+  } else if (["REJECTED", "CANCELLED", "AMOUNT_MISMATCH"].includes(norm)) {
+    statusClass = "status-bad";
+  } else if (["REFUND_REQUESTED", "REFUNDED"].includes(norm)) {
+    statusClass = "status-teal";
+  }
+
   return (
-    <span
-      className={
-        "status " +
-        (["VERIFIED", "CONFIRMED", "DELIVERED", "AMOUNT_MATCHED"].includes(
-          value,
-        )
-          ? "good"
-          : ["REJECTED", "CANCELLED", "AMOUNT_MISMATCH"].includes(value)
-            ? "bad"
-            : "")
-      }
-    >
-      {label || statuses[value] || value.replaceAll("_", " ")}
+    <span className={`status ${statusClass}`}>
+      <span className="status-dot" />
+      {label || statuses[value] || (value ? String(value).replaceAll("_", " ") : "")}
     </span>
   );
 }

@@ -1049,35 +1049,65 @@ footer {
 .status {
   display: inline-flex;
   align-items: center;
-  padding: 5px 9px;
-  border-radius: 7px;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
   background: var(--secondary);
   color: var(--foreground);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   line-height: 1.4;
-  white-space: normal;
+  white-space: nowrap;
   margin: 2px;
-  max-width: 210px;
+  border: 1px solid var(--border);
+  transition: all 0.18s ease;
 }
 
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status.status-good,
 .status.good {
-  background: #dcefe1;
-  color: #1c613d;
+  background: var(--status-good-bg);
+  color: var(--status-good-text);
+  border-color: var(--status-good-border);
 }
 
+.status.status-warn {
+  background: var(--status-warn-bg);
+  color: var(--status-warn-text);
+  border-color: var(--status-warn-border);
+}
+
+.status.status-bad,
 .status.bad {
-  background: #fae4e2;
-  color: #a22f2d;
+  background: var(--status-danger-bg);
+  color: var(--status-danger-text);
+  border-color: var(--status-danger-border);
 }
 
-.dark .status.good {
-  background: #254331;
-  color: #b4eec2;
+.status.status-info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+  border-color: var(--status-info-border);
 }
 
-.dark .status.bad {
-  background: #542e2a;
-  color: #ffb7a7;
+.status.status-purple {
+  background: var(--status-purple-bg);
+  color: var(--status-purple-text);
+  border-color: var(--status-purple-border);
+}
+
+.status.status-teal {
+  background: var(--status-cyan-bg);
+  color: var(--status-cyan-text);
+  border-color: var(--status-cyan-border);
 }
 
 .tracking-form {
@@ -1606,20 +1636,34 @@ footer {
   border-radius: 12px;
   background: var(--card);
   overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .data-table th {
   background: var(--secondary);
   font-size: 0.78rem;
-  color: var(--muted-foreground);
-  height: 50px;
+  font-weight: 700;
+  color: var(--foreground);
+  height: 48px;
+  border-bottom: 1.5px solid var(--border);
+  letter-spacing: 0.02em;
 }
 
 .data-table td {
-  font-size: 0.83rem;
-  padding: 17px 13px;
+  font-size: 0.84rem;
+  padding: 14px 13px;
   white-space: normal;
   min-width: 100px;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover td {
+  background: color-mix(in srgb, var(--primary) 4%, var(--card));
 }
 
 .data-table th:first-child,

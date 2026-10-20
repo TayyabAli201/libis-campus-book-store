@@ -2071,9 +2071,9 @@ function CourierTrackingModal({
             style={{
               padding: "10px 14px",
               borderRadius: 8,
-              background: "rgba(245, 158, 11, 0.12)",
-              border: "1px solid #f59e0b",
-              color: "#b45309",
+              background: "var(--status-warn-bg)",
+              border: "1px solid var(--status-warn-border)",
+              color: "var(--status-warn-text)",
               fontSize: "0.85rem",
               marginTop: 10,
               lineHeight: 1.45,
@@ -2289,9 +2289,9 @@ function AssignVendorModal({
               style={{
                 padding: "14px 16px",
                 borderRadius: 8,
-                background: "rgba(16, 185, 129, 0.12)",
-                border: "1px solid #10b981",
-                color: "#065f46",
+                background: "var(--status-good-bg)",
+                border: "1px solid var(--status-good-border)",
+                color: "var(--status-good-text)",
                 fontSize: "0.9rem",
               }}
             >
@@ -2334,8 +2334,9 @@ function AssignVendorModal({
               style={{
                 padding: "10px 14px",
                 borderRadius: 8,
-                background: isOther ? "rgba(59, 130, 246, 0.08)" : "rgba(245, 158, 11, 0.08)",
-                border: `1px solid ${isOther ? "#3b82f6" : "#f59e0b"}`,
+                background: isOther ? "var(--status-info-bg)" : "var(--status-warn-bg)",
+                border: `1px solid ${isOther ? "var(--status-info-border)" : "var(--status-warn-border)"}`,
+                color: isOther ? "var(--status-info-text)" : "var(--status-warn-text)",
                 fontSize: "0.83rem",
                 lineHeight: 1.45,
               }}
@@ -2499,9 +2500,9 @@ function BulkAssignVendorModal({
               style={{
                 padding: "14px 16px",
                 borderRadius: 8,
-                background: "rgba(16, 185, 129, 0.12)",
-                border: "1px solid #10b981",
-                color: "#065f46",
+                background: "var(--status-good-bg)",
+                border: "1px solid var(--status-good-border)",
+                color: "var(--status-good-text)",
                 fontSize: "0.9rem",
               }}
             >
@@ -2523,16 +2524,16 @@ function BulkAssignVendorModal({
               style={{
                 padding: "10px 14px",
                 borderRadius: 8,
-                background: "rgba(16, 185, 129, 0.08)",
-                border: "1px solid #10b981",
+                background: "var(--status-good-bg)",
+                border: "1px solid var(--status-good-border)",
                 fontSize: "0.83rem",
                 lineHeight: 1.45,
               }}
             >
-              <div style={{ fontWeight: 600, color: "#065f46", marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ fontWeight: 600, color: "var(--status-good-text)", marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
                 <CheckCircle2 size={14} /> Verified Student Orders Only
               </div>
-              <div style={{ color: "#047857" }}>
+              <div style={{ color: "var(--status-good-text)", opacity: 0.9 }}>
                 {campusLahoreCount > 0 && (
                   <span>🏛️ <strong>{campusLahoreCount}</strong> Campus / Lahore order(s) (Vendor delivers printed batch to Bookstore Office). </span>
                 )}
@@ -2579,8 +2580,9 @@ function BulkAssignVendorModal({
                         fontSize: "0.70rem",
                         padding: "1px 6px",
                         borderRadius: 4,
-                        background: "rgba(37, 99, 235, 0.1)",
-                        color: "#1d4ed8",
+                        background: "var(--status-info-bg)",
+                        color: "var(--status-info-text)",
+                        border: "1px solid var(--status-info-border)",
                         fontWeight: 600,
                       }}
                     >
@@ -2708,12 +2710,12 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
                 fontWeight: 600,
                 padding: "3px 8px",
                 background: isCampus
-                  ? "rgba(37, 99, 235, 0.12)"
+                  ? "var(--status-info-bg)"
                   : isOther
-                    ? "rgba(234, 88, 12, 0.12)"
-                    : "rgba(16, 185, 129, 0.12)",
-                color: isCampus ? "#1d4ed8" : isOther ? "#c2410c" : "#047857",
-                border: `1px solid ${isCampus ? "#93c5fd" : isOther ? "#fdba74" : "#86efac"}`,
+                    ? "var(--status-warn-bg)"
+                    : "var(--status-good-bg)",
+                color: isCampus ? "var(--status-info-text)" : isOther ? "var(--status-warn-text)" : "var(--status-good-text)",
+                border: `1px solid ${isCampus ? "var(--status-info-border)" : isOther ? "var(--status-warn-border)" : "var(--status-good-border)"}`,
               }}
             >
               {isCampus
@@ -2745,8 +2747,9 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
             style={{
               fontSize: "0.75rem",
               fontWeight: 700,
-              background: "rgba(37, 99, 235, 0.1)",
-              color: "#2563eb",
+              background: "var(--status-info-bg)",
+              color: "var(--status-info-text)",
+              border: "1px solid var(--status-info-border)",
             }}
           >
             {totalBooks} {totalBooks === 1 ? "book" : "books"}
@@ -2806,8 +2809,9 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
                         style={{
                           fontWeight: 700,
                           fontSize: "0.8rem",
-                          background: "rgba(37, 99, 235, 0.12)",
-                          color: "#1d4ed8",
+                          background: "var(--status-info-bg)",
+                          color: "var(--status-info-text)",
+                          border: "1px solid var(--status-info-border)",
                           padding: "2px 7px",
                         }}
                       >
@@ -2825,7 +2829,7 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
                   <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--foreground)" }}>
                     {totalPages > 0 ? `${totalPages.toLocaleString()} pages` : "—"}
                   </td>
-                  <td style={{ padding: "8px 10px", textAlign: "center", color: "#1d4ed8", fontWeight: 700 }}>
+                  <td style={{ padding: "8px 10px", textAlign: "center", color: "var(--status-info-text)", fontWeight: 700 }}>
                     {totalBooks}
                   </td>
                 </tr>
@@ -3610,10 +3614,10 @@ function SuperAdminDueManagementPanel({
       className="panel stack no-print"
       style={{
         border: isDuePending
-          ? "1.5px solid #f59e0b"
+          ? "1.5px solid var(--status-warn-border)"
           : "1px solid var(--border)",
         background: isDuePending
-          ? "linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, var(--card) 100%)"
+          ? "linear-gradient(180deg, var(--status-warn-bg) 0%, var(--card) 100%)"
           : "var(--card)",
         padding: "16px",
         borderRadius: 10,
@@ -3633,7 +3637,7 @@ function SuperAdminDueManagementPanel({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Coins
             size={20}
-            style={{ color: isDuePending ? "#d97706" : "#059669" }}
+            style={{ color: isDuePending ? "var(--status-warn-text)" : "var(--status-good-text)" }}
           />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -3645,9 +3649,9 @@ function SuperAdminDueManagementPanel({
                 style={{
                   fontSize: "0.70rem",
                   fontWeight: 700,
-                  background: "rgba(99, 102, 241, 0.12)",
-                  color: "#4f46e5",
-                  border: "1px solid #c7d2fe",
+                  background: "var(--status-purple-bg)",
+                  color: "var(--status-purple-text)",
+                  border: "1px solid var(--status-purple-border)",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 4,
@@ -3675,9 +3679,9 @@ function SuperAdminDueManagementPanel({
               style={{
                 fontSize: "0.78rem",
                 fontWeight: 700,
-                background: "rgba(245, 158, 11, 0.15)",
-                color: "#b45309",
-                border: "1.5px solid #fde68a",
+                background: "var(--status-warn-bg)",
+                color: "var(--status-warn-text)",
+                border: "1.5px solid var(--status-warn-border)",
                 padding: "3px 10px",
               }}
             >
@@ -3689,9 +3693,9 @@ function SuperAdminDueManagementPanel({
               style={{
                 fontSize: "0.78rem",
                 fontWeight: 700,
-                background: "rgba(22, 163, 74, 0.15)",
-                color: "#15803d",
-                border: "1.5px solid #86efac",
+                background: "var(--status-good-bg)",
+                color: "var(--status-good-text)",
+                border: "1.5px solid var(--status-good-border)",
                 padding: "3px 10px",
               }}
             >
@@ -3713,9 +3717,9 @@ function SuperAdminDueManagementPanel({
                 fontSize: "0.78rem",
                 fontWeight: 600,
                 padding: "4px 10px",
-                background: "#d97706",
-                borderColor: "#d97706",
-                color: "#fff",
+                background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)",
+                borderColor: "#b45309",
+                color: "#ffffff",
               }}
             >
               <Coins size={13} /> Collect Due Payment
@@ -3775,14 +3779,14 @@ function SuperAdminDueManagementPanel({
           style={{
             padding: "10px 14px",
             borderRadius: 8,
-            background: "rgba(16, 185, 129, 0.08)",
-            border: "1px solid rgba(16, 185, 129, 0.25)",
+            background: "var(--status-good-bg)",
+            border: "1px solid var(--status-good-border)",
           }}
         >
           <div
             style={{
               fontSize: "0.75rem",
-              color: "#047857",
+              color: "var(--status-good-text)",
               fontWeight: 600,
               textTransform: "uppercase",
             }}
@@ -3793,13 +3797,13 @@ function SuperAdminDueManagementPanel({
             style={{
               fontSize: "1.2rem",
               fontWeight: 800,
-              color: "#059669",
+              color: "var(--status-good-text)",
               marginTop: 2,
             }}
           >
             {money(amountPaid)}
           </div>
-          <div style={{ fontSize: "0.75rem", color: "#047857", marginTop: 2 }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--status-good-text)", marginTop: 2, opacity: 0.9 }}>
             Collected & verified
           </div>
         </div>
@@ -3809,17 +3813,17 @@ function SuperAdminDueManagementPanel({
             padding: "10px 14px",
             borderRadius: 8,
             background: isDuePending
-              ? "rgba(239, 68, 68, 0.08)"
-              : "rgba(22, 163, 74, 0.08)",
+              ? "var(--status-danger-bg)"
+              : "var(--status-good-bg)",
             border: isDuePending
-              ? "1.5px solid rgba(239, 68, 68, 0.3)"
-              : "1px solid rgba(22, 163, 74, 0.25)",
+              ? "1.5px solid var(--status-danger-border)"
+              : "1px solid var(--status-good-border)",
           }}
         >
           <div
             style={{
               fontSize: "0.75rem",
-              color: isDuePending ? "#b91c1c" : "#15803d",
+              color: isDuePending ? "var(--status-danger-text)" : "var(--status-good-text)",
               fontWeight: 600,
               textTransform: "uppercase",
             }}
@@ -3830,7 +3834,7 @@ function SuperAdminDueManagementPanel({
             style={{
               fontSize: "1.2rem",
               fontWeight: 800,
-              color: isDuePending ? "#dc2626" : "#16a34a",
+              color: isDuePending ? "var(--status-danger-text)" : "var(--status-good-text)",
               marginTop: 2,
             }}
           >
@@ -3839,8 +3843,9 @@ function SuperAdminDueManagementPanel({
           <div
             style={{
               fontSize: "0.75rem",
-              color: isDuePending ? "#b91c1c" : "#15803d",
+              color: isDuePending ? "var(--status-danger-text)" : "var(--status-good-text)",
               marginTop: 2,
+              opacity: 0.9,
             }}
           >
             {isDuePending ? "Pending collection" : "Zero balance"}
@@ -4041,7 +4046,7 @@ function SuperAdminDueManagementPanel({
                           padding: "7px 10px",
                           textAlign: "right",
                           fontWeight: 700,
-                          color: "#15803d",
+                          color: "var(--status-good-text)",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -4055,16 +4060,23 @@ function SuperAdminDueManagementPanel({
                             fontWeight: 600,
                             background:
                               log.type === "ADVANCE"
-                                ? "rgba(37, 99, 235, 0.1)"
+                                ? "var(--status-info-bg)"
                                 : log.type === "FULL_PAYMENT"
-                                  ? "rgba(22, 163, 74, 0.15)"
-                                  : "rgba(245, 158, 11, 0.15)",
+                                  ? "var(--status-good-bg)"
+                                  : "var(--status-warn-bg)",
                             color:
                               log.type === "ADVANCE"
-                                ? "#1d4ed8"
+                                ? "var(--status-info-text)"
                                 : log.type === "FULL_PAYMENT"
-                                  ? "#15803d"
-                                  : "#b45309",
+                                  ? "var(--status-good-text)"
+                                  : "var(--status-warn-text)",
+                            border: `1px solid ${
+                              log.type === "ADVANCE"
+                                ? "var(--status-info-border)"
+                                : log.type === "FULL_PAYMENT"
+                                  ? "var(--status-good-border)"
+                                  : "var(--status-warn-border)"
+                            }`,
                           }}
                         >
                           {typeLabel}
@@ -4124,11 +4136,11 @@ function SuperAdminDueManagementPanel({
               </div>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Already Received:</span>
-                <strong style={{ display: "block", fontSize: "0.95rem", color: "#059669" }}>{money(amountPaid)}</strong>
+                <strong style={{ display: "block", fontSize: "0.95rem", color: "var(--status-good-text)" }}>{money(amountPaid)}</strong>
               </div>
               <div style={{ gridColumn: "1 / -1", paddingTop: 6, borderTop: "1px dashed var(--border)" }}>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Current Due Balance:</span>
-                <strong style={{ display: "block", fontSize: "1.1rem", color: "#dc2626" }}>{money(dueAmount)}</strong>
+                <strong style={{ display: "block", fontSize: "1.1rem", color: "var(--status-danger-text)" }}>{money(dueAmount)}</strong>
               </div>
             </div>
 
@@ -4153,8 +4165,8 @@ function SuperAdminDueManagementPanel({
                   style={{
                     padding: "8px 12px",
                     borderRadius: 6,
-                    background: remainingAfter === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(245, 158, 11, 0.1)",
-                    border: `1px solid ${remainingAfter === 0 ? "#86efac" : "#fde68a"}`,
+                    background: remainingAfter === 0 ? "var(--status-good-bg)" : "var(--status-warn-bg)",
+                    border: `1px solid ${remainingAfter === 0 ? "var(--status-good-border)" : "var(--status-warn-border)"}`,
                     fontSize: "0.82rem",
                     display: "flex",
                     justifyContent: "space-between",
@@ -4162,7 +4174,7 @@ function SuperAdminDueManagementPanel({
                   }}
                 >
                   <span>Remaining Due After Collection:</span>
-                  <strong style={{ color: remainingAfter === 0 ? "#15803d" : "#b45309" }}>
+                  <strong style={{ color: remainingAfter === 0 ? "var(--status-good-text)" : "var(--status-warn-text)" }}>
                     {money(remainingAfter)} {remainingAfter === 0 && "(Will mark as Fully Paid ✓)"}
                   </strong>
                 </div>
@@ -4191,7 +4203,7 @@ function SuperAdminDueManagementPanel({
                 type="submit"
                 className="btn primary"
                 disabled={recording || !recordAmount}
-                style={{ background: "#d97706" }}
+                style={{ background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)", borderColor: "#b45309", color: "#ffffff" }}
               >
                 {recording ? "Saving Payment…" : "Save Payment Record"}
               </button>
@@ -4845,13 +4857,13 @@ function OrderModalPopup({
                             style={{
                               padding: "12px 14px",
                               borderRadius: 8,
-                              background: "rgba(16, 185, 129, 0.08)",
-                              border: "1px solid #10b981",
+                              background: "var(--status-good-bg)",
+                              border: "1px solid var(--status-good-border)",
                               fontSize: "0.85rem",
                               lineHeight: 1.45,
                             }}
                           >
-                            <strong style={{ color: "#047857" }}>🚚 Shipped via Courier:</strong>
+                            <strong style={{ color: "var(--status-good-text)" }}>🚚 Shipped via Courier:</strong>
                             <p style={{ margin: "4px 0 8px" }}>
                               Shipped via <strong>{o.courier_name}</strong> · Tracking ID: <code>{o.courier_tracking_id}</code>. Once the parcel is delivered to student, click below to mark as Delivered:
                             </p>
@@ -4877,7 +4889,7 @@ function OrderModalPopup({
                                   setBusy(false);
                                 }
                               }}
-                              style={{ gap: 6, background: "#059669", borderColor: "#059669" }}
+                              style={{ gap: 6, background: "linear-gradient(135deg, #059669 0%, #047857 100%)", borderColor: "#047857", color: "#ffffff" }}
                             >
                               <CheckCircle2 size={14} /> Mark as Delivered
                             </button>
@@ -4887,13 +4899,13 @@ function OrderModalPopup({
                             style={{
                               padding: "12px 14px",
                               borderRadius: 8,
-                              background: "rgba(16, 185, 129, 0.08)",
-                              border: "1px solid #10b981",
+                              background: "var(--status-good-bg)",
+                              border: "1px solid var(--status-good-border)",
                               fontSize: "0.85rem",
                               lineHeight: 1.45,
                             }}
                           >
-                            <strong style={{ color: "#047857" }}>✅ Delivered to Student:</strong>
+                            <strong style={{ color: "var(--status-good-text)" }}>✅ Delivered to Student:</strong>
                             <p style={{ margin: "4px 0 0" }}>
                               Fulfillment complete. Delivered via {o.courier_name} (Tracking: {o.courier_tracking_id}).
                             </p>
@@ -4903,8 +4915,8 @@ function OrderModalPopup({
                             style={{
                               padding: "12px 14px",
                               borderRadius: 8,
-                              background: "rgba(59, 130, 246, 0.08)",
-                              border: "1px solid #3b82f6",
+                              background: "var(--status-info-bg)",
+                              border: "1px solid var(--status-info-border)",
                               fontSize: "0.85rem",
                               lineHeight: 1.45,
                             }}
@@ -4920,8 +4932,8 @@ function OrderModalPopup({
                           style={{
                             padding: "12px 14px",
                             borderRadius: 8,
-                            background: "rgba(245, 158, 11, 0.08)",
-                            border: "1px solid #f59e0b",
+                            background: "var(--status-warn-bg)",
+                            border: "1px solid var(--status-warn-border)",
                             fontSize: "0.85rem",
                             lineHeight: 1.45,
                           }}
@@ -4949,7 +4961,7 @@ function OrderModalPopup({
                                   setBusy(false);
                                 }
                               }}
-                              style={{ gap: 6, background: "#2563eb" }}
+                              style={{ gap: 6, background: "linear-gradient(135deg, #1d64b4 0%, #154c8a 100%)", borderColor: "#16467c", color: "#ffffff" }}
                             >
                               <Building2 size={14} /> Send to Bookstore Office
                             </button>
@@ -4958,8 +4970,9 @@ function OrderModalPopup({
                               <span
                                 className="mono-pill"
                                 style={{
-                                  background: "rgba(37, 99, 235, 0.15)",
-                                  color: "#1d4ed8",
+                                  background: "var(--status-info-bg)",
+                                  color: "var(--status-info-text)",
+                                  border: "1px solid var(--status-info-border)",
                                   fontWeight: 600,
                                 }}
                               >
@@ -4983,12 +4996,12 @@ function OrderModalPopup({
                       {(o.vendor_printed_at || o.vendor_dispatched_at) && (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
                           {o.vendor_printed_at && (
-                            <span className="mono-pill" style={{ background: "rgba(22, 163, 74, 0.15)", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <span className="mono-pill" style={{ background: "var(--status-good-bg)", color: "var(--status-good-text)", border: "1px solid var(--status-good-border)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
                               <CheckCircle2 size={13} /> Printed by Vendor ({formatDateDMY(o.vendor_printed_at)})
                             </span>
                           )}
                           {o.vendor_dispatched_at && (
-                            <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.15)", color: "#1d4ed8", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <span className="mono-pill" style={{ background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "1px solid var(--status-info-border)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
                               <Building2 size={13} /> Dispatched by Vendor to Office ({formatDateDMY(o.vendor_dispatched_at)})
                             </span>
                           )}
@@ -5044,9 +5057,9 @@ function OrderModalPopup({
                                     style={{
                                       padding: "8px 10px",
                                       borderRadius: 6,
-                                      background: "rgba(245, 158, 11, 0.12)",
-                                      border: "1px solid #fde68a",
-                                      color: "#b45309",
+                                      background: "var(--status-warn-bg)",
+                                      border: "1px solid var(--status-warn-border)",
+                                      color: "var(--status-warn-text)",
                                       fontSize: "0.82rem",
                                       display: "flex",
                                       justifyContent: "space-between",
@@ -5071,7 +5084,7 @@ function OrderModalPopup({
                               <div
                                 style={{
                                   fontSize: "0.78rem",
-                                  color: "#15803d",
+                                  color: "var(--status-good-text)",
                                   display: "flex",
                                   alignItems: "center",
                                   gap: 4,
@@ -5107,7 +5120,13 @@ function OrderModalPopup({
                           <div className="actions">
                             <button
                               className="btn compact primary"
-                              style={{ background: isPartial ? "#d97706" : undefined }}
+                              style={{
+                                background: isPartial
+                                  ? "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
+                                  : undefined,
+                                borderColor: isPartial ? "#b45309" : undefined,
+                                color: isPartial ? "#ffffff" : undefined,
+                              }}
                               onClick={() =>
                                 setDecision({
                                   action: "approve",
@@ -5192,9 +5211,9 @@ function OrderModalPopup({
                               gap: 8,
                               padding: "8px 12px",
                               borderRadius: 6,
-                              background: "rgba(239, 68, 68, 0.08)",
-                              border: "1.5px solid #ef4444",
-                              color: "#dc2626",
+                              background: "var(--status-danger-bg)",
+                              border: "1.5px solid var(--status-danger-border)",
+                              color: "var(--status-danger-text)",
                               fontSize: "0.82rem",
                               fontWeight: 600,
                               margin: "6px 0",
@@ -5386,17 +5405,17 @@ const VENDOR_STAGES_CONFIG: {
     iconSize: 24,
     subtext: (c) => (c === 0 ? "Queue clear" : "Action needed (Print now)"),
     theme: {
-      activeBorder: "#ef4444",
-      activeBg: "linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.04) 100%)",
-      activeText: "#dc2626",
-      activeIconBg: "#dc2626",
+      activeBorder: "var(--destructive)",
+      activeBg: "linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, var(--card) 100%)",
+      activeText: "var(--status-danger-text)",
+      activeIconBg: "var(--destructive)",
       activeIconColor: "#ffffff",
-      indicator: "#ef4444",
-      idleBorder: "rgba(239, 68, 68, 0.35)",
-      idleBg: "rgba(254, 242, 242, 0.65)",
-      idleText: "#b91c1c",
-      idleIconBg: "rgba(239, 68, 68, 0.14)",
-      idleIconColor: "#dc2626",
+      indicator: "var(--destructive)",
+      idleBorder: "var(--status-danger-border)",
+      idleBg: "var(--status-danger-bg)",
+      idleText: "var(--status-danger-text)",
+      idleIconBg: "var(--status-danger-bg)",
+      idleIconColor: "var(--status-danger-text)",
     },
   },
   {
@@ -5407,17 +5426,17 @@ const VENDOR_STAGES_CONFIG: {
     iconSize: 22,
     subtext: (c) => (c === 0 ? "None ready" : "Ready for dispatch"),
     theme: {
-      activeBorder: "#10b981",
-      activeBg: "linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(16, 185, 129, 0.04) 100%)",
-      activeText: "#059669",
+      activeBorder: "var(--status-good-border)",
+      activeBg: "linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, var(--card) 100%)",
+      activeText: "var(--status-good-text)",
       activeIconBg: "#10b981",
       activeIconColor: "#ffffff",
       indicator: "#10b981",
-      idleBorder: "rgba(16, 185, 129, 0.3)",
-      idleBg: "rgba(240, 253, 244, 0.6)",
-      idleText: "#047857",
-      idleIconBg: "rgba(16, 185, 129, 0.14)",
-      idleIconColor: "#059669",
+      idleBorder: "var(--status-good-border)",
+      idleBg: "var(--status-good-bg)",
+      idleText: "var(--status-good-text)",
+      idleIconBg: "var(--status-good-bg)",
+      idleIconColor: "var(--status-good-text)",
     },
   },
   {
@@ -5428,17 +5447,17 @@ const VENDOR_STAGES_CONFIG: {
     iconSize: 22,
     subtext: (c) => (c === 0 ? "None in transit" : "In transit to student"),
     theme: {
-      activeBorder: "#3b82f6",
-      activeBg: "linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, rgba(59, 130, 246, 0.04) 100%)",
-      activeText: "#2563eb",
+      activeBorder: "var(--status-info-border)",
+      activeBg: "linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, var(--card) 100%)",
+      activeText: "var(--status-info-text)",
       activeIconBg: "#2563eb",
       activeIconColor: "#ffffff",
       indicator: "#3b82f6",
-      idleBorder: "rgba(59, 130, 246, 0.25)",
-      idleBg: "rgba(239, 246, 255, 0.55)",
-      idleText: "#1d4ed8",
-      idleIconBg: "rgba(37, 99, 235, 0.12)",
-      idleIconColor: "#2563eb",
+      idleBorder: "var(--status-info-border)",
+      idleBg: "var(--status-info-bg)",
+      idleText: "var(--status-info-text)",
+      idleIconBg: "var(--status-info-bg)",
+      idleIconColor: "var(--status-info-text)",
     },
   },
   {
@@ -5449,17 +5468,17 @@ const VENDOR_STAGES_CONFIG: {
     iconSize: 22,
     subtext: (c) => (c === 0 ? "No completions yet" : "Successfully delivered"),
     theme: {
-      activeBorder: "#8b5cf6",
-      activeBg: "linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(139, 92, 246, 0.04) 100%)",
-      activeText: "#7c3aed",
+      activeBorder: "var(--status-purple-border)",
+      activeBg: "linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, var(--card) 100%)",
+      activeText: "var(--status-purple-text)",
       activeIconBg: "#7c3aed",
       activeIconColor: "#ffffff",
       indicator: "#8b5cf6",
-      idleBorder: "rgba(139, 92, 246, 0.25)",
-      idleBg: "rgba(250, 245, 255, 0.55)",
-      idleText: "#6d28d9",
-      idleIconBg: "rgba(124, 58, 237, 0.12)",
-      idleIconColor: "#7c3aed",
+      idleBorder: "var(--status-purple-border)",
+      idleBg: "var(--status-purple-bg)",
+      idleText: "var(--status-purple-text)",
+      idleIconBg: "var(--status-purple-bg)",
+      idleIconColor: "var(--status-purple-text)",
     },
   },
   {
@@ -5470,17 +5489,17 @@ const VENDOR_STAGES_CONFIG: {
     iconSize: 22,
     subtext: (c) => (c === 0 ? "Total volume" : "Total assigned orders"),
     theme: {
-      activeBorder: "#64748b",
-      activeBg: "linear-gradient(135deg, rgba(100, 116, 139, 0.14) 0%, rgba(100, 116, 139, 0.04) 100%)",
+      activeBorder: "var(--primary)",
+      activeBg: "linear-gradient(135deg, rgba(37, 99, 235, 0.14) 0%, var(--card) 100%)",
       activeText: "var(--foreground)",
-      activeIconBg: "#475569",
+      activeIconBg: "var(--primary)",
       activeIconColor: "#ffffff",
-      indicator: "#64748b",
+      indicator: "var(--primary)",
       idleBorder: "var(--border)",
       idleBg: "var(--card)",
-      idleText: "var(--muted-foreground)",
-      idleIconBg: "rgba(100, 116, 139, 0.12)",
-      idleIconColor: "#64748b",
+      idleText: "var(--foreground)",
+      idleIconBg: "var(--secondary)",
+      idleIconColor: "var(--foreground)",
     },
   },
 ];
@@ -8897,7 +8916,7 @@ function Vendors() {
               <CheckCircle2 size={19} />
             </span>
           </div>
-          <strong style={{ color: "#15803d" }}>Rs. {totalPaidToVendors.toLocaleString()}</strong>
+          <strong style={{ color: "var(--status-good-text)" }}>Rs. {totalPaidToVendors.toLocaleString()}</strong>
           <small>Disbursed to all vendors</small>
         </div>
 
@@ -8908,7 +8927,7 @@ function Vendors() {
               <Receipt size={19} />
             </span>
           </div>
-          <strong style={{ color: totalPendingBalance > 0 ? "#b45309" : "#15803d" }}>
+          <strong style={{ color: totalPendingBalance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)" }}>
             Rs. {totalPendingBalance.toLocaleString()}
           </strong>
           <small>{totalPendingBalance > 0 ? "Remaining payable" : "All cleared"}</small>
@@ -9803,10 +9822,10 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", fontWeight: 700, fontSize: "0.78rem" }}>
+          <span className="mono-pill" style={{ background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "1px solid var(--status-info-border)", fontWeight: 700, fontSize: "0.78rem" }}>
             Per Page: Rs. {Number(summary.per_page_rate).toFixed(2)}
           </span>
-          <span className="mono-pill" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#047857", fontWeight: 700, fontSize: "0.78rem" }}>
+          <span className="mono-pill" style={{ background: "var(--status-good-bg)", color: "var(--status-good-text)", border: "1px solid var(--status-good-border)", fontWeight: 700, fontSize: "0.78rem" }}>
             Binding: Rs. {Number(summary.binding_rate).toFixed(2)} / book
           </span>
           <button
@@ -9897,10 +9916,10 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.printing_orders || 0) > 0 ? "#b45309" : "var(--foreground)", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.printing_orders || 0) > 0 ? "var(--status-warn-text)" : "var(--foreground)", marginBottom: 6 }}>
                 {summary.printing_orders || 0}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: (summary.printing_orders || 0) > 0 ? "#b45309" : "var(--muted-foreground)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.82rem", color: (summary.printing_orders || 0) > 0 ? "var(--status-warn-text)" : "var(--muted-foreground)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
                 {(summary.printing_orders || 0) > 0 ? "Active print queue →" : "Print queue clear ✓"}
               </div>
             </div>
@@ -9924,8 +9943,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   width: 38,
                   height: 38,
                   borderRadius: 10,
-                  background: "rgba(16, 185, 129, 0.12)",
-                  color: "#059669",
+                  background: "var(--status-good-bg)",
+                  color: "var(--status-good-text)",
                   flexShrink: 0,
                 }}
               >
@@ -9934,10 +9953,10 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "#15803d", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-good-text)", marginBottom: 6 }}>
                 {summary.printed_orders || 0}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "#059669", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.82rem", color: "var(--status-good-text)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
                 Ready for dispatch / pickup →
               </div>
             </div>
@@ -9961,8 +9980,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   width: 38,
                   height: 38,
                   borderRadius: 10,
-                  background: "rgba(37, 99, 235, 0.1)",
-                  color: "#2563eb",
+                  background: "var(--status-info-bg)",
+                  color: "var(--status-info-text)",
                   flexShrink: 0,
                 }}
               >
@@ -9971,12 +9990,12 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "#1d4ed8", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-info-text)", marginBottom: 6 }}>
                 Rs. {summary.total_earned.toLocaleString()}
               </strong>
               <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
                 <span>{summary.total_pages.toLocaleString()} pages · {summary.total_books} books</span>
-                <span style={{ color: "#2563eb", fontWeight: 600 }}>→</span>
+                <span style={{ color: "var(--primary)", fontWeight: 600 }}>→</span>
               </div>
             </div>
           </a>
@@ -9999,8 +10018,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   width: 38,
                   height: 38,
                   borderRadius: 10,
-                  background: "rgba(16, 185, 129, 0.12)",
-                  color: "#059669",
+                  background: "var(--status-good-bg)",
+                  color: "var(--status-good-text)",
                   flexShrink: 0,
                 }}
               >
@@ -10009,10 +10028,10 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "#15803d", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-good-text)", marginBottom: 6 }}>
                 Rs. {summary.total_paid.toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "#059669", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.82rem", color: "var(--status-good-text)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
                 Disbursed by Admin →
               </div>
             </div>
@@ -10023,13 +10042,13 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             href="/vendor/ledger"
             className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"} vendor-metric-card`}
             style={{
-              border: summary.pending_balance > 0 ? "1px solid #fde68a" : undefined,
-              background: summary.pending_balance > 0 ? "rgba(254, 243, 199, 0.35)" : undefined,
+              border: summary.pending_balance > 0 ? "1px solid var(--status-warn-border)" : undefined,
+              background: summary.pending_balance > 0 ? "var(--status-warn-bg)" : undefined,
             }}
             title="Click to view payment ledger balance"
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: summary.pending_balance > 0 ? "#92400e" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
                 Remaining Pending
               </span>
               <span
@@ -10040,8 +10059,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   width: 38,
                   height: 38,
                   borderRadius: 10,
-                  background: summary.pending_balance > 0 ? "rgba(245, 158, 11, 0.14)" : "rgba(16, 185, 129, 0.12)",
-                  color: summary.pending_balance > 0 ? "#d97706" : "#059669",
+                  background: summary.pending_balance > 0 ? "var(--status-warn-bg)" : "var(--status-good-bg)",
+                  color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
                   flexShrink: 0,
                 }}
               >
@@ -10056,7 +10075,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   fontWeight: 700,
                   lineHeight: 1.15,
                   display: "block",
-                  color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
+                  color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
                   marginBottom: 6,
                 }}
               >
@@ -10065,7 +10084,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
               <div
                 style={{
                   fontSize: "0.82rem",
-                  color: summary.pending_balance > 0 ? "#b45309" : "#059669",
+                  color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
                   fontWeight: 550,
                   display: "flex",
                   alignItems: "center",
@@ -10259,10 +10278,10 @@ function VendorLedgerView({ user }: { user: User }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <span className="mono-pill" style={{ background: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", fontWeight: 700, fontSize: "0.78rem" }}>
+          <span className="mono-pill" style={{ background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "1px solid var(--status-info-border)", fontWeight: 700, fontSize: "0.78rem" }}>
             Per Page: Rs. {Number(summary.per_page_rate).toFixed(2)}
           </span>
-          <span className="mono-pill" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#047857", fontWeight: 700, fontSize: "0.78rem" }}>
+          <span className="mono-pill" style={{ background: "var(--status-good-bg)", color: "var(--status-good-text)", border: "1px solid var(--status-good-border)", fontWeight: 700, fontSize: "0.78rem" }}>
             Binding: Rs. {Number(summary.binding_rate).toFixed(2)} / book
           </span>
           <button
@@ -10310,7 +10329,7 @@ function VendorLedgerView({ user }: { user: User }) {
                 <CreditCard size={19} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.6rem", color: "#15803d" }}>
+            <strong style={{ fontSize: "1.6rem", color: "var(--status-good-text)" }}>
               Rs. {summary.total_paid.toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
@@ -10328,7 +10347,7 @@ function VendorLedgerView({ user }: { user: User }) {
             <strong
               style={{
                 fontSize: "1.6rem",
-                color: summary.pending_balance > 0 ? "#b45309" : "#15803d",
+                color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
               }}
             >
               Rs. {summary.pending_balance.toLocaleString()}

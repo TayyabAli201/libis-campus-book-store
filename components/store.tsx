@@ -133,11 +133,12 @@ export function Store({
   const [data, setData] = useState<Catalog | undefined>(initial),
     [error, setError] = useState("");
   useEffect(() => {
-    if (!initial && ready)
+    if (initial) return;
+    if ((mode === "cart" || mode === "checkout") && !ready) return;
       api("catalog" + (cartIds ? "?ids=" + encodeURIComponent(cartIds) : ""))
         .then(setData)
         .catch((e) => setError(errorText(e)));
-  }, [initial, ready, cartIds]);
+  }, [initial, ready, cartIds, mode]);
   return (
     <StoreMotion>
       <Header settings={data?.settings} />
@@ -742,7 +743,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span
                 className="track-status-badge status-pending"
-                style={{ background: "#fee2e2", color: "#b91c1c", borderColor: "#fca5a5" }}
+                style={{ background: "var(--status-danger-bg)", color: "var(--status-danger-text)", borderColor: "var(--status-danger-border)" }}
               >
                 Action Required: New Slip Needed
               </span>
@@ -751,7 +752,7 @@ export function OrderTrackerCard({ o }: { o: any }) {
                 style={{
                   fontSize: "0.8rem",
                   fontWeight: 600,
-                  color: "#dc2626",
+                  color: "var(--destructive)",
                   textDecoration: "underline",
                 }}
               >
@@ -850,8 +851,8 @@ export function OrderTrackerCard({ o }: { o: any }) {
               width: "100%",
               padding: "12px 14px",
               borderRadius: "8px",
-              background: "rgba(245, 158, 11, 0.08)",
-              border: "1.5px solid #f59e0b",
+              background: "var(--status-warn-bg)",
+              border: "1.5px solid var(--status-warn-border)",
               fontSize: "0.84rem",
               lineHeight: 1.45,
               display: "flex",
@@ -861,12 +862,12 @@ export function OrderTrackerCard({ o }: { o: any }) {
           >
             <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>ℹ️</span>
             <div style={{ flex: 1 }}>
-              <strong style={{ color: "#b45309", display: "block", marginBottom: 3 }}>
+              <strong style={{ color: "var(--status-warn-text)", display: "block", marginBottom: 3 }}>
                 Remaining Balance Notice:
               </strong>
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", margin: "4px 0 6px" }}>
                 <span>Advance Received: <strong>{money(o.amount_paid || 0, o.currency)}</strong></span>
-                <span>Remaining Due: <strong style={{ color: "#d97706" }}>{money(o.due_amount, o.currency)}</strong></span>
+                <span>Remaining Due: <strong style={{ color: "var(--status-warn-text)" }}>{money(o.due_amount, o.currency)}</strong></span>
               </div>
               <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--foreground)" }}>
                 Please pay the remaining balance of <strong>{money(o.due_amount, o.currency)}</strong> upon parcel delivery to the rider or at the campus pickup counter.
@@ -880,8 +881,8 @@ export function OrderTrackerCard({ o }: { o: any }) {
               width: "100%",
               padding: "10px 14px",
               borderRadius: "8px",
-              background: "rgba(239, 68, 68, 0.06)",
-              border: "1.5px solid #ef4444",
+              background: "var(--status-danger-bg)",
+              border: "1.5px solid var(--status-danger-border)",
               fontSize: "0.82rem",
               lineHeight: 1.45,
               display: "flex",
@@ -889,9 +890,9 @@ export function OrderTrackerCard({ o }: { o: any }) {
               gap: 8,
             }}
           >
-            <AlertTriangle size={18} style={{ color: "#dc2626", flexShrink: 0 }} />
+            <AlertTriangle size={18} style={{ color: "var(--status-danger-text)", flexShrink: 0 }} />
             <div>
-              <strong style={{ color: "#dc2626" }}>Delivery Notice:</strong> Order total includes {money(o.delivery, o.currency)} minimum base delivery fee. If actual rider fare or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.
+              <strong style={{ color: "var(--status-danger-text)" }}>Delivery Notice:</strong> Order total includes {money(o.delivery, o.currency)} minimum base delivery fee. If actual rider fare or courier charges exceed this base amount, the remaining difference must be paid directly by the student upon delivery.
             </div>
           </div>
         )}
@@ -1747,8 +1748,8 @@ function Checkout({ data }: { data: Catalog }) {
                   style={{
                     padding: "12px 15px",
                     borderRadius: "10px",
-                    background: "rgba(239, 68, 68, 0.08)",
-                    border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                    background: "var(--status-danger-bg)",
+                    border: "1.5px solid var(--status-danger-border)",
                     marginBottom: 16,
                     display: "flex",
                     gap: 12,
@@ -1757,7 +1758,7 @@ function Checkout({ data }: { data: Catalog }) {
                 >
                   <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
                   <div style={{ flex: 1 }}>
-                    <strong style={{ color: "#ef4444", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
+                    <strong style={{ color: "var(--status-danger-text)", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
                       Cash on Delivery (COD) is NOT Available
                     </strong>
                     <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.45, color: "var(--foreground)" }}>
@@ -1773,17 +1774,17 @@ function Checkout({ data }: { data: Catalog }) {
                     style={{
                       padding: "14px 16px",
                       borderRadius: "10px",
-                      background: "rgba(239, 68, 68, 0.06)",
-                      border: "2px solid #ef4444",
+                      background: "var(--status-danger-bg)",
+                      border: "1.5px solid var(--status-danger-border)",
                       marginBottom: 12,
                       fontSize: "0.86rem",
                       lineHeight: 1.5,
                     }}
                   >
                     <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <AlertTriangle size={20} style={{ color: "#dc2626", flexShrink: 0, marginTop: 2 }} />
+                      <AlertTriangle size={20} style={{ color: "var(--status-danger-text)", flexShrink: 0, marginTop: 2 }} />
                       <div>
-                        <strong style={{ color: "#dc2626", display: "block", marginBottom: 4, fontSize: "0.92rem" }}>
+                        <strong style={{ color: "var(--status-danger-text)", display: "block", marginBottom: 4, fontSize: "0.92rem" }}>
                           ⚠️ Important Delivery Notice: Minimum Base Rider Fare ({money(data.settings.delivery_lahore)})
                         </strong>
                         <p style={{ margin: 0, color: "var(--foreground)" }}>
@@ -1798,8 +1799,8 @@ function Checkout({ data }: { data: Catalog }) {
                     style={{
                       padding: "12px 15px",
                       borderRadius: "10px",
-                      background: "rgba(239, 68, 68, 0.08)",
-                      border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                      background: "var(--status-danger-bg)",
+                      border: "1.5px solid var(--status-danger-border)",
                       marginBottom: 16,
                       display: "flex",
                       gap: 12,
@@ -1808,7 +1809,7 @@ function Checkout({ data }: { data: Catalog }) {
                   >
                     <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
                     <div style={{ flex: 1 }}>
-                      <strong style={{ color: "#ef4444", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
+                      <strong style={{ color: "var(--status-danger-text)", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
                         Cash on Delivery (COD) is NOT Available
                       </strong>
                       <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.45, color: "var(--foreground)" }}>
@@ -1864,17 +1865,17 @@ function Checkout({ data }: { data: Catalog }) {
                     style={{
                       padding: "14px 16px",
                       borderRadius: "10px",
-                      background: "rgba(239, 68, 68, 0.06)",
-                      border: "2px solid #ef4444",
+                      background: "var(--status-danger-bg)",
+                      border: "1.5px solid var(--status-danger-border)",
                       marginBottom: 12,
                       fontSize: "0.86rem",
                       lineHeight: 1.5,
                     }}
                   >
                     <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <AlertTriangle size={20} style={{ color: "#dc2626", flexShrink: 0, marginTop: 2 }} />
+                      <AlertTriangle size={20} style={{ color: "var(--status-danger-text)", flexShrink: 0, marginTop: 2 }} />
                       <div>
-                        <strong style={{ color: "#dc2626", display: "block", marginBottom: 4, fontSize: "0.92rem" }}>
+                        <strong style={{ color: "var(--status-danger-text)", display: "block", marginBottom: 4, fontSize: "0.92rem" }}>
                           ⚠️ Important Delivery Notice: Minimum Base Courier Charge ({money(data.settings.delivery_other)})
                         </strong>
                         <p style={{ margin: 0, color: "var(--foreground)" }}>
@@ -1889,8 +1890,8 @@ function Checkout({ data }: { data: Catalog }) {
                     style={{
                       padding: "12px 15px",
                       borderRadius: "10px",
-                      background: "rgba(239, 68, 68, 0.08)",
-                      border: "1.5px solid rgba(239, 68, 68, 0.35)",
+                      background: "var(--status-danger-bg)",
+                      border: "1.5px solid var(--status-danger-border)",
                       marginBottom: 16,
                       display: "flex",
                       gap: 12,
@@ -1899,7 +1900,7 @@ function Checkout({ data }: { data: Catalog }) {
                   >
                     <span style={{ fontSize: "1.25rem", lineHeight: 1.2, flexShrink: 0 }}>🚫</span>
                     <div style={{ flex: 1 }}>
-                      <strong style={{ color: "#ef4444", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
+                      <strong style={{ color: "var(--status-danger-text)", display: "block", marginBottom: 3, fontSize: "0.88rem", fontWeight: 700 }}>
                         Cash on Delivery (COD) is NOT Available
                       </strong>
                       <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.45, color: "var(--foreground)" }}>
