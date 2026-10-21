@@ -45,6 +45,7 @@ import {
   changeStatus,
   setCourierTracking,
   removeCourierTracking,
+  updateActualCourierCharges,
   batchChangeStatus,
   vendorPrint,
   vendorDispatchOffice,
@@ -733,6 +734,7 @@ async function handle(req: Request) {
               "manual",
               "courier",
               "remove_courier",
+              "update_courier_charges",
               "assign_vendor",
               "vendor_print",
               "vendor_dispatch_office",
@@ -744,6 +746,7 @@ async function handle(req: Request) {
             status: z.string().optional(),
             courier_name: z.string().trim().max(100).optional(),
             courier_tracking_id: z.string().trim().max(100).optional(),
+            actual_courier_charges: z.coerce.number().min(0).max(100000).optional(),
             vendor_id: z.string().trim().optional(),
             note: z.string().trim().max(2000).default(""),
             version: z.number().int().optional(),
@@ -819,10 +822,20 @@ async function handle(req: Request) {
               b.courier_name || "",
               b.courier_tracking_id || "",
               b.status,
+              b.actual_courier_charges,
             ),
           );
         if (b.action === "remove_courier")
           return ok(await removeCourierTracking(req, u, id));
+        if (b.action === "update_courier_charges")
+          return ok(
+            await updateActualCourierCharges(
+              req,
+              u,
+              id,
+              b.actual_courier_charges ?? 0,
+            ),
+          );
         if (b.action === "record_due_payment") {
           if (u.role !== "SUPER_ADMIN")
             throw new AppError(403, "Only Super Admin can record due payments.");

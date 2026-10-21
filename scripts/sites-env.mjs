@@ -20,3 +20,7 @@ for (const directory of [
 ]) {
   mkdirSync(directory, { recursive: true });
 }
+
+try {
+  await import("./migrate-local.mjs");
+} catch {}

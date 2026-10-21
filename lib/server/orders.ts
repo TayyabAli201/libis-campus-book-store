@@ -436,7 +436,10 @@ export async function getOrder(
       (orderPages * perPageRate) + (orderBooks * bindingRate),
     );
 
+    const courierCharge = Number(o.actual_courier_charges || 0);
     o.vendor_price = vendorPrice;
+    o.actual_courier_charges = courierCharge;
+    o.vendor_total_credit = vendorPrice + courierCharge;
     o.vendor_pages = orderPages;
     o.vendor_books = orderBooks;
     o.vendor_rate_breakdown = {
@@ -446,8 +449,12 @@ export async function getOrder(
       total_books: orderBooks,
       pages_amount: Math.round(orderPages * perPageRate),
       binding_amount: Math.round(orderBooks * bindingRate),
-      total_vendor_price: vendorPrice,
-      formula: `(${orderPages} pages × Rs. ${perPageRate}) + (${orderBooks} books × Rs. ${bindingRate}) = Rs. ${vendorPrice}`,
+      total_printing_cost: vendorPrice,
+      actual_courier_charges: courierCharge,
+      total_vendor_credit: vendorPrice + courierCharge,
+      formula: courierCharge > 0
+        ? `(${orderPages} pages × Rs. ${perPageRate}) + (${orderBooks} books × Rs. ${bindingRate}) + (Courier Rs. ${courierCharge}) = Rs. ${vendorPrice + courierCharge}`
+        : `(${orderPages} pages × Rs. ${perPageRate}) + (${orderBooks} books × Rs. ${bindingRate}) = Rs. ${vendorPrice}`,
     };
 
     delete o.subtotal;
@@ -483,6 +490,12 @@ export async function getOrder(
     delete o.due_status;
     delete o.due_note;
     delete o.payment_logs;
+  }
+
+  if (u?.role === "SUPER_ADMIN" || u?.role === "VENDOR") {
+    o.actual_courier_charges = Number(o.actual_courier_charges || 0);
+  } else {
+    delete o.actual_courier_charges;
   }
 
   return { ...o, items, history, tracking_only: false };
@@ -590,6 +603,11 @@ export async function listOrders(
       o.due_amount = Number(o.due_amount || 0);
       o.due_status = o.due_status || "NONE";
     }
+    if (u.role !== "SUPER_ADMIN" && u.role !== "VENDOR") {
+      delete o.actual_courier_charges;
+    } else {
+      o.actual_courier_charges = Number(o.actual_courier_charges || 0);
+    }
   });
   if (rows.length > 0) {
     const orderIds = rows.map((r: any) => r.id);
@@ -695,7 +713,10 @@ export async function listOrders(
         (orderPages * perPageRate) + (orderBooks * bindingRate),
       );
 
+      const courierCharge = Number((r as any).actual_courier_charges || 0);
       (r as any).vendor_price = vendorPrice;
+      (r as any).actual_courier_charges = courierCharge;
+      (r as any).vendor_total_credit = vendorPrice + courierCharge;
       (r as any).vendor_pages = orderPages;
       (r as any).vendor_books = orderBooks;
       (r as any).vendor_rate_breakdown = {
@@ -705,8 +726,12 @@ export async function listOrders(
         total_books: orderBooks,
         pages_amount: Math.round(orderPages * perPageRate),
         binding_amount: Math.round(orderBooks * bindingRate),
-        total_vendor_price: vendorPrice,
-        formula: `(${orderPages} pages × Rs. ${perPageRate}) + (${orderBooks} books × Rs. ${bindingRate}) = Rs. ${vendorPrice}`,
+        total_printing_cost: vendorPrice,
+        actual_courier_charges: courierCharge,
+        total_vendor_credit: vendorPrice + courierCharge,
+        formula: courierCharge > 0
+          ? `(${orderPages} pgs × Rs. ${perPageRate}) + (${orderBooks} bks × Rs. ${bindingRate}) + (Courier Rs. ${courierCharge}) = Rs. ${vendorPrice + courierCharge}`
+          : `(${orderPages} pgs × Rs. ${perPageRate}) + (${orderBooks} bks × Rs. ${bindingRate}) = Rs. ${vendorPrice}`,
       };
 
       // 100% Privacy: Delete retail customer prices and payment slip info
@@ -737,7 +762,19 @@ export async function listOrders(
 
     const totalPagesAll = Number(vendorAggregate?.total_pages || 0);
     const totalBooksAll = Number(vendorAggregate?.total_books || 0);
-    const totalEarningsAll = Math.round((totalPagesAll * perPageRate) + (totalBooksAll * bindingRate));
+    const totalPrintingCostAll = Math.round((totalPagesAll * perPageRate) + (totalBooksAll * bindingRate));
+
+    const courierStats = await one<any>(
+      `SELECT 
+        COALESCE(SUM(actual_courier_charges), 0) AS total_courier_charges,
+        COUNT(CASE WHEN actual_courier_charges > 0 THEN 1 END) AS courier_orders_count
+       FROM orders
+       WHERE vendor_id = ?`,
+      vendorId,
+    );
+    const totalCourierAll = Math.round(Number(courierStats?.total_courier_charges || 0));
+    const courierOrdersCountAll = Number(courierStats?.courier_orders_count || 0);
+    const totalEarningsAll = totalPrintingCostAll + totalCourierAll;
 
     const totalPaidRow = await one<any>(
       "SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments WHERE vendor_id = ?",
@@ -750,6 +787,9 @@ export async function listOrders(
       total_assigned: Number(vendorAggregate?.total_assigned || 0),
       printing_queue_count: Number(vendorAggregate?.printing_queue_count || 0),
       printed_count: Number(vendorAggregate?.printed_count || 0),
+      total_printing_cost: totalPrintingCostAll,
+      total_courier_charges: totalCourierAll,
+      courier_orders_count: courierOrdersCountAll,
       total_earnings: totalEarningsAll,
       total_paid: totalPaidAll,
       pending_balance: pendingBalanceAll,
@@ -1167,6 +1207,7 @@ export async function setCourierTracking(
   courierName: string,
   trackingId: string,
   targetStatus?: string,
+  actualCourierCharges?: number,
 ) {
   const o = await getOrder(req, id, u);
   const cName = courierName.trim();
@@ -1211,12 +1252,17 @@ export async function setCourierTracking(
       : `Shipped via ${cName} - Tracking #: ${tId}`;
 
   const newVendorPrintedAt = o.vendor_printed_at || at;
+  const finalActualCharges =
+    actualCourierCharges !== undefined
+      ? Math.max(0, Number(actualCourierCharges) || 0)
+      : Math.max(0, Number(o.actual_courier_charges) || 0);
 
   const statements = [
     stmt(
-      "UPDATE orders SET courier_name=?,courier_tracking_id=?,status=?,vendor_printed_at=?,updated_at=?,version=version+1 WHERE id=?",
+      "UPDATE orders SET courier_name=?,courier_tracking_id=?,actual_courier_charges=?,status=?,vendor_printed_at=?,updated_at=?,version=version+1 WHERE id=?",
       cName,
       tId,
+      finalActualCharges,
       nextStatus,
       newVendorPrintedAt,
       at,
@@ -1235,13 +1281,27 @@ export async function setCourierTracking(
       u.email,
       "SET_COURIER_TRACKING",
       o.id,
-      { courier_name: o.courier_name, courier_tracking_id: o.courier_tracking_id },
-      { courier_name: cName, courier_tracking_id: tId },
+      {
+        courier_name: o.courier_name,
+        courier_tracking_id: o.courier_tracking_id,
+        actual_courier_charges: o.actual_courier_charges,
+      },
+      {
+        courier_name: cName,
+        courier_tracking_id: tId,
+        actual_courier_charges: finalActualCharges,
+      },
       req,
     ),
   ];
   await batch(statements);
-  return { ok: true, courier_name: cName, courier_tracking_id: tId, status: nextStatus };
+  return {
+    ok: true,
+    courier_name: cName,
+    courier_tracking_id: tId,
+    actual_courier_charges: finalActualCharges,
+    status: nextStatus,
+  };
 }
 
 export async function removeCourierTracking(
@@ -1259,7 +1319,7 @@ export async function removeCourierTracking(
 
   const statements = [
     stmt(
-      "UPDATE orders SET courier_name=NULL,courier_tracking_id=NULL,status=?,updated_at=?,version=version+1 WHERE id=?",
+      "UPDATE orders SET courier_name=NULL,courier_tracking_id=NULL,actual_courier_charges=0,status=?,updated_at=?,version=version+1 WHERE id=?",
       nextStatus,
       at,
       o.id,
@@ -1281,13 +1341,76 @@ export async function removeCourierTracking(
         courier_name: o.courier_name,
         courier_tracking_id: o.courier_tracking_id,
         status: o.status,
+        actual_courier_charges: o.actual_courier_charges,
       },
-      { courier_name: null, courier_tracking_id: null, status: nextStatus },
+      {
+        courier_name: null,
+        courier_tracking_id: null,
+        actual_courier_charges: 0,
+        status: nextStatus,
+      },
       req,
     ),
   ];
   await batch(statements);
   return { ok: true, removed: true, status: nextStatus };
+}
+
+export async function updateActualCourierCharges(
+  req: Request,
+  u: User,
+  id: string,
+  charges: number,
+) {
+  const o = await getOrder(req, id, u);
+  if (u.role !== "SUPER_ADMIN" && u.role !== "VENDOR") {
+    throw new AppError(403, "Only Super Admin and Vendors can update delivery charges.");
+  }
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only update courier charges for orders assigned to you.");
+  }
+  const isCampus =
+    o.delivery_type === "campus" ||
+    (o.city && o.city.toLowerCase().includes("campus")) ||
+    (o.address && o.address.toLowerCase().includes("campus"));
+  const isLahore =
+    !isCampus &&
+    (o.delivery_type === "lahore" ||
+      o.delivery_type === "lahore_home" ||
+      (o.city && o.city.toLowerCase().includes("lahore")));
+  if (isCampus || isLahore) {
+    throw new AppError(400, "Courier delivery charges are only for Other City orders.");
+  }
+
+  const validCharges = Math.max(0, Number(charges) || 0);
+  const at = now();
+  const statements = [
+    stmt(
+      "UPDATE orders SET actual_courier_charges=?,updated_at=?,version=version+1 WHERE id=?",
+      validCharges,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,1,?)",
+      uid(),
+      o.id,
+      o.status,
+      `Actual courier delivery charges updated: Rs. ${validCharges}`,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "UPDATE_ACTUAL_COURIER_CHARGES",
+      o.id,
+      { actual_courier_charges: o.actual_courier_charges },
+      { actual_courier_charges: validCharges },
+      req,
+    ),
+  ];
+  await batch(statements);
+  return { ok: true, actual_courier_charges: validCharges };
 }
 
 export async function editOrderItems(

@@ -52,6 +52,8 @@ const {
   changeStatus,
   pendingOrderCount,
   setCourierTracking,
+  removeCourierTracking,
+  updateActualCourierCharges,
   vendorPrint,
   vendorDispatchOffice,
   batchVendorPrint,
@@ -127,6 +129,7 @@ function database(t) {
     "0008_vendor_management.sql",
     "0009_vendor_ledger.sql",
     "0010_due_payments.sql",
+    "0011_actual_courier_charges.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -2572,15 +2575,126 @@ test("Partial Payment / Due Balance / Remaining Margin Management Scenario", asy
   assert.equal(ord2AfterEdit.due_status, "PAID");
 });
 
+test("Vendor Ledger automatically credits actual courier delivery charges for Other City orders, while keeping internal costs hidden from students", async (t) => {
+  const sqlite = database(t);
+  const adminUser = {
+    id: "admin",
+    name: "QA Admin",
+    email: "qa@example.invalid",
+    role: "SUPER_ADMIN",
+    permissions: ["orders.update", "orders.manage"],
+  };
+
+  // 1. Create a vendor with Rs. 2.00 / page and Rs. 50 / book binding
+  const { vendor: vendorRecord } = await createVendor(request, adminUser, {
+    name: "Express Print Works",
+    phone: "03112233445",
+    email: "express@example.com",
+    password: "Password123!",
+    per_page_rate: 2.00,
+    binding_rate: 50.00,
+  });
+  const vendorId = vendorRecord.id;
+  const vendorUser = {
+    id: vendorRecord.user_id,
+    name: "Express Print Works",
+    email: "express@example.com",
+    role: "VENDOR",
+    vendor_id: vendorId,
+    permissions: [],
+  };
+
+  // 2. Create a book with 80 pages
+  const { id: bookId } = await saveBook(bookInput("CS-OTHER-CITY", { pages: 80 }), adminUser, request);
+
+  // 3. Customer places Other City order (e.g. Faisalabad, delivery_type: "other")
+  const cartData = {
+    name: "Other City Student",
+    phone: "03001234567",
+    city: "Faisalabad",
+    address: "House 123, Street 4, Faisalabad",
+    delivery_type: "other",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 2 }], // 2 books of 80 pages each = 160 pages, 2 books
+  };
+  const q = await quote(request, cartData);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const ord = await getOrder(request, placed.id, adminUser);
+  await decidePayment(request, adminUser, placed.id, "approve", "Approved", ord.version);
+
+  // 4. Assign order to vendor
+  await assignOrderToVendor(request, adminUser, placed.id, vendorId);
+
+  // Expected Printing Cost = (160 pages * 2.00) + (2 books * 50) = 320 + 100 = Rs. 420
+  const ledgerBeforeCourier = await getVendorLedger(adminUser, vendorId);
+  assert.equal(ledgerBeforeCourier.summary.total_printing_cost, 420);
+  assert.equal(ledgerBeforeCourier.summary.total_courier_charges, 0);
+  assert.equal(ledgerBeforeCourier.summary.courier_orders_count, 0);
+  assert.equal(ledgerBeforeCourier.summary.total_earned, 420);
+  assert.equal(ledgerBeforeCourier.summary.pending_balance, 420);
+
+  // 5. Vendor dispatches via TCS Courier, entering actual courier expense of Rs. 380
+  const attachRes = await setCourierTracking(
+    request,
+    vendorUser,
+    placed.id,
+    "TCS",
+    "TCS-99887766",
+    "SHIPPED",
+    380, // Actual courier charges
+  );
+  assert.equal(attachRes.ok, true);
+  assert.equal(attachRes.actual_courier_charges, 380);
+
+  // 6. Vendor Ledger Khata check: Printing (420) + Courier (380) = Rs. 800
+  const ledgerAfterCourier = await getVendorLedger(adminUser, vendorId);
+  assert.equal(ledgerAfterCourier.summary.total_printing_cost, 420);
+  assert.equal(ledgerAfterCourier.summary.total_courier_charges, 380);
+  assert.equal(ledgerAfterCourier.summary.courier_orders_count, 1);
+  assert.equal(ledgerAfterCourier.summary.total_earned, 800);
+  assert.equal(ledgerAfterCourier.summary.pending_balance, 800);
+
+  // Order breakdown in ledger
+  assert.ok(ledgerAfterCourier.orders);
+  assert.equal(ledgerAfterCourier.orders.length, 1);
+  const ledgerOrder = ledgerAfterCourier.orders[0];
+  assert.equal(ledgerOrder.id, placed.id);
+  assert.equal(ledgerOrder.printing_cost, 420);
+  assert.equal(ledgerOrder.actual_courier_charges, 380);
+  assert.equal(ledgerOrder.total_credit, 800);
+  assert.equal(ledgerOrder.courier_name, "TCS");
+  assert.equal(ledgerOrder.courier_tracking_id, "TCS-99887766");
+
+  // 7. Student Privacy Check: student tracking NEVER leaks actual_courier_charges
+  const studentTrack = await getOrder(request, placed.id, undefined, "tracking");
+  assert.equal(studentTrack.courier_name, "TCS");
+  assert.equal(studentTrack.courier_tracking_id, "TCS-99887766");
+  assert.equal(studentTrack.actual_courier_charges, undefined);
 
 
 
+  // 8. Super Admin adjusts actual courier charges to Rs. 420 (e.g. vendor had extra weight charge)
+  await updateActualCourierCharges(request, adminUser, placed.id, 420);
+  const ledgerAfterUpdate = await getVendorLedger(vendorUser);
+  assert.equal(ledgerAfterUpdate.summary.total_courier_charges, 420);
+  assert.equal(ledgerAfterUpdate.summary.total_earned, 840); // 420 + 420 = 840
+  assert.equal(ledgerAfterUpdate.summary.pending_balance, 840);
+  assert.equal(ledgerAfterUpdate.orders[0].actual_courier_charges, 420);
+  assert.equal(ledgerAfterUpdate.orders[0].total_credit, 840);
 
-
-
-
-
-
-
-
-
+  // 9. Vendor removes courier tracking: actual_courier_charges resets to 0
+  await removeCourierTracking(request, vendorUser, placed.id);
+  const ledgerAfterRemove = await getVendorLedger(adminUser, vendorId);
+  assert.equal(ledgerAfterRemove.summary.total_courier_charges, 0);
+  assert.equal(ledgerAfterRemove.summary.total_courier_charges, 0);
+  assert.equal(ledgerAfterRemove.summary.total_earned, 420);
+  assert.equal(ledgerAfterRemove.summary.pending_balance, 420);
+  assert.equal(ledgerAfterRemove.orders[0].actual_courier_charges, 0);
+  assert.equal(ledgerAfterRemove.orders[0].total_credit, 420);
+});

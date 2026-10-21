@@ -1981,6 +1981,13 @@ function CourierTrackingModal({
 }) {
   const [courierName, setCourierName] = useState(order.courier_name || "");
   const [trackingId, setTrackingId] = useState(order.courier_tracking_id || "");
+  const [actualCourierCharges, setActualCourierCharges] = useState<string>(
+    order.actual_courier_charges !== undefined &&
+      order.actual_courier_charges !== null &&
+      Number(order.actual_courier_charges) > 0
+      ? String(order.actual_courier_charges)
+      : "",
+  );
   const [deliveryStatus, setDeliveryStatus] = useState<"SHIPPED" | "DELIVERED">(
     order.status === "DELIVERED" ? "DELIVERED" : "SHIPPED",
   );
@@ -2013,12 +2020,17 @@ function CourierTrackingModal({
       return;
     }
     setBusy(true);
+    const parsedCharges = actualCourierCharges.trim()
+      ? parseFloat(actualCourierCharges)
+      : 0;
     try {
       await api("manage/orders/" + order.id, {
         action: "courier",
         courier_name: courierName.trim(),
         courier_tracking_id: trackingId.trim(),
         status: deliveryStatus,
+        actual_courier_charges:
+          isNaN(parsedCharges) || parsedCharges < 0 ? 0 : parsedCharges,
       });
       toast.success(
         deliveryStatus === "DELIVERED"
@@ -2129,6 +2141,62 @@ function CourierTrackingModal({
               <code style={{ fontSize: "0.78rem", color: "var(--primary)" }}>
                 Shipped via {courierName || "[Courier Company Name]"} - Tracking #: {trackingId || "[Tracking Number]"}
               </code>
+            </p>
+          </div>
+
+          <div>
+            <label
+              className="field-label"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 6,
+                fontWeight: 600,
+                fontSize: "0.85rem",
+              }}
+            >
+              <span>Actual Courier Delivery Charges (Rs.)</span>
+              <span
+                style={{
+                  fontSize: "0.76rem",
+                  color: "var(--muted-foreground)",
+                  fontWeight: "normal",
+                }}
+              >
+                Optional · Internal Ledger / Khata
+              </span>
+            </label>
+            <div style={{ position: "relative" }}>
+              <span
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  fontSize: "0.85rem",
+                  color: "var(--muted-foreground)",
+                  fontWeight: 600,
+                }}
+              >
+                Rs.
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                className="input full-width"
+                placeholder="e.g. 380, 420, 650 (added to vendor khata)"
+                value={actualCourierCharges}
+                onChange={(e) => setActualCourierCharges(e.target.value)}
+                style={{ paddingLeft: 38 }}
+              />
+            </div>
+            <p
+              className="small-text muted"
+              style={{ margin: "5px 0 0", fontSize: "0.78rem", lineHeight: 1.4 }}
+            >
+              🔒 <strong>Confidential (Vendor Ledger Only):</strong> Courier charges added directly to vendor khata. Customer / student will <u>never</u> see this amount.
             </p>
           </div>
 
@@ -4381,6 +4449,11 @@ function OrderModalPopup({
                               <code className="courier-tracking-code">
                                 {o.courier_tracking_id}
                               </code>
+                              {Number(o.actual_courier_charges || 0) > 0 ? (
+                                <span className="mono-pill" style={{ marginLeft: 6, fontSize: "0.74rem", background: "rgba(37, 99, 235, 0.1)", color: "var(--primary)" }}>
+                                  Ledger Cost: Rs. {Number(o.actual_courier_charges).toLocaleString()}
+                                </span>
+                              ) : null}
                             </>
                           ) : isPaymentVerified ? (
                             "Add courier tracking details (e.g. Leopards, TCS, Trax) for student tracking."
@@ -6830,7 +6903,7 @@ function Orders({
                         }}
                         title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit tracking details.`}
                       >
-                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}
+                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
                       </button>
                     ) : o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING" ? (
                       <button
@@ -6934,25 +7007,48 @@ function Orders({
 
               const vendorEarningCell = (
                 <div
-                  style={{ display: "flex", flexDirection: "column", gap: 3, cursor: "help", minWidth: 120 }}
-                  title={`Formula: (${totalPages} pages × Rs. ${o.vendor_per_page_rate ?? 1.6}) + (${booksCount} books × Rs. ${o.vendor_binding_rate ?? 30}) = Rs. ${Number(o.vendor_price || 0).toLocaleString()}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 3, cursor: "help", minWidth: 135 }}
+                  title={Number(o.actual_courier_charges || 0) > 0
+                    ? `Total: Rs. ${(Number(o.vendor_price || 0) + Number(o.actual_courier_charges || 0)).toLocaleString()} (Printing Rs. ${Number(o.vendor_price || 0).toLocaleString()} + Courier Rs. ${Number(o.actual_courier_charges).toLocaleString()})`
+                    : `Formula: (${totalPages} pages × Rs. ${o.vendor_per_page_rate ?? 1.6}) + (${booksCount} books × Rs. ${o.vendor_binding_rate ?? 30}) = Rs. ${Number(o.vendor_price || 0).toLocaleString()}`}
                 >
-                  <strong style={{ fontSize: "0.96rem", color: "#15803d" }}>
-                    Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                  <strong style={{ fontSize: "0.98rem", color: "#15803d" }}>
+                    Rs. {(Number(o.vendor_price || 0) + Number(o.actual_courier_charges || 0)).toLocaleString()}
                   </strong>
-                  <span
-                    className="mono-pill"
-                    style={{
-                      fontSize: "0.68rem",
-                      background: "rgba(22, 163, 74, 0.08)",
-                      color: "#166534",
-                      border: "1px dashed rgba(22, 163, 74, 0.3)",
-                      padding: "1px 6px",
-                      width: "fit-content",
-                    }}
-                  >
-                    ({totalPages}p × {o.vendor_per_page_rate ?? 1.6} + {booksCount}b × {o.vendor_binding_rate ?? 30})
-                  </span>
+                  {Number(o.actual_courier_charges || 0) > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 600,
+                          background: "rgba(37, 99, 235, 0.12)",
+                          color: "var(--primary)",
+                          padding: "1px 6px",
+                          width: "fit-content",
+                        }}
+                      >
+                        🚚 Courier: Rs. {Number(o.actual_courier_charges).toLocaleString()}
+                      </span>
+                      <span className="small-text muted" style={{ fontSize: "0.68rem" }}>
+                        Print: Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  ) : (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        background: "rgba(22, 163, 74, 0.08)",
+                        color: "#166534",
+                        border: "1px dashed rgba(22, 163, 74, 0.3)",
+                        padding: "1px 6px",
+                        width: "fit-content",
+                      }}
+                    >
+                      ({totalPages}p × {o.vendor_per_page_rate ?? 1.6} + {booksCount}b × {o.vendor_binding_rate ?? 30})
+                    </span>
+                  )}
                 </div>
               );
 
@@ -7046,7 +7142,7 @@ function Orders({
                         }}
                         title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit.`}
                       >
-                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}
+                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
                       </button>
                     ) : (
                       <button
@@ -8842,6 +8938,14 @@ function Vendors() {
     (sum, v) => sum + (Number(v.assigned_orders_count) || 0),
     0,
   );
+  const totalCourierCharges = vendors.reduce(
+    (sum, v) => sum + (Number(v.total_courier_charges) || 0),
+    0,
+  );
+  const totalPrintingCost = vendors.reduce(
+    (sum, v) => sum + (Number(v.total_printing_cost) || 0),
+    0,
+  );
   const totalEarningsGenerated = vendors.reduce(
     (sum, v) => sum + (Number(v.total_earnings) || 0),
     0,
@@ -8898,15 +9002,26 @@ function Vendors() {
           <small>Orders in active print batches</small>
         </div>
 
+        <div className="metric metric-sky">
+          <div className="metric-heading">
+            <span>Courier Charges</span>
+            <span className="metric-icon">
+              <Truck size={19} />
+            </span>
+          </div>
+          <strong style={{ color: "var(--primary)" }}>Rs. {totalCourierCharges.toLocaleString()}</strong>
+          <small>Total courier charges for other cities</small>
+        </div>
+
         <div className="metric metric-blue">
           <div className="metric-heading">
-            <span>Total Generated</span>
+            <span>Total Generated (Khata)</span>
             <span className="metric-icon">
               <Coins size={19} />
             </span>
           </div>
           <strong>Rs. {totalEarningsGenerated.toLocaleString()}</strong>
-          <small>Total order printing cost</small>
+          <small>Printing Rs. {totalPrintingCost.toLocaleString()} + Courier Rs. {totalCourierCharges.toLocaleString()}</small>
         </div>
 
         <div className="metric metric-emerald">
@@ -9063,18 +9178,28 @@ function Vendors() {
                 </div>
               </div>,
 
-              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 160 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem" }}>
-                  <span className="muted">Generated:</span>
-                  <strong>Rs. {Number(v.total_earnings || 0).toLocaleString()}</strong>
+              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 175 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.80rem" }}>
+                  <span className="muted">Printing:</span>
+                  <span>Rs. {Number(v.total_printing_cost || 0).toLocaleString()}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.80rem" }}>
+                  <span className="muted">Courier:</span>
+                  <span style={{ fontWeight: 600, color: "var(--primary)" }}>
+                    Rs. {Number(v.total_courier_charges || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem", borderTop: "1px dashed var(--border)", paddingTop: 2 }}>
+                  <strong style={{ fontSize: "0.84rem" }}>Total Earned:</strong>
+                  <strong style={{ fontSize: "0.86rem" }}>Rs. {Number(v.total_earnings || 0).toLocaleString()}</strong>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.78rem" }}>
                   <span className="muted">Paid:</span>
                   <span style={{ color: "#15803d", fontWeight: 600 }}>
                     Rs. {Number(v.total_paid || 0).toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.78rem" }}>
                   <span className="muted">Balance:</span>
                   <span
                     className="mono-pill"
@@ -9458,6 +9583,9 @@ function VendorLedgerModal({
     total_books: 0,
     per_page_rate: vendor.per_page_rate ?? 1.6,
     binding_rate: vendor.binding_rate ?? 30,
+    total_printing_cost: 0,
+    total_courier_charges: 0,
+    courier_orders_count: 0,
     total_earned: vendor.total_earnings ?? 0,
     total_paid: vendor.total_paid ?? 0,
     pending_balance: vendor.pending_balance ?? 0,
@@ -9536,37 +9664,49 @@ function VendorLedgerModal({
             className="metrics"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: 12,
               margin: "12px 0 20px",
             }}
           >
             <div className="metric metric-blue">
-              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
-                Total Generated (Orders)
+              <span style={{ fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                Total Earned (Khata)
               </span>
               <strong style={{ fontSize: "1.35rem", margin: "4px 0" }}>
                 Rs. {summary.total_earned.toLocaleString()}
               </strong>
               <small style={{ color: "var(--muted-foreground)" }}>
-                {summary.total_orders} orders · {summary.total_pages.toLocaleString()} pgs · {summary.total_books} bks
+                Printing Rs. {((summary.total_printing_cost !== undefined ? summary.total_printing_cost : (summary.total_earned - (summary.total_courier_charges || 0)))).toLocaleString()} + Courier Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+              </small>
+            </div>
+
+            <div className="metric metric-sky">
+              <span style={{ fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                Courier Charges
+              </span>
+              <strong style={{ fontSize: "1.35rem", margin: "4px 0", color: "var(--primary)" }}>
+                Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+              </strong>
+              <small style={{ color: "var(--muted-foreground)" }}>
+                {summary.courier_orders_count || 0} Other City courier order{summary.courier_orders_count !== 1 ? "s" : ""}
               </small>
             </div>
 
             <div className="metric metric-emerald">
-              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+              <span style={{ fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
                 Total Amount Paid
               </span>
               <strong style={{ fontSize: "1.35rem", margin: "4px 0", color: "#15803d" }}>
                 Rs. {summary.total_paid.toLocaleString()}
               </strong>
               <small style={{ color: "var(--muted-foreground)" }}>
-                {ledger?.payments?.length || 0} recorded disbursements
+                {ledger?.payments?.length || 0} recorded disbursement{ledger?.payments?.length !== 1 ? "s" : ""}
               </small>
             </div>
 
             <div className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"}`}>
-              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+              <span style={{ fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
                 Remaining Pending
               </span>
               <strong
@@ -9579,7 +9719,7 @@ function VendorLedgerModal({
                 Rs. {summary.pending_balance.toLocaleString()}
               </strong>
               <small style={{ color: "var(--muted-foreground)" }}>
-                {summary.pending_balance > 0 ? "Outstanding balance payable" : "All accounts fully settled"}
+                {summary.pending_balance > 0 ? "Outstanding balance payable" : "All accounts fully settled ✓"}
               </small>
             </div>
           </div>
@@ -9753,6 +9893,119 @@ function VendorLedgerModal({
                       </tr>
                     ))}
                   </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Order-by-Order Breakdown */}
+          <div style={{ marginTop: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+              <h4 style={{ margin: 0, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: 6 }}>
+                <Package size={16} /> Order-by-Order Student & Delivery Khata ({ledger?.orders?.length || 0})
+              </h4>
+              <span className="small-text muted">Individual order printing & courier accounting</span>
+            </div>
+            {(!ledger?.orders || ledger.orders.length === 0) ? (
+              <div style={{ padding: 20, textAlign: "center", color: "var(--muted-foreground)", background: "var(--card)", borderRadius: 8, border: "1px dashed var(--border)" }}>
+                No completed or assigned orders for this vendor yet.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Order Ref & Date</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Student Info</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Destination</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Books & Pages</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Printing Cost</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Courier Charges</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Total Credit</th>
+                      <th style={{ padding: "8px 10px", fontWeight: 600 }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(ledger.orders || []).map((ord, idx) => {
+                      const isOther = ord.delivery_type === "other" || ord.actual_courier_charges > 0 || (ord.courier_name && ord.courier_tracking_id);
+                      return (
+                        <tr
+                          key={ord.id || idx}
+                          style={{
+                            borderBottom: "1px solid var(--border)",
+                            background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                          }}
+                        >
+                          <td style={{ padding: "9px 10px", fontWeight: 600, whiteSpace: "nowrap" }}>
+                            <div>{ord.reference}</div>
+                            <div style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", fontWeight: "normal" }}>
+                              {formatDateDMY(ord.created_at)}
+                            </div>
+                          </td>
+                          <td style={{ padding: "9px 10px" }}>
+                            <strong>{ord.name}</strong>
+                            {ord.phone && (
+                              <div style={{ fontSize: "0.74rem", color: "var(--muted-foreground)" }}>
+                                {ord.phone}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: "9px 10px" }}>
+                            <span>{ord.city || (ord.delivery_type === "campus" ? "Campus Pickup" : "Lahore Home")}</span>
+                            {ord.courier_name && (
+                              <div style={{ fontSize: "0.75rem", color: "var(--primary)", marginTop: 2, fontWeight: 500 }}>
+                                🚚 {ord.courier_name}: {ord.courier_tracking_id}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                            {ord.total_pages.toLocaleString()} pgs · {ord.total_books} bk{ord.total_books !== 1 ? "s" : ""}
+                          </td>
+                          <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                            Rs. {ord.printing_cost.toLocaleString()}
+                          </td>
+                          <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                            {isOther ? (
+                              ord.actual_courier_charges > 0 ? (
+                                <span style={{ fontWeight: 600, color: "var(--primary)" }}>
+                                  Rs. {ord.actual_courier_charges.toLocaleString()}
+                                </span>
+                              ) : (
+                                <span style={{ color: "var(--muted-foreground)" }}>Rs. 0</span>
+                              )
+                            ) : (
+                              <span style={{ color: "var(--muted-foreground)" }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ padding: "9px 10px", fontWeight: 700, color: "#15803d", whiteSpace: "nowrap" }}>
+                            Rs. {ord.total_credit.toLocaleString()}
+                          </td>
+                          <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                            <span className="mono-pill" style={{ fontSize: "0.72rem" }}>
+                              {ord.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot style={{ background: "var(--muted)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
+                    <tr>
+                      <td colSpan={4} style={{ padding: "10px 10px" }}>
+                        Total Breakdown ({(ledger.orders || []).length} Orders):
+                      </td>
+                      <td style={{ padding: "10px 10px", whiteSpace: "nowrap" }}>
+                        Rs. {(ledger.orders || []).reduce((s, o) => s + (o.printing_cost || 0), 0).toLocaleString()}
+                      </td>
+                      <td style={{ padding: "10px 10px", color: "var(--primary)", whiteSpace: "nowrap" }}>
+                        Rs. {(ledger.orders || []).reduce((s, o) => s + (o.actual_courier_charges || 0), 0).toLocaleString()}
+                      </td>
+                      <td style={{ padding: "10px 10px", color: "#15803d", fontSize: "0.95rem", whiteSpace: "nowrap" }}>
+                        Rs. {(ledger.orders || []).reduce((s, o) => s + (o.total_credit || 0), 0).toLocaleString()}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
@@ -9962,7 +10215,45 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
           </a>
 
-          {/* 4. Total Earnings */}
+          {/* 4. Courier Charges */}
+          <a
+            href="/vendor/ledger"
+            className="metric metric-sky vendor-metric-card"
+            title="Click to view courier charges"
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--primary)", letterSpacing: "0.3px" }}>
+                Courier Charges
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "rgba(37, 99, 235, 0.12)",
+                  color: "var(--primary)",
+                  flexShrink: 0,
+                }}
+              >
+                <Truck size={20} />
+              </span>
+            </div>
+
+            <div>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--primary)", marginBottom: 6 }}>
+                Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+              </strong>
+              <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                <span>{summary.courier_orders_count || 0} Other City parcel{summary.courier_orders_count !== 1 ? "s" : ""}</span>
+                <span style={{ color: "var(--primary)", fontWeight: 600 }}>→</span>
+              </div>
+            </div>
+          </a>
+
+          {/* 5. Total Earnings */}
           <a
             href="/vendor/ledger"
             className="metric metric-blue vendor-metric-card"
@@ -9970,7 +10261,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
-                Total Earnings
+                Total Earnings (Khata)
               </span>
               <span
                 style={{
@@ -9993,8 +10284,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
               <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-info-text)", marginBottom: 6 }}>
                 Rs. {summary.total_earned.toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
-                <span>{summary.total_pages.toLocaleString()} pages · {summary.total_books} books</span>
+              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                <span>Print: Rs. {((summary.total_printing_cost !== undefined ? summary.total_printing_cost : (summary.total_earned - (summary.total_courier_charges || 0)))).toLocaleString()} + Courier: Rs. {(summary.total_courier_charges || 0).toLocaleString()}</span>
                 <span style={{ color: "var(--primary)", fontWeight: 600 }}>→</span>
               </div>
             </div>
@@ -10202,11 +10493,17 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                         </td>
                         <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
                           <strong style={{ fontSize: "0.95rem", color: "#15803d" }}>
-                            Rs. {Number(o.vendor_price || 0).toLocaleString()}
+                            Rs. {(Number(o.vendor_price || 0) + Number(o.actual_courier_charges || 0)).toLocaleString()}
                           </strong>
-                          <div style={{ fontSize: "0.70rem", color: "var(--muted-foreground)" }}>
-                            ({pagesCount}p × {summary.per_page_rate} + {booksCount}b × {summary.binding_rate})
-                          </div>
+                          {Number(o.actual_courier_charges || 0) > 0 ? (
+                            <div style={{ fontSize: "0.70rem", color: "var(--primary)", fontWeight: 600 }}>
+                              Print: Rs. {Number(o.vendor_price || 0).toLocaleString()} + Courier: Rs. {Number(o.actual_courier_charges).toLocaleString()}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.70rem", color: "var(--muted-foreground)" }}>
+                              ({pagesCount}p × {summary.per_page_rate} + {booksCount}b × {summary.binding_rate})
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontSize: "0.82rem" }}>
                           {formatDateDMY(o.created_at)}
@@ -10231,6 +10528,126 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
           )}
         </div>
+
+        {/* Order-by-Order Earnings Breakdown */}
+        <div className="panel stack" style={{ gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1rem" }}>
+                Order-by-Order Earnings Breakdown ({(ledger?.orders || []).length})
+              </h3>
+              <p style={{ margin: "2px 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                Transparent breakdown of printing earnings and courier charges per student order
+              </p>
+            </div>
+            <span className="small-text muted">Auto-calculated per assigned order</span>
+          </div>
+
+          {(!ledger?.orders || ledger.orders.length === 0) ? (
+            <div style={{ padding: 28, textAlign: "center", color: "var(--muted-foreground)", border: "1px dashed var(--border)", borderRadius: 8 }}>
+              <Package size={28} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+              <p style={{ margin: 0, fontWeight: 500 }}>No orders completed yet</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                <thead>
+                  <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Order Ref & Date</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Student Info</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Destination</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Books & Pages</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Printing Cost</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Courier Charges</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Total Credit</th>
+                    <th style={{ padding: "9px 12px", fontWeight: 600 }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(ledger.orders || []).map((ord, idx) => {
+                    const isOther = ord.delivery_type === "other" || ord.actual_courier_charges > 0 || (ord.courier_name && ord.courier_tracking_id);
+                    return (
+                      <tr
+                        key={ord.id || idx}
+                        style={{
+                          borderBottom: "1px solid var(--border)",
+                          background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                        }}
+                      >
+                        <td style={{ padding: "10px 12px", fontWeight: 600, whiteSpace: "nowrap" }}>
+                          <div>{ord.reference}</div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", fontWeight: "normal" }}>
+                            {formatDateDMY(ord.created_at)}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <strong>{ord.name}</strong>
+                          {ord.phone && (
+                            <div style={{ fontSize: "0.74rem", color: "var(--muted-foreground)" }}>
+                              {ord.phone}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <span>{ord.city || (ord.delivery_type === "campus" ? "Campus Pickup" : "Lahore Home")}</span>
+                          {ord.courier_name && (
+                            <div style={{ fontSize: "0.75rem", color: "var(--primary)", marginTop: 2, fontWeight: 500 }}>
+                              🚚 {ord.courier_name}: {ord.courier_tracking_id}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          {ord.total_pages.toLocaleString()} pgs · {ord.total_books} bk{ord.total_books !== 1 ? "s" : ""}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          Rs. {ord.printing_cost.toLocaleString()}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          {isOther ? (
+                            ord.actual_courier_charges > 0 ? (
+                              <span style={{ fontWeight: 600, color: "var(--primary)" }}>
+                                Rs. {ord.actual_courier_charges.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--muted-foreground)" }}>Rs. 0</span>
+                            )
+                          ) : (
+                            <span style={{ color: "var(--muted-foreground)" }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 12px", fontWeight: 700, color: "#15803d", whiteSpace: "nowrap" }}>
+                          Rs. {ord.total_credit.toLocaleString()}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          <span className="mono-pill" style={{ fontSize: "0.72rem" }}>
+                            {ord.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot style={{ background: "var(--muted)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
+                  <tr>
+                    <td colSpan={4} style={{ padding: "11px 12px" }}>
+                      Total Summary ({(ledger.orders || []).length} Orders):
+                    </td>
+                    <td style={{ padding: "11px 12px", whiteSpace: "nowrap" }}>
+                      Rs. {(ledger.orders || []).reduce((s, o) => s + (o.printing_cost || 0), 0).toLocaleString()}
+                    </td>
+                    <td style={{ padding: "11px 12px", color: "var(--primary)", whiteSpace: "nowrap" }}>
+                      Rs. {(ledger.orders || []).reduce((s, o) => s + (o.actual_courier_charges || 0), 0).toLocaleString()}
+                    </td>
+                    <td style={{ padding: "11px 12px", color: "#15803d", fontSize: "0.95rem", whiteSpace: "nowrap" }}>
+                      Rs. {(ledger.orders || []).reduce((s, o) => s + (o.total_credit || 0), 0).toLocaleString()}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
       </Result>
     </div>
   );
@@ -10245,6 +10662,9 @@ function VendorLedgerView({ user }: { user: User }) {
     total_books: 0,
     per_page_rate: 1.6,
     binding_rate: 30,
+    total_printing_cost: 0,
+    total_courier_charges: 0,
+    courier_orders_count: 0,
     total_earned: 0,
     total_paid: 0,
     pending_balance: 0,
@@ -10298,27 +10718,42 @@ function VendorLedgerView({ user }: { user: User }) {
       </div>
 
       <Result loading={loading} error={error}>
-        {/* 3 Main Financial Summary Cards */}
+        {/* 4 Financial Summary Cards */}
         <div
           className="metrics"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: 16,
           }}
         >
           <div className="metric metric-blue">
             <div className="metric-heading">
-              <span>Total Earned</span>
+              <span>Total Earned (Khata)</span>
               <span className="metric-icon">
                 <Coins size={19} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.6rem", color: "var(--foreground)" }}>
+            <strong style={{ fontSize: "1.55rem", color: "var(--foreground)" }}>
               Rs. {summary.total_earned.toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
-              {summary.total_pages.toLocaleString()} pages · {summary.total_books} books ({summary.total_orders} orders)
+              Printing Rs. {((summary.total_printing_cost !== undefined ? summary.total_printing_cost : (summary.total_earned - (summary.total_courier_charges || 0)))).toLocaleString()} + Courier Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+            </small>
+          </div>
+
+          <div className="metric metric-sky">
+            <div className="metric-heading">
+              <span>Courier Charges</span>
+              <span className="metric-icon">
+                <Truck size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.55rem", color: "var(--primary)" }}>
+              Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+            </strong>
+            <small style={{ color: "var(--muted-foreground)" }}>
+              {summary.courier_orders_count || 0} Other City courier order{summary.courier_orders_count !== 1 ? "s" : ""}
             </small>
           </div>
 
@@ -10329,7 +10764,7 @@ function VendorLedgerView({ user }: { user: User }) {
                 <CreditCard size={19} />
               </span>
             </div>
-            <strong style={{ fontSize: "1.6rem", color: "var(--status-good-text)" }}>
+            <strong style={{ fontSize: "1.55rem", color: "var(--status-good-text)" }}>
               Rs. {summary.total_paid.toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
@@ -10346,7 +10781,7 @@ function VendorLedgerView({ user }: { user: User }) {
             </div>
             <strong
               style={{
-                fontSize: "1.6rem",
+                fontSize: "1.55rem",
                 color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
               }}
             >
@@ -10369,14 +10804,19 @@ function VendorLedgerView({ user }: { user: User }) {
             lineHeight: 1.5,
           }}
         >
-          <strong style={{ display: "block", marginBottom: 2 }}>
-            📐 Auto-Calculation Formula:
+          <strong style={{ display: "block", marginBottom: 4 }}>
+            📐 Auto-Calculation & Ledger Formula:
           </strong>
-          <span>
-            Total Earning = (Total Order Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + (Total Books × Rs. {Number(summary.binding_rate).toFixed(2)} Binding)
-          </span>
-          <div style={{ marginTop: 4, color: "var(--muted-foreground)", fontSize: "0.78rem" }}>
-            * Rates are configured by Bookstore Administration. Any rate changes immediately recalculate your total earnings.
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div>
+              1. <strong>Printing & Binding Earning:</strong> (Total Order Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + (Total Books × Rs. {Number(summary.binding_rate).toFixed(2)} Binding)
+            </div>
+            <div>
+              2. <strong>Courier Charges:</strong> Actual courier expense entered when dispatching Other City orders (credited 100% into your ledger).
+            </div>
+            <div style={{ fontWeight: 600, color: "var(--primary)", marginTop: 2 }}>
+              ➔ Total Vendor Credit = Printing & Binding Earning + Courier Charges
+            </div>
           </div>
         </div>
 

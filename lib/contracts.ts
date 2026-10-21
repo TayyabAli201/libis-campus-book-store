@@ -361,9 +361,30 @@ export interface VendorLedgerSummary {
   printed_orders?: number;
   per_page_rate: number;
   binding_rate: number;
+  total_printing_cost?: number;
+  total_courier_charges?: number;
+  courier_orders_count?: number;
   total_earned: number;
   total_paid: number;
   pending_balance: number;
+}
+
+export interface VendorLedgerOrder {
+  id: string;
+  reference: string;
+  name: string;
+  phone?: string | null;
+  city: string;
+  delivery_type: string;
+  status: string;
+  courier_name?: string | null;
+  courier_tracking_id?: string | null;
+  actual_courier_charges: number;
+  total_books: number;
+  total_pages: number;
+  printing_cost: number;
+  total_credit: number;
+  created_at: string;
 }
 
 export interface VendorLedger {
@@ -374,6 +395,7 @@ export interface VendorLedger {
   pending_balance?: number;
   total_orders?: number;
   payments: VendorPayment[];
+  orders?: VendorLedgerOrder[];
 }
 export type Quote = {
   id: string;

@@ -49,11 +49,27 @@ export async function listVendors(u: User): Promise<Vendor[]> {
     });
   }
 
+  const courierAggs = await all<any>(
+    `SELECT 
+      o.vendor_id,
+      COALESCE(SUM(o.actual_courier_charges), 0) AS total_courier_charges
+     FROM orders o
+     WHERE o.vendor_id IS NOT NULL
+     GROUP BY o.vendor_id`
+  );
+
+  const courierByVendor = new Map<string, number>();
+  for (const ca of courierAggs) {
+    courierByVendor.set(ca.vendor_id, Number(ca.total_courier_charges || 0));
+  }
+
   return rows.map((r) => {
     const perPageRate = Number(r.per_page_rate ?? 1.60);
     const bindingRate = Number(r.binding_rate ?? 30.00);
     const agg = aggByVendor.get(r.id) || { total_pages: 0, total_books: 0 };
-    const totalEarnings = Math.round((agg.total_pages * perPageRate) + (agg.total_books * bindingRate));
+    const courierCharges = Math.round(Number(courierByVendor.get(r.id) || 0));
+    const printingEarnings = Math.round((agg.total_pages * perPageRate) + (agg.total_books * bindingRate));
+    const totalEarnings = printingEarnings + courierCharges;
     const totalPaid = Number(r.total_paid || 0);
     const pendingBalance = totalEarnings - totalPaid;
 
@@ -70,6 +86,8 @@ export async function listVendors(u: User): Promise<Vendor[]> {
       binding_rate: bindingRate,
       assigned_orders_count: Number(r.assigned_orders_count || 0),
       printing_orders_count: Number(r.printing_orders_count || 0),
+      total_printing_cost: printingEarnings,
+      total_courier_charges: courierCharges,
       total_earnings: totalEarnings,
       total_paid: totalPaid,
       pending_balance: pendingBalance,
@@ -325,10 +343,21 @@ export async function getVendorLedger(
     targetVendorId,
   );
 
+  const courierStats = await one<any>(
+    `SELECT 
+      COALESCE(SUM(actual_courier_charges), 0) AS total_courier_charges,
+      COUNT(CASE WHEN actual_courier_charges > 0 THEN 1 END) AS courier_orders_count
+     FROM orders 
+     WHERE vendor_id = ?`,
+    targetVendorId,
+  );
+
   const totalPages = Number(orderStats?.total_pages || 0);
   const totalBooks = Number(orderStats?.total_books || 0);
   const totalOrders = Number(orderStats?.total_orders || 0);
-  const totalEarnings = Math.round((totalPages * perPageRate) + (totalBooks * bindingRate));
+  const totalCourierCharges = Math.round(Number(courierStats?.total_courier_charges || 0));
+  const totalPrintingCost = Math.round((totalPages * perPageRate) + (totalBooks * bindingRate));
+  const totalEarnings = totalPrintingCost + totalCourierCharges;
 
   // Compute payments and ledger entries
   const payments = await all<any>(
@@ -342,6 +371,52 @@ export async function getVendorLedger(
 
   const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const pendingBalance = totalEarnings - totalPaid;
+
+  const vendorOrdersRaw = await all<any>(
+    `SELECT 
+      o.id,
+      o.reference,
+      o.name,
+      o.phone,
+      o.city,
+      o.delivery_type,
+      o.status,
+      o.courier_name,
+      o.courier_tracking_id,
+      COALESCE(o.actual_courier_charges, 0) AS actual_courier_charges,
+      o.created_at,
+      COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
+      COALESCE(SUM(oi.quantity), 0) AS total_books
+     FROM orders o
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.vendor_id = ?
+     GROUP BY o.id
+     ORDER BY o.created_at DESC`,
+    targetVendorId,
+  );
+
+  const vendorOrders = vendorOrdersRaw.map((ord) => {
+    const pCost = Math.round((Number(ord.total_pages || 0) * perPageRate) + (Number(ord.total_books || 0) * bindingRate));
+    const cCharges = Math.round(Number(ord.actual_courier_charges || 0));
+    return {
+      id: ord.id,
+      reference: ord.reference || ord.id,
+      name: ord.name,
+      phone: ord.phone || null,
+      city: ord.city,
+      delivery_type: ord.delivery_type,
+      status: ord.status,
+      courier_name: ord.courier_name || null,
+      courier_tracking_id: ord.courier_tracking_id || null,
+      actual_courier_charges: cCharges,
+      total_books: Number(ord.total_books || 0),
+      total_pages: Number(ord.total_pages || 0),
+      printing_cost: pCost,
+      total_credit: pCost + cCharges,
+      created_at: ord.created_at,
+    };
+  });
+
   const summary = {
     total_orders: totalOrders,
     total_pages: totalPages,
@@ -350,6 +425,9 @@ export async function getVendorLedger(
     printed_orders: Number(orderStats?.printed_orders || 0),
     per_page_rate: perPageRate,
     binding_rate: bindingRate,
+    total_printing_cost: totalPrintingCost,
+    total_courier_charges: totalCourierCharges,
+    courier_orders_count: Number(courierStats?.courier_orders_count || 0),
     total_earned: totalEarnings,
     total_paid: totalPaid,
     pending_balance: pendingBalance,
@@ -390,6 +468,7 @@ export async function getVendorLedger(
       created_by: p.created_by,
       created_at: p.created_at,
     })),
+    orders: vendorOrders,
   };
 }
 
