@@ -146,6 +146,22 @@ export function notifyOrdersUpdated() {
   }
 }
 
+export function syncTabBranding(storeName?: string, logoUrl?: string | null) {
+  if (typeof document === "undefined") return;
+  const targetUrl = logoUrl && logoUrl.trim() ? logoUrl.trim() : "/favicon.svg";
+  const links = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
+  if (!links || links.length === 0) {
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = targetUrl;
+    document.head.appendChild(link);
+  } else {
+    links.forEach((link) => {
+      link.href = targetUrl;
+    });
+  }
+}
+
 export function BrandText({ name = "Campus Bookstore" }: { name?: string }) {
   const parts = (name || "Campus Bookstore").trim().split(/\s+/);
   if (parts.length > 1) {
@@ -162,8 +178,10 @@ export function BrandText({ name = "Campus Bookstore" }: { name?: string }) {
 export function Login({
   portal,
   storeName = "Campus Bookstore",
+  logoUrl = null,
 }: {
   portal: "admin" | "campus" | "vendor";
+  logoUrl?: string | null;
   storeName?: string;
 }) {
   const signingIn = useRef(false);
@@ -178,6 +196,10 @@ export function Login({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [successNotice, setSuccessNotice] = useState("");
+
+  useEffect(() => {
+    syncTabBranding(storeName, logoUrl);
+  }, [logoUrl, storeName]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -196,7 +218,23 @@ export function Login({
     <main className="login-page">
       <section className="login-story">
         <a href="/" className="brand">
-          <BookOpen />
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={storeName}
+              className="brand-logo-img"
+              style={{
+                height: 38,
+                maxHeight: 44,
+                width: "auto",
+                maxWidth: 150,
+                objectFit: "contain",
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <BookOpen />
+          )}
           <BrandText name={storeName} />
         </a>
         <div>
@@ -523,11 +561,13 @@ export function Portal({
   record,
   pendingOrders = 0,
   storeName = "Campus Bookstore",
+  logoUrl = null,
 }: {
   user: User;
   section?: string;
   record?: string;
   pendingOrders?: number;
+  logoUrl?: string | null;
   storeName?: string;
 }) {
   const isAdmin = user.role === "SUPER_ADMIN",
@@ -536,15 +576,25 @@ export function Portal({
   const title = nav.find((n) => n[0] === section)?.[1] || "Overview";
   const [pendingCount, setPendingCount] = useState(pendingOrders);
   const [currentStoreName, setCurrentStoreName] = useState(storeName);
+  const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(logoUrl ?? null);
 
   useEffect(() => {
     setCurrentStoreName(storeName);
+    setCurrentLogoUrl(logoUrl ?? null);
   }, [storeName]);
+
+  useEffect(() => {
+    syncTabBranding(currentStoreName, currentLogoUrl);
+  }, [currentLogoUrl, currentStoreName]);
 
   useEffect(() => {
     const handleSettingsUpdated = (e: any) => {
       if (e.detail?.store_name) {
         setCurrentStoreName(e.detail.store_name);
+      }
+      if (e.detail?.logo_url !== undefined) {
+        setCurrentLogoUrl(e.detail.logo_url || null);
+        syncTabBranding(e.detail.store_name || currentStoreName, e.detail.logo_url);
       }
     };
     window.addEventListener("store-settings-updated", handleSettingsUpdated);
@@ -606,7 +656,24 @@ export function Portal({
               whiteSpace: "nowrap",
             }}
           >
-            <BookOpen size={20} style={{ flexShrink: 0 }} />
+            {currentLogoUrl ? (
+              <img
+                src={currentLogoUrl}
+                alt={currentStoreName}
+                className="portal-brand-logo"
+                style={{
+                  height: 30,
+                  maxHeight: 34,
+                  width: "auto",
+                  maxWidth: 90,
+                  objectFit: "contain",
+                  borderRadius: 4,
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <BookOpen size={20} style={{ flexShrink: 0 }} />
+            )}
             <BrandText name={currentStoreName} />
           </a>
           <span className="portal-label">
@@ -11069,12 +11136,14 @@ function SettingsPage() {
     version: number;
   }>("manage/settings");
   const [form, setForm] = useState<any>(null),
+    [logoUploading, setLogoUploading] = useState(false),
     [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (data) {
       setForm({
         ...data.settings,
+        logo_url: data.settings.logo_url ?? "",
         support_email: data.settings.support_email || "Not Available",
         header_tagline: data.settings.header_tagline ?? "Your one-stop shop for educational books",
         distribution_center_address: data.settings.distribution_center_address ?? "Qanchi",
@@ -11089,6 +11158,31 @@ function SettingsPage() {
     }
   }, [data]);
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setLogoUploading(true);
+    try {
+      const r = await fetch("/api/covers", {
+        method: "POST",
+        headers: {
+          "Content-Type": f.type,
+          "X-Requested-With": "CampusBookstore",
+        },
+        body: f,
+      });
+      const d: any = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed to upload logo image");
+      setForm((prev: any) => ({ ...prev, logo_url: d.url }));
+      toast.success("Logo uploaded! Click 'Save System Configuration' to apply changes.");
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setLogoUploading(false);
+      e.target.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -11101,7 +11195,7 @@ function SettingsPage() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("store-settings-updated", {
-            detail: { store_name: form.store_name },
+            detail: { store_name: form.store_name, logo_url: form.logo_url },
           }),
         );
       }
@@ -11135,7 +11229,133 @@ function SettingsPage() {
           <div className="settings-group-panel">
             <div className="settings-group-header">
               <Globe size={18} className="settings-group-icon" />
-              <h3>GENERAL CONFIGURATION</h3>
+              <h3>GENERAL CONFIGURATION & BRANDING</h3>
+            </div>
+
+            {/* Logo Upload & Branding Section */}
+            <div
+              style={{
+                padding: "16px 18px",
+                borderRadius: 10,
+                background: "var(--muted)",
+                border: "1px solid var(--border)",
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                <div>
+                  <strong style={{ fontSize: "0.95rem", display: "block" }}>
+                    Website & Portal Brand Logo
+                  </strong>
+                  <p style={{ margin: "3px 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                    Upload your official institution or bookstore logo. It automatically updates across the storefront header, mobile drawer, footer, receipts, and admin/vendor portals.
+                  </p>
+                </div>
+                {form.logo_url && (
+                  <span
+                    className="mono-pill"
+                    style={{
+                      background: "rgba(34, 197, 94, 0.12)",
+                      color: "#15803d",
+                      fontSize: "0.74rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Custom Logo Active ✓
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+                {/* Live Preview Box */}
+                <div
+                  style={{
+                    width: 170,
+                    height: 72,
+                    borderRadius: 8,
+                    border: "2px dashed var(--border)",
+                    background: "var(--background)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 8,
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                  title={form.logo_url ? "Current brand logo preview" : "No custom logo uploaded"}
+                >
+                  {form.logo_url ? (
+                    <img
+                      src={form.logo_url}
+                      alt="Brand Logo Preview"
+                      style={{
+                        maxHeight: "100%",
+                        maxWidth: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--muted-foreground)", fontSize: "0.78rem" }}>
+                      <BookOpen size={20} />
+                      <span>Default Icon</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload & Action Buttons */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 220 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <label
+                      className="btn"
+                      style={{
+                        margin: 0,
+                        cursor: logoUploading ? "wait" : "pointer",
+                        opacity: logoUploading ? 0.7 : 1,
+                        fontSize: "0.84rem",
+                        padding: "7px 16px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Upload size={15} />
+                      <span>{logoUploading ? "Uploading Logo..." : form.logo_url ? "Change Logo" : "Upload Logo"}</span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        style={{ display: "none" }}
+                        disabled={logoUploading}
+                        onChange={handleLogoUpload}
+                      />
+                    </label>
+
+                    {form.logo_url && (
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{
+                          margin: 0,
+                          fontSize: "0.84rem",
+                          padding: "7px 14px",
+                          color: "var(--status-bad-text)",
+                          borderColor: "rgba(239, 68, 68, 0.3)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                        onClick={() => setForm({ ...form, logo_url: "" })}
+                        title="Revert back to default bookstore icon"
+                      >
+                        <Trash2 size={14} />
+                        <span>Remove Logo</span>
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)", lineHeight: 1.4 }}>
+                    Supported formats: PNG, JPG, WEBP, SVG. Transparent background with horizontal layout recommended.
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="form-grid">
               <Field

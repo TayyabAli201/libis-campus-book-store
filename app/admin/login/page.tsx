@@ -8,9 +8,11 @@ export const metadata = {
 
 export default async function Page() {
   let storeName = "Campus Bookstore";
+  let logoUrl: string | null = null;
   try {
     const { settings } = await getSettings();
     if (settings?.store_name) storeName = settings.store_name;
+    if (settings?.logo_url) logoUrl = settings.logo_url;
   } catch {}
-  return <Login portal="admin" storeName={storeName} />;
+  return <Login portal="admin" storeName={storeName} logoUrl={logoUrl} />;
 }

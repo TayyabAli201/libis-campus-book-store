@@ -36,6 +36,7 @@ export async function getSettings() {
   const raw = JSON.parse(r.value);
   const settings: StoreSettings = {
     store_name: raw.store_name || "Campus Bookstore",
+    logo_url: raw.logo_url || null,
     header_tagline: raw.header_tagline || "Your one-stop shop for educational books",
     whatsapp: raw.whatsapp || "03034049973",
     support_email: raw.support_email || "Not Available",

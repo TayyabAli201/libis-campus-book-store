@@ -266,6 +266,7 @@ export const checkoutInput = z
   });
 export const settingsInput = z.object({
   store_name: str(100),
+  logo_url: z.string().max(2000).optional().nullable(),
   header_tagline: z.string().max(250).optional().default("Your one-stop shop for educational books"),
   whatsapp: str(20).regex(/^[+0-9 ]+$/),
   support_email: z.string().max(150),

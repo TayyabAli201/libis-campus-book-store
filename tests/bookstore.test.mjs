@@ -40,8 +40,9 @@ registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { catalog, saveBook, importBooks, clearBooks, clearBooksPreview } =
+const { catalog, saveBook, importBooks, clearBooks, clearBooksPreview, getSettings } =
   await import("../lib/server/catalog.ts");
+const { upload } = await import("../lib/server/uploads.ts");
 const {
   priceCart,
   quote,
@@ -2697,4 +2698,80 @@ test("Vendor Ledger automatically credits actual courier delivery charges for Ot
   assert.equal(ledgerAfterRemove.summary.pending_balance, 420);
   assert.equal(ledgerAfterRemove.orders[0].actual_courier_charges, 0);
   assert.equal(ledgerAfterRemove.orders[0].total_credit, 420);
+});
+
+
+test("Site logo branding can be uploaded, saved in settings, and updated or cleared", async (t) => {
+  const sqlite = database(t);
+  const uploads = new Map();
+  env.BUCKET = {
+    put: async (key, val, meta) => {
+      uploads.set(key, { val, meta });
+    },
+    get: async (key) => {
+      const obj = uploads.get(key);
+      if (!obj) return null;
+      return { body: obj.val, httpMetadata: obj.meta?.httpMetadata };
+    },
+  };
+
+  const adminUser = {
+    id: "admin-logo-test",
+    email: "admin@example.com",
+    role: "SUPER_ADMIN",
+    permissions: ["settings.write", "settings.read", "books.write"],
+  };
+
+  // 1. Initial settings should have default/null logo
+  const initial = await getSettings();
+  assert.equal(initial.settings.logo_url, null);
+
+  // 2. Admin uploads a PNG brand logo
+  const adminSession = "logo-admin-session";
+  sqlite.exec("UPDATE users SET must_change=0 WHERE id='admin'");
+  sqlite
+    .prepare("INSERT INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)")
+    .run(hash(adminSession), "admin", Date.now() + 60000, "2026-01-01");
+
+  const pngHeader = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13]);
+  const logoReq = new Request("http://127.0.0.1:5173/api/covers", {
+    method: "POST",
+    headers: {
+      origin: "http://127.0.0.1:5173",
+      cookie: "cbs_admin_session=" + adminSession,
+      "content-type": "image/png",
+      "content-length": String(pngHeader.length),
+      "x-requested-with": "CampusBookstore",
+    },
+    body: pngHeader,
+  });
+
+  const uploadRes = await upload(logoReq, true);
+  assert.ok(uploadRes.url.startsWith("/api/covers/"));
+
+  // 3. Save settings with new logo_url
+  const updatedSettings = {
+    ...initial.settings,
+    logo_url: uploadRes.url,
+  };
+
+  sqlite.prepare("UPDATE settings SET value=?, version=version+1 WHERE id=1").run(
+    JSON.stringify(updatedSettings),
+  );
+
+  const reloaded = await getSettings();
+  assert.equal(reloaded.settings.logo_url, uploadRes.url);
+
+  // 4. Admin removes logo (revert to null/icon)
+  const clearedSettings = {
+    ...reloaded.settings,
+    logo_url: "",
+  };
+
+  sqlite.prepare("UPDATE settings SET value=?, version=version+1 WHERE id=1").run(
+    JSON.stringify(clearedSettings),
+  );
+
+  const afterClear = await getSettings();
+  assert.equal(afterClear.settings.logo_url, null);
 });

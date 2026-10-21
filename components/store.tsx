@@ -86,6 +86,7 @@ import {
 } from "./book-experience";
 import { StoreMotion } from "./store-motion";
 import { receiptDate, receiptPaymentNote } from "@/lib/receipt-format";
+import { syncTabBranding } from "./portal";
 import {
   api,
   Blank,
@@ -139,6 +140,12 @@ export function Store({
         .then(setData)
         .catch((e) => setError(errorText(e)));
   }, [initial, ready, cartIds, mode]);
+
+  useEffect(() => {
+    if (data?.settings) {
+      syncTabBranding(data.settings.store_name, data.settings.logo_url);
+    }
+  }, [data?.settings?.logo_url, data?.settings?.store_name]);
   return (
     <StoreMotion>
       <Header settings={data?.settings} />
@@ -201,7 +208,19 @@ function MaintenanceScreen({ settings }: { settings: StoreSettings }) {
     <section className="section maintenance-section">
       <div className="maintenance-card">
         <div className="maintenance-header-badge">
-          <AlertTriangle size={36} />
+          {settings.logo_url ? (
+            <img
+              src={settings.logo_url}
+              alt={settings.store_name || "Campus Bookstore"}
+              style={{
+                height: 52,
+                maxWidth: 160,
+                objectFit: "contain",
+              }}
+            />
+          ) : (
+            <AlertTriangle size={36} />
+          )}
         </div>
         <span className="maintenance-eyebrow">STOREFRONT TEMPORARILY OFFLINE</span>
         <h1 className="maintenance-title">{settings.store_name || "Campus Bookstore"}</h1>
@@ -298,7 +317,15 @@ function Header({ settings }: { settings?: StoreSettings }) {
       </a>
       <header className="store-header">
         <a className="brand" href="/">
-          <BookOpen />
+          {settings?.logo_url ? (
+            <img
+              src={settings.logo_url}
+              alt={storeName}
+              className="brand-logo-img"
+            />
+          ) : (
+            <BookOpen />
+          )}
           <div className="brand-text-wrap">
             <span className="brand-title">{storeName}</span>
             {settings?.header_tagline && (
@@ -2515,11 +2542,11 @@ export function printOrderReceiptSlip(order: any) {
     <header class="receipt-header">
       <div class="receipt-brand">
         <span class="receipt-brand-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          ${order.store?.logo_url ? `<img src="${escapeHtml(order.store.logo_url)}" alt="${escapeHtml(storeName)}" style="height:32px;max-width:120px;object-fit:contain;vertical-align:middle;" />` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`}
         </span>
         <div>
           <strong>${escapeHtml(storeName)}</strong>
-          <span>BOOKS FOR YOUR NEXT CHAPTER</span>
+          <span>${escapeHtml(order.store?.header_tagline || "BOOKS FOR YOUR NEXT CHAPTER")}</span>
         </div>
       </div>
       <span class="receipt-document-label">${order.tracking_only ? "ORDER SUMMARY" : "ORDER RECEIPT"}</span>
@@ -2689,11 +2716,24 @@ export function OrderReceipt({ o }: { o: any }) {
       <header className="receipt-header">
         <div className="receipt-brand">
           <span className="receipt-brand-icon">
-            <BookOpen size={23} />
+            {o.store?.logo_url ? (
+              <img
+                src={o.store.logo_url}
+                alt={storeName}
+                style={{
+                  height: 30,
+                  maxWidth: 120,
+                  objectFit: "contain",
+                  verticalAlign: "middle",
+                }}
+              />
+            ) : (
+              <BookOpen size={23} />
+            )}
           </span>
           <div>
             <strong>{storeName}</strong>
-            <span>BOOKS FOR YOUR NEXT CHAPTER</span>
+            <span>{o.store?.header_tagline || "BOOKS FOR YOUR NEXT CHAPTER"}</span>
           </div>
         </div>
         <span className="receipt-document-label">
@@ -3792,7 +3832,15 @@ function Footer({ data }: { data: Catalog }) {
         <div>
           <a className="footer-brand-logo" href="/">
             <span className="footer-logo-icon">
-              <BookOpen size={20} />
+              {s.logo_url ? (
+                <img
+                  src={s.logo_url}
+                  alt={storeName}
+                  className="footer-logo-img"
+                />
+              ) : (
+                <BookOpen size={20} />
+              )}
             </span>
             <span className="footer-logo-text">{storeName.toUpperCase()}</span>
           </a>

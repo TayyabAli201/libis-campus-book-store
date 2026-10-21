@@ -4642,6 +4642,51 @@ footer {
   }
 }
 
+/* Brand Logo Responsiveness across Storefront & Portals */
+.brand-logo-img {
+  height: 38px;
+  max-height: 42px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
+.footer-logo-img {
+  height: 28px;
+  max-height: 32px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
+.portal-brand-logo {
+  height: 30px;
+  max-height: 34px;
+  width: auto;
+  max-width: 90px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 4px;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .brand-logo-img {
+    height: 32px;
+    max-height: 36px;
+    max-width: 120px;
+  }
+  .portal-brand-logo {
+    height: 26px;
+    max-height: 28px;
+    max-width: 75px;
+  }
+}
+
 /* Maintenance Mode Screen Styling */
 .maintenance-section {
   display: flex;

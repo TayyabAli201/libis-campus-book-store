@@ -413,8 +413,22 @@ export async function getOrder(
   delete o.owner;
   delete o.tracking_hash;
   delete o.quote_id;
-  o.store = JSON.parse(o.store_snapshot);
+  try {
+    o.store = JSON.parse(o.store_snapshot);
+  } catch {
+    o.store = {};
+  }
   delete o.store_snapshot;
+  if (!o.store.logo_url) {
+    try {
+      const { settings: curSettings } = await getSettings();
+      if (curSettings?.logo_url) o.store.logo_url = curSettings.logo_url;
+      if (!o.store.store_name && curSettings?.store_name)
+        o.store.store_name = curSettings.store_name;
+      if (!o.store.header_tagline && curSettings?.header_tagline)
+        o.store.header_tagline = curSettings.header_tagline;
+    } catch {}
+  }
 
   if (u?.role === "VENDOR") {
     const v = await one<any>(

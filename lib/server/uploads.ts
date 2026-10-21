@@ -29,8 +29,23 @@ export function detectMime(b: Uint8Array) {
     return "image/png";
   if (b.length > 3 && b[0] === 255 && b[1] === 216 && b[2] === 255)
     return "image/jpeg";
+  if (
+    b.length > 12 &&
+    b[0] === 82 && b[1] === 73 && b[2] === 70 && b[3] === 70 &&
+    b[8] === 87 && b[9] === 69 && b[10] === 66 && b[11] === 80
+  )
+    return "image/webp";
+  if (
+    b.length > 6 &&
+    b[0] === 71 && b[1] === 73 && b[2] === 70 && b[3] === 56 &&
+    (b[4] === 55 || b[4] === 57) && b[5] === 97
+  )
+    return "image/gif";
   if (new TextDecoder().decode(b.slice(0, 5)) === "%PDF-")
     return "application/pdf";
+  const strStart = new TextDecoder().decode(b.slice(0, Math.min(b.length, 256))).trim().toLowerCase();
+  if (strStart.startsWith("<svg") || (strStart.startsWith("<?xml") && strStart.includes("<svg")))
+    return "image/svg+xml";
   return null;
 }
 async function readBounded(req: Request, max: number) {
@@ -126,11 +141,28 @@ export async function upload(req: Request, cover = false) {
     mime === "image/jpeg" &&
     (headerType === "image/jpeg" || headerType === "image/jpg");
   const isPng = mime === "image/png" && headerType === "image/png";
+  const isWebp = mime === "image/webp" && headerType === "image/webp";
+  const isSvg = mime === "image/svg+xml" && (headerType === "image/svg+xml" || headerType === "image/svg");
+  const isGif = mime === "image/gif" && headerType === "image/gif";
 
-  if (!mime || (!isJpeg && !isPng)) {
+  if (!mime) {
+    throw new AppError(
+      415,
+      !cover
+        ? "Only picture uploads (JPEG, JPG, PNG) are allowed. PDF and other file formats are not accepted."
+        : "Only image uploads (JPEG, PNG, WEBP, SVG, GIF) are allowed.",
+    );
+  }
+  if (!cover && !isJpeg && !isPng) {
     throw new AppError(
       415,
       "Only picture uploads (JPEG, JPG, PNG) are allowed. PDF and other file formats are not accepted.",
+    );
+  }
+  if (cover && !isJpeg && !isPng && !isWebp && !isSvg && !isGif) {
+    throw new AppError(
+      415,
+      "Only image uploads (JPEG, PNG, WEBP, SVG, GIF) are allowed.",
     );
   }
   const id = uid(),

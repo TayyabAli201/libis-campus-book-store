@@ -10,6 +10,25 @@ export async function receipt(o: any) {
   doc.setSubject("Order receipt");
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  let embeddedLogo: any = null;
+  if (o.store?.logo_url && typeof o.store.logo_url === "string" && o.store.logo_url.startsWith("/api/covers/")) {
+    try {
+      const { bucket } = await import("./db");
+      const id = o.store.logo_url.replace("/api/covers/", "").split("?")[0];
+      const obj = await bucket().get("covers/" + id);
+      if (obj) {
+        const buf = await obj.arrayBuffer();
+        try {
+          embeddedLogo = await doc.embedPng(buf);
+        } catch {
+          try {
+            embeddedLogo = await doc.embedJpg(buf);
+          } catch {}
+        }
+      }
+    } catch {}
+  }
   const width = 595.28,
     height = 841.89,
     margin = 44,
@@ -112,8 +131,25 @@ export async function receipt(o: any) {
     });
   const header = (continued = false) => {
     page.drawRectangle({ x: 0, y: height - 8, width, height: 8, color: blue });
-    const brand = wrap(storeName, 340, 20, bold);
-    const brandHeight = lines(brand, margin, height - 43, 20, true, blue);
+    let textX = margin;
+    let availableWidth = 340;
+    if (embeddedLogo) {
+      const maxW = 75;
+      const maxH = 32;
+      const scale = Math.min(maxW / embeddedLogo.width, maxH / embeddedLogo.height);
+      const imgW = embeddedLogo.width * scale;
+      const imgH = embeddedLogo.height * scale;
+      page.drawImage(embeddedLogo, {
+        x: margin,
+        y: height - 48 - (imgH / 2),
+        width: imgW,
+        height: imgH,
+      });
+      textX = margin + imgW + 10;
+      availableWidth = Math.max(180, 340 - (imgW + 10));
+    }
+    const brand = wrap(storeName, availableWidth, 18, bold);
+    const brandHeight = lines(brand, textX, height - 41, 18, true, blue);
     right("ORDER RECEIPT", width - margin, height - 49, 9, true, blue);
     right(
       continued ? "CONTINUED" : "CUSTOMER COPY",

@@ -100,6 +100,7 @@ export async function PortalPage({
     getSettings().catch(() => null),
   ]);
   const storeName = settingsRes?.settings?.store_name || "Campus Bookstore";
+  const logoUrl = settingsRes?.settings?.logo_url || null;
   return (
     <Portal
       user={u}
@@ -107,6 +108,7 @@ export async function PortalPage({
       record={segments[1]}
       pendingOrders={pendingOrders}
       storeName={storeName}
+      logoUrl={logoUrl}
     />
   );
 }
