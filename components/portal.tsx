@@ -7822,6 +7822,16 @@ function Orders({
 
             const orderItems: any[] = o.items || [];
             const pendingItems = orderItems.filter((it: any) => !it.received_from_vendor);
+            const pendingTooltip =
+              pendingItems.length > 0
+                ? `Pending from Vendor (${pendingItems.length} books):\n${pendingItems
+                    .map(
+                      (p: any) =>
+                        `• [${p.code}] ${p.title || "Book"}${p.quantity > 1 ? ` × ${p.quantity}` : ""}`,
+                    )
+                    .join("\n")}`
+                : "";
+
             const booksCell = (
               <div
                 style={{
@@ -7829,18 +7839,17 @@ function Orders({
                   flexDirection: "column",
                   gap: 3,
                   cursor: orderItems.length > 0 ? "help" : "default",
-                  whiteSpace: "nowrap",
+                  minWidth: 150,
+                  maxWidth: 240,
                 }}
                 title={booksTooltip}
               >
-                <div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
                   <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
                     {booksCount === 1 ? "book" : "books"}
                   </span>
-                </div>
-                {isPartiallyDelivered && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
+                  {isPartiallyDelivered && (
                     <span
                       className="mono-pill"
                       style={{
@@ -7849,11 +7858,66 @@ function Orders({
                         background: "rgba(245, 158, 11, 0.15)",
                         color: "#b45309",
                         border: "1px solid #fde68a",
-                        width: "fit-content",
+                        padding: "1px 6px",
+                        borderRadius: 9999,
                       }}
-                      title={`${rcvdItemsCount} of ${booksCount} books delivered by vendor. ${booksCount - rcvdItemsCount} pending.`}
+                      title={`${rcvdItemsCount} of ${booksCount} books received at office. ${booksCount - rcvdItemsCount} still pending from vendor.`}
                     >
-                      ⚠️ {rcvdItemsCount}/{booksCount} Rcvd
+                      {rcvdItemsCount}/{booksCount} Rcvd
+                    </span>
+                  )}
+                  {isAllDelivered && booksCount > 1 && (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        background: "rgba(22, 163, 74, 0.12)",
+                        color: "#15803d",
+                        border: "1px solid #86efac",
+                        padding: "1px 6px",
+                        borderRadius: 9999,
+                      }}
+                      title={`All ${booksCount} books received from vendor`}
+                    >
+                      ✓ All Rcvd
+                    </span>
+                  )}
+                </div>
+
+                {isPartiallyDelivered && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      flexWrap: "wrap",
+                      marginTop: 1,
+                    }}
+                    title={pendingTooltip}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        color: "#dc2626",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: "50%",
+                          background: "#dc2626",
+                          display: "inline-block",
+                        }}
+                      />
+                      Pending:
                     </span>
                     {pendingItems.map((p: any) => (
                       <span
@@ -7861,38 +7925,43 @@ function Orders({
                         className="mono-pill"
                         style={{
                           fontSize: "0.68rem",
-                          fontWeight: 600,
-                          background: "rgba(239, 68, 68, 0.10)",
+                          fontWeight: 700,
+                          fontFamily: "var(--font-mono, monospace)",
+                          background: "rgba(239, 68, 68, 0.08)",
                           color: "#dc2626",
-                          border: "1px solid #fca5a5",
-                          padding: "1px 6px",
-                          width: "fit-content",
-                          whiteSpace: "normal",
-                          maxWidth: 220,
-                          lineHeight: 1.25,
+                          border: "1px solid rgba(239, 68, 68, 0.28)",
+                          padding: "1px 5px",
+                          borderRadius: 4,
+                          cursor: "help",
+                          whiteSpace: "nowrap",
                         }}
-                        title={`Pending from vendor: ${p.code} - ${p.title || ""}`}
+                        title={`${p.code}: ${p.title || "Book"}${p.quantity > 1 ? ` (Qty: ${p.quantity})` : ""}`}
                       >
-                        ⏳ Pending: <strong>{p.code}</strong>{p.title ? ` (${p.title.length > 20 ? p.title.slice(0, 18) + "…" : p.title})` : ""}
+                        {p.code}
+                        {p.quantity > 1 && (
+                          <span style={{ opacity: 0.7, fontWeight: 500, marginLeft: 2 }}>
+                            ×{p.quantity}
+                          </span>
+                        )}
                       </span>
                     ))}
+                    {pendingItems.length === 1 && pendingItems[0]?.title && (
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          color: "var(--muted-foreground)",
+                          maxWidth: 130,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          display: "inline-block",
+                        }}
+                        title={pendingItems[0].title}
+                      >
+                        {pendingItems[0].title}
+                      </span>
+                    )}
                   </div>
-                )}
-                {isAllDelivered && booksCount > 1 && (
-                  <span
-                    className="mono-pill"
-                    style={{
-                      fontSize: "0.68rem",
-                      fontWeight: 700,
-                      background: "rgba(22, 163, 74, 0.12)",
-                      color: "#15803d",
-                      border: "1px solid #86efac",
-                      width: "fit-content",
-                    }}
-                    title={`All ${booksCount} books received from vendor`}
-                  >
-                    ✓ All {booksCount} Rcvd
-                  </span>
                 )}
               </div>
             );
@@ -7915,11 +7984,12 @@ function Orders({
                     display: "inline-flex",
                     flexDirection: "column",
                     gap: 3,
-                    whiteSpace: "nowrap",
+                    minWidth: 150,
+                    maxWidth: 240,
                   }}
                   title={booksTooltip}
                 >
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <span
                       className="mono-pill"
                       style={{
@@ -7948,22 +8018,65 @@ function Orders({
                     )}
                   </div>
                   {vIsPartial && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        flexWrap: "wrap",
+                        marginTop: 1,
+                      }}
+                      title={`Office received ${vRcvdCount} of ${orderItems.length} books. Waiting for delivery: ${vPendingItems.map((p: any) => p.code).join(", ")}`}
+                    >
                       <span
-                        className="mono-pill"
                         style={{
                           fontSize: "0.68rem",
                           fontWeight: 700,
-                          background: "rgba(239, 68, 68, 0.12)",
                           color: "#dc2626",
-                          border: "1px solid #fca5a5",
-                          padding: "1px 6px",
-                          width: "fit-content",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.02em",
                         }}
-                        title={`Office received ${vRcvdCount} of ${orderItems.length} books. ${vPendingItems.map((p: any) => p.code).join(", ")} still pending.`}
                       >
-                        ⚠️ Pending at Office: {vPendingItems.map((p: any) => p.code).join(", ")}
+                        <span
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: "50%",
+                            background: "#dc2626",
+                            display: "inline-block",
+                          }}
+                        />
+                        Pending:
                       </span>
+                      {vPendingItems.map((p: any) => (
+                        <span
+                          key={p.id || p.code}
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            fontFamily: "var(--font-mono, monospace)",
+                            background: "rgba(239, 68, 68, 0.08)",
+                            color: "#dc2626",
+                            border: "1px solid rgba(239, 68, 68, 0.28)",
+                            padding: "1px 5px",
+                            borderRadius: 4,
+                            cursor: "help",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={`${p.code}: ${p.title || "Book"}${p.quantity > 1 ? ` (Qty: ${p.quantity})` : ""}`}
+                        >
+                          {p.code}
+                          {p.quantity > 1 && (
+                            <span style={{ opacity: 0.7, fontWeight: 500, marginLeft: 2 }}>
+                              ×{p.quantity}
+                            </span>
+                          )}
+                        </span>
+                      ))}
                     </div>
                   )}
                   {vIsAllRcvd && (
@@ -7977,6 +8090,7 @@ function Orders({
                         border: "1px solid #86efac",
                         padding: "1px 6px",
                         width: "fit-content",
+                        borderRadius: 9999,
                       }}
                       title="All books in this order have been received by the Bookstore Office"
                     >
