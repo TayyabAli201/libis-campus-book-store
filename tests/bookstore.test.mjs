@@ -3197,3 +3197,142 @@ test("Vendor Remove from Printing: requires mandatory reason and unassigns vendo
   assert.equal(reassignedOrder.status, "PROCESSING");
   assert.equal(reassignedOrder.vendor_id, vRes2.vendor.id);
 });
+
+test("Vendor Pending Books Checklist: clean format, shortage vs printing breakdown, excludes other city orders, and hides received books", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/orders");
+  const adminUser = { id: "admin", email: "admin@vu.edu.pk", role: "SUPER_ADMIN", permissions: ["orders.update", "orders.manage"] };
+
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Checklist Test Press",
+    phone: "03450001122",
+    email: "chkpress@example.com",
+    password: "Password123!",
+  });
+  const vendorId = vRes.vendor.id;
+  const vendorUser = { id: vRes.vendor.user_id, vendor_id: vendorId, email: "chkpress@example.com", role: "VENDOR" };
+
+  const { id: bCs101 } = await saveBook(bookInput("CS101", { title: "Introduction to Computing", pages: 120 }), adminUser, request);
+  const { id: bMth101 } = await saveBook(bookInput("MTH101", { title: "Calculus And Analytical Geometry", pages: 200 }), adminUser, request);
+  const { id: bEng101 } = await saveBook(bookInput("ENG101", { title: "English Comprehension", pages: 150 }), adminUser, request);
+
+  // Helper to place, approve, and assign order
+  async function placeAndAssign(cartData) {
+    const q = await quote(request, cartData);
+    const slip = crypto.randomUUID();
+    sqlite
+      .prepare(
+        "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+      )
+      .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+    const placed = await submitOrder(request, q.id, slip);
+    const ord = await getOrder(request, placed.id, adminUser);
+    await decidePayment(request, adminUser, placed.id, "approve", "Approved", ord.version);
+    await assignOrderToVendor(testReq, adminUser, placed.id, vendorId);
+    return placed.id;
+  }
+
+  // 1. Order 1: Campus Order (3x CS101) -> Still in Printing Queue (not dispatched)
+  const o1Id = await placeAndAssign({
+    name: "Campus Student",
+    phone: "03001112233",
+    address: "Campus Pick",
+    city: "Lahore",
+    delivery_type: "campus",
+    campus_id: null,
+    items: [{ id: bCs101, code: "CS101", quantity: 3 }],
+  });
+
+  // 2. Order 2: Lahore Order (2x MTH101, 1x ENG101) -> Dispatched by vendor to campus
+  const o2Id = await placeAndAssign({
+    name: "Lahore Student",
+    phone: "03002223344",
+    address: "Gulberg, Lahore",
+    city: "Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: bMth101, code: "MTH101", quantity: 2 },
+      { id: bEng101, code: "ENG101", quantity: 1 },
+    ],
+  });
+
+  // Vendor clicks "Send to Campus" for Order 2
+  await vendorDispatchOffice(testReq, vendorUser, o2Id);
+
+  // Admin marks ENG101 as received at office, but MTH101 is missing from box (remains received_from_vendor = 0)
+  const o2Details = await getOrder(request, o2Id, adminUser);
+  const eng101Item = o2Details.items.find(i => i.code === "ENG101");
+  const mth101Item = o2Details.items.find(i => i.code === "MTH101");
+  await toggleOrderItemReceived(testReq, adminUser, o2Id, eng101Item.id, true);
+
+  // 3. Order 3: Other City Courier Order (5x CS101) -> Directly shipped to customer, MUST BE EXCLUDED from campus checklist
+  const o3Id = await placeAndAssign({
+    name: "Other City Student",
+    phone: "03003334455",
+    address: "Canal Road, Faisalabad",
+    city: "Faisalabad",
+    delivery_type: "other",
+    campus_id: null,
+    items: [{ id: bCs101, code: "CS101", quantity: 5 }],
+  });
+
+  // 4. Fetch Pending Books Checklist for Vendor
+  const pendingRes = await getVendorPendingBooks(adminUser, vendorId);
+  assert.equal(pendingRes.ok, true);
+  assert.equal(pendingRes.totalPendingQty, 5); // 3x CS101 (printing) + 2x MTH101 (shortage), Order 3 excluded!
+  assert.equal(pendingRes.totalShortageQty, 2);
+  assert.equal(pendingRes.totalPrintingQty, 3);
+  assert.equal(pendingRes.totalPendingTitles, 2);
+
+  // Check individual book items
+  const cs101Summary = pendingRes.pendingBooks.find(b => b.code === "CS101");
+  assert.ok(cs101Summary);
+  assert.equal(cs101Summary.totalQty, 3);
+  assert.equal(cs101Summary.printingQty, 3);
+  assert.equal(cs101Summary.shortageQty, 0);
+
+  const mth101Summary = pendingRes.pendingBooks.find(b => b.code === "MTH101");
+  assert.ok(mth101Summary);
+  assert.equal(mth101Summary.totalQty, 2);
+  assert.equal(mth101Summary.shortageQty, 2);
+  assert.equal(mth101Summary.printingQty, 0);
+
+  // ENG101 is received, so it must not be in pendingBooks
+  const eng101Summary = pendingRes.pendingBooks.find(b => b.code === "ENG101");
+  assert.equal(eng101Summary, undefined);
+
+  // 5. Verify WhatsApp Message formatting
+  const msg = pendingRes.whatsappMessage;
+  // Must NOT include order references like QA- or VU-
+  assert.equal(msg.includes("QA-"), false);
+  assert.equal(msg.includes("VU-"), false);
+  assert.equal(msg.includes("[VU-"), false);
+
+  // Must include Shortage and Printing sections
+  assert.ok(msg.includes("🔴 *Office Shortage (Missing / Not Received):*"));
+  assert.ok(msg.includes("🟡 *In Printing (Not Sent to Campus Yet):*"));
+
+  // Check exact 3-column bullet format: "1.      *CODE*     Title       *Qty*"
+  assert.match(msg, /1\.\s+\*MTH101\*\s+Calculus And Analytical Geometry\s+\*2\*/);
+  assert.match(msg, /1\.\s+\*CS101\*\s+Introduction to Computing\s+\*3\*/);
+
+  // 6. When Admin receives missing MTH101 at office -> it disappears from shortage list
+  await toggleOrderItemReceived(testReq, adminUser, o2Id, mth101Item.id, true);
+  const updatedPending = await getVendorPendingBooks(adminUser, vendorId);
+  assert.equal(updatedPending.totalShortageQty, 0);
+  assert.equal(updatedPending.totalPendingQty, 3); // Only CS101 remains in printing
+  assert.equal(updatedPending.whatsappMessage.includes("Office Shortage"), false);
+  assert.ok(updatedPending.whatsappMessage.includes("In Printing"));
+
+  // 7. When Vendor dispatches Order 1 and Admin marks CS101 received -> checklist is completely empty!
+  await vendorDispatchOffice(testReq, vendorUser, o1Id);
+  const o1Details = await getOrder(request, o1Id, adminUser);
+  const cs101Item = o1Details.items.find(i => i.code === "CS101");
+  await toggleOrderItemReceived(testReq, adminUser, o1Id, cs101Item.id, true);
+
+  const emptyPending = await getVendorPendingBooks(adminUser, vendorId);
+  assert.equal(emptyPending.totalPendingQty, 0);
+  assert.equal(emptyPending.pendingBooks.length, 0);
+  assert.ok(emptyPending.whatsappMessage.includes("All pending books for Campus have been received"));
+});

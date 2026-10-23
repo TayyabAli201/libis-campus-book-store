@@ -9963,11 +9963,21 @@ function VendorPendingBooksModal({
     `manage/vendor-pending-books?vendor_id=${vendor.id}`
   );
 
+  const [filterTab, setFilterTab] = useState<"ALL" | "SHORTAGE" | "PRINTING">("ALL");
+
   const pendingBooks: any[] = data?.pendingBooks || [];
   const totalQty = data?.totalPendingQty ?? 0;
+  const totalShortageQty = data?.totalShortageQty ?? 0;
+  const totalPrintingQty = data?.totalPrintingQty ?? 0;
   const totalTitles = data?.totalPendingTitles ?? 0;
   const whatsappUrl = data?.whatsappUrl;
   const whatsappMessage = data?.whatsappMessage || "";
+
+  const filteredBooks = pendingBooks.filter((b) => {
+    if (filterTab === "SHORTAGE") return (b.shortageQty || 0) > 0;
+    if (filterTab === "PRINTING") return (b.printingQty || 0) > 0;
+    return true;
+  });
 
   const copyToClipboard = () => {
     if (!whatsappMessage) return;
@@ -9999,7 +10009,7 @@ function VendorPendingBooksModal({
                 Pending Books Checklist — {vendor.name}
               </DialogTitle>
               <DialogDescription style={{ fontSize: "0.82rem", marginTop: 2 }}>
-                Consolidated summary of books currently waiting for intake at Bookstore Office
+                Books pending for Campus & Lahore orders (excluding Other City courier parcels)
               </DialogDescription>
             </div>
           </div>
@@ -10018,41 +10028,79 @@ function VendorPendingBooksModal({
             >
               <CheckCircle2 size={36} color="#16a34a" style={{ margin: "0 auto 8px" }} />
               <strong style={{ display: "block", color: "#15803d", fontSize: "1rem" }}>
-                All Books Received!
+                All Campus Books Received!
               </strong>
               <p className="small-text muted" style={{ marginTop: 4 }}>
-                There are no pending books waiting from {vendor.name}. All active orders are fulfilled.
+                There are no pending books waiting from {vendor.name} for Campus. All batches fulfilled.
               </p>
             </div>
           ) : (
             <div className="stack" style={{ gap: 14 }}>
-              {/* Summary Stats Pill Banner */}
+              {/* Filter Tabs / Pills */}
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 10,
                   background: "var(--muted)",
                   padding: "10px 14px",
                   borderRadius: 8,
-                  fontSize: "0.85rem",
                 }}
               >
-                <div>
-                  <span className="muted">Total Pending Books: </span>
-                  <strong style={{ color: "#d97706", fontSize: "1rem" }}>
-                    {totalQty} {totalQty === 1 ? "copy" : "copies"}
-                  </strong>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className={`btn compact ${filterTab === "ALL" ? "primary" : ""}`}
+                    style={{ fontSize: "0.78rem", padding: "3px 10px", borderRadius: 9999 }}
+                    onClick={() => setFilterTab("ALL")}
+                  >
+                    All Pending ({totalQty})
+                  </button>
+                  {totalShortageQty > 0 && (
+                    <button
+                      type="button"
+                      className="btn compact"
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "3px 10px",
+                        borderRadius: 9999,
+                        background: filterTab === "SHORTAGE" ? "#dc2626" : "rgba(239, 68, 68, 0.12)",
+                        color: filterTab === "SHORTAGE" ? "#fff" : "#dc2626",
+                        borderColor: filterTab === "SHORTAGE" ? "#dc2626" : "rgba(239, 68, 68, 0.3)",
+                        fontWeight: 700,
+                      }}
+                      onClick={() => setFilterTab("SHORTAGE")}
+                    >
+                      🔴 Office Shortage ({totalShortageQty})
+                    </button>
+                  )}
+                  {totalPrintingQty > 0 && (
+                    <button
+                      type="button"
+                      className="btn compact"
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "3px 10px",
+                        borderRadius: 9999,
+                        background: filterTab === "PRINTING" ? "#d97706" : "rgba(245, 158, 11, 0.12)",
+                        color: filterTab === "PRINTING" ? "#fff" : "#b45309",
+                        borderColor: filterTab === "PRINTING" ? "#d97706" : "rgba(245, 158, 11, 0.3)",
+                        fontWeight: 600,
+                      }}
+                      onClick={() => setFilterTab("PRINTING")}
+                    >
+                      🟡 In Printing ({totalPrintingQty})
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <span className="muted">Across: </span>
-                  <strong style={{ color: "var(--foreground)" }}>
-                    {totalTitles} {totalTitles === 1 ? "title" : "titles"}
-                  </strong>
+                <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                  Across <strong>{totalTitles}</strong> course title{totalTitles !== 1 ? "s" : ""}
                 </div>
               </div>
 
-              {/* Table of Pending Books */}
+              {/* Table of Pending Books (No order references, clean 4 columns) */}
               <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead>
@@ -10060,52 +10108,78 @@ function VendorPendingBooksModal({
                       <th style={{ padding: "8px 10px", width: 35 }}>#</th>
                       <th style={{ padding: "8px 10px", width: 90 }}>Code</th>
                       <th style={{ padding: "8px 10px" }}>Title / Course</th>
-                      <th style={{ padding: "8px 10px", textAlign: "center", width: 70 }}>Qty</th>
-                      <th style={{ padding: "8px 10px", width: 140 }}>Order(s)</th>
+                      <th style={{ padding: "8px 10px", width: 140 }}>Status / Category</th>
+                      <th style={{ padding: "8px 10px", textAlign: "right", width: 70 }}>Qty</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingBooks.map((b: any, idx: number) => (
-                      <tr
-                        key={b.code + idx}
-                        style={{
-                          borderBottom: idx < pendingBooks.length - 1 ? "1px solid var(--border)" : "none",
-                          background: idx % 2 === 0 ? "transparent" : "var(--muted)",
-                        }}
-                      >
-                        <td style={{ padding: "7px 10px", color: "var(--muted-foreground)" }}>{idx + 1}</td>
-                        <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
-                          <span
-                            className="mono-pill"
-                            style={{
-                              fontWeight: 700,
-                              fontSize: "0.76rem",
-                              background: "rgba(37, 99, 235, 0.10)",
-                              color: "var(--primary)",
-                            }}
-                          >
-                            {b.code}
-                          </span>
-                        </td>
-                        <td style={{ padding: "7px 10px", fontWeight: 500 }}>{b.title || "—"}</td>
-                        <td style={{ padding: "7px 10px", textAlign: "center" }}>
-                          <span
-                            className="mono-pill"
-                            style={{
-                              fontWeight: 700,
-                              background: "rgba(245, 158, 11, 0.15)",
-                              color: "#b45309",
-                              padding: "2px 7px",
-                            }}
-                          >
-                            ×{b.totalQty}
-                          </span>
-                        </td>
-                        <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "var(--muted-foreground)" }}>
-                          {b.orders.join(", ")}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredBooks.map((b: any, idx: number) => {
+                      const isShortage = (b.shortageQty || 0) > 0;
+                      const isPrinting = (b.printingQty || 0) > 0;
+                      return (
+                        <tr
+                          key={b.code + idx}
+                          style={{
+                            borderBottom: idx < filteredBooks.length - 1 ? "1px solid var(--border)" : "none",
+                            background: isShortage
+                              ? "rgba(239, 68, 68, 0.04)"
+                              : idx % 2 === 0
+                                ? "transparent"
+                                : "var(--muted)",
+                          }}
+                        >
+                          <td style={{ padding: "7px 10px", color: "var(--muted-foreground)" }}>{idx + 1}</td>
+                          <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
+                            <span
+                              className="mono-pill"
+                              style={{
+                                fontWeight: 700,
+                                fontSize: "0.76rem",
+                                background: isShortage ? "rgba(239, 68, 68, 0.12)" : "rgba(37, 99, 235, 0.10)",
+                                color: isShortage ? "#dc2626" : "var(--primary)",
+                              }}
+                            >
+                              {b.code}
+                            </span>
+                          </td>
+                          <td style={{ padding: "7px 10px", fontWeight: 500 }}>{b.title || "—"}</td>
+                          <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
+                            {isShortage && isPrinting ? (
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                <span className="mono-pill" style={{ background: "rgba(239, 68, 68, 0.15)", color: "#dc2626", fontWeight: 700, fontSize: "0.70rem", padding: "1px 6px" }}>
+                                  🔴 Shortage: {b.shortageQty}
+                                </span>
+                                <span className="mono-pill" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#b45309", fontWeight: 600, fontSize: "0.70rem", padding: "1px 6px" }}>
+                                  🟡 Printing: {b.printingQty}
+                                </span>
+                              </div>
+                            ) : isShortage ? (
+                              <span className="mono-pill" style={{ background: "rgba(239, 68, 68, 0.15)", color: "#dc2626", fontWeight: 700, fontSize: "0.72rem", padding: "2px 7px" }}>
+                                🔴 Office Shortage ({b.shortageQty})
+                              </span>
+                            ) : (
+                              <span className="mono-pill" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#b45309", fontWeight: 600, fontSize: "0.72rem", padding: "2px 7px" }}>
+                                🟡 In Printing
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                            <span
+                              className="mono-pill"
+                              style={{
+                                fontWeight: 800,
+                                fontSize: "0.82rem",
+                                background: isShortage ? "rgba(239, 68, 68, 0.15)" : "rgba(37, 99, 235, 0.12)",
+                                color: isShortage ? "#dc2626" : "#1d4ed8",
+                                padding: "2px 8px",
+                              }}
+                            >
+                              {b.totalQty}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

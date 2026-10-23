@@ -848,15 +848,17 @@ export async function getVendorPendingBooks(
     `SELECT 
       oi.code,
       oi.title,
-      SUM(oi.quantity) as total_qty,
-      GROUP_CONCAT(DISTINCT COALESCE(o.reference, o.id)) as orders
+      SUM(CASE WHEN o.vendor_dispatched_at IS NOT NULL THEN oi.quantity ELSE 0 END) AS shortage_qty,
+      SUM(CASE WHEN o.vendor_dispatched_at IS NULL THEN oi.quantity ELSE 0 END) AS printing_qty,
+      SUM(oi.quantity) AS total_qty
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     WHERE o.vendor_id = ? 
+      AND (o.delivery_type != 'other' OR o.delivery_type IS NULL)
       AND o.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED')
       AND oi.received_from_vendor = 0
     GROUP BY oi.code, oi.title
-    ORDER BY oi.code ASC`,
+    ORDER BY shortage_qty DESC, oi.code ASC`,
     targetVendorId,
   );
 
@@ -864,10 +866,13 @@ export async function getVendorPendingBooks(
     code: r.code,
     title: r.title || "",
     totalQty: Number(r.total_qty || 0),
-    orders: (r.orders || "").split(",").map((s: string) => s.trim()).filter(Boolean),
+    shortageQty: Number(r.shortage_qty || 0),
+    printingQty: Number(r.printing_qty || 0),
   }));
 
   const totalPendingQty = pendingList.reduce((sum: number, item: any) => sum + item.totalQty, 0);
+  const totalShortageQty = pendingList.reduce((sum: number, item: any) => sum + item.shortageQty, 0);
+  const totalPrintingQty = pendingList.reduce((sum: number, item: any) => sum + item.printingQty, 0);
   const totalPendingTitles = pendingList.length;
 
   const whatsappMessage = getVendorPendingBooksWhatsAppMessage(vendor.name, pendingList);
@@ -883,6 +888,8 @@ export async function getVendorPendingBooks(
     },
     pendingBooks: pendingList,
     totalPendingQty,
+    totalShortageQty,
+    totalPrintingQty,
     totalPendingTitles,
     whatsappMessage,
     whatsappUrl,

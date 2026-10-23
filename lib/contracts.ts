@@ -465,25 +465,71 @@ export function getStudentRefundWhatsAppUrl(
 
 export function getVendorPendingBooksWhatsAppMessage(
   vendorName: string,
-  pendingList: Array<{ code: string; title?: string; totalQty: number; orders: string[] }>,
+  pendingList: Array<{
+    code: string;
+    title?: string;
+    totalQty: number;
+    shortageQty?: number;
+    printingQty?: number;
+    orders?: string[];
+  }>,
 ): string {
   const name = (vendorName || "Vendor").trim();
   const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
-  const lines = pendingList.map((p, idx) => {
-    const ordersStr = p.orders.length > 0 ? ` [${p.orders.join(", ")}]` : "";
-    return `${idx + 1}. *${p.code}* - ${p.totalQty} cop${p.totalQty === 1 ? "y" : "ies"}${p.title ? ` (${p.title})` : ""}${ordersStr}`;
-  }).join("\n");
+  if (!pendingList || pendingList.length === 0) {
+    return `Assalam-o-Alaikum ${name}!
 
-  return `Salam ${name}!
+*Pending Books Checklist — Campus Bookstore (${dateStr}):*
 
-*Pending Books Checklist (${dateStr}):*
-Campus Bookstore Office mein aap ki taraf se mandarja zail books abhi tak pending / not received hain:
+✅ All pending books for Campus have been received at Bookstore Office. Koi pending book baqi nahi hai.
 
-${lines}
+Shukriya — Campus Bookstore Office`;
+  }
 
-Baraye meharbani yeh remaining books jald print kar ke deliver/dispatch karwayen.
-Shukriya - Campus Bookstore Office`;
+  const totalCopies = pendingList.reduce((sum, it) => sum + (Number(it.totalQty) || 0), 0);
+
+  const shortageItems = pendingList.filter((it) => (Number(it.shortageQty) || 0) > 0);
+  const printingItems = pendingList.filter((it) => (Number(it.printingQty) || 0) > 0);
+
+  let body = "";
+
+  if (shortageItems.length > 0 && printingItems.length > 0) {
+    const shortageLines = shortageItems.map((p, idx) => {
+      const q = p.shortageQty || p.totalQty;
+      return `${idx + 1}.      *${p.code}*     ${p.title || "—"}       *${q}*`;
+    }).join("\n");
+
+    const printingLines = printingItems.map((p, idx) => {
+      const q = p.printingQty || p.totalQty;
+      return `${idx + 1}.      *${p.code}*     ${p.title || "—"}       *${q}*`;
+    }).join("\n");
+
+    body = `🔴 *Office Shortage (Missing / Not Received):*\n${shortageLines}\n\n🟡 *In Printing (Not Sent to Campus Yet):*\n${printingLines}`;
+  } else if (shortageItems.length > 0) {
+    const shortageLines = shortageItems.map((p, idx) => {
+      const q = p.shortageQty || p.totalQty;
+      return `${idx + 1}.      *${p.code}*     ${p.title || "—"}       *${q}*`;
+    }).join("\n");
+
+    body = `🔴 *Office Shortage (Missing / Not Received):*\n${shortageLines}`;
+  } else {
+    const lines = pendingList.map((p, idx) => {
+      return `${idx + 1}.      *${p.code}*     ${p.title || "—"}       *${p.totalQty}*`;
+    }).join("\n");
+
+    body = `🟡 *In Printing (Not Sent to Campus Yet):*\n${lines}`;
+  }
+
+  return `Assalam-o-Alaikum ${name}!
+
+*Pending Books Checklist — Campus Bookstore (${dateStr}):*
+
+${body}
+
+*Total Pending to Deliver:* ${totalCopies} books
+Baraye meharbani yeh books jald print kar ke Campus deliver karwayen.
+Shukriya — Campus Bookstore Operations`;
 }
 
 export function getVendorPendingBooksWhatsAppUrl(
