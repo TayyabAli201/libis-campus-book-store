@@ -5959,8 +5959,17 @@ function Orders({
         statusPart = ` - ${statusList.map((s) => statuses[s] || s).join(", ")}`;
       }
       const filename = `${deliveryPrefix}${statusPart} - ${currentDate}.xlsx`;
+      const isShippedOrDelivered =
+        activeTab === "SHIPPED" ||
+        activeTab === "DELIVERED" ||
+        statusList.includes("SHIPPED") ||
+        statusList.includes("DELIVERED") ||
+        (rows.length > 0 &&
+          rows.every(
+            (r: any) => r.status === "SHIPPED" || r.status === "DELIVERED",
+          ));
       const includeAddress = deliveryTypeList.length === 0 || deliveryTypeList.includes("other");
-      const includeMobile = includeAddress;
+      const includeMobile = includeAddress || isShippedOrDelivered;
 
       const includeBookSummary =
         (deliveryTypeList.length > 0 &&
@@ -5973,11 +5982,12 @@ function Orders({
         const { exportOrdersExcel } = await import("@/lib/orders-excel-browser");
         await exportOrdersExcel(rows, filename, {
           includeAddress,
+          includeMobile,
           sheetName,
           includeBookSummary,
         });
         toast.success(
-          `Exported ${rows.length} order(s)${includeAddress ? " with address & phone" : ""}${includeBookSummary ? " with Books Summary" : ""} to ${filename}.`,
+          `Exported ${rows.length} order(s)${includeAddress ? " with address & phone" : includeMobile ? " with mobile" : ""}${includeBookSummary ? " with Books Summary" : ""} to ${filename}.`,
         );
       } catch (excelErr) {
         // Fallback to structured CSV with book items

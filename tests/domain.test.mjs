@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {compareAmount} from '../lib/payment-status.ts';
 import {money,checkoutInput,transitions,getOrderWhatsAppMessage,formatWhatsAppPhone,getWhatsAppUrl,formatReceiptBookTitle} from '../lib/contracts.ts';
-import {orderSheet, ORDER_EXPORT_COLUMNS, ORDER_EXPORT_COLUMNS_WITH_ADDRESS} from '../lib/orders-spreadsheet.ts';
+import {orderSheet, ORDER_EXPORT_COLUMNS, ORDER_EXPORT_COLUMNS_WITH_MOBILE, ORDER_EXPORT_COLUMNS_WITH_ADDRESS} from '../lib/orders-spreadsheet.ts';
 test('OCR outcomes distinguish exact, lower, higher, unreadable amounts and never claim verification',()=>{assert.equal(compareAmount(400000,400000).status,'AMOUNT_MATCHED');assert.equal(compareAmount(399999,400000).status,'AMOUNT_MISMATCH');assert.equal(compareAmount(500000,400000).status,'AMOUNT_MISMATCH');assert.equal(compareAmount(null,400000).status,'OCR_FAILED');for(const amount of [0,400000,500000,null])assert.notEqual(compareAmount(amount,400000).status,'VERIFIED');});
 test('Currency formatting is deterministic between server and browser locales',()=>{assert.equal(money(122500),'Rs. 1,225');assert.equal(money(250),'Rs. 2.50');assert.equal(money(0),'Rs. 0');assert.equal(money(-80000),'Rs. -800');});
 test('Checkout rejects fractional or negative quantities',()=>{const data={name:'Student',phone:'03001234567',city:'Lahore',address:'Campus Road',delivery_type:'lahore',campus_id:null,items:[{id:crypto.randomUUID(),quantity:0.5}]};assert.equal(checkoutInput.safeParse(data).success,false);data.items[0].quantity=-2;assert.equal(checkoutInput.safeParse(data).success,false);});
@@ -85,6 +85,19 @@ test('orderSheet exports theme spreadsheet with standard 7 columns or address fo
   assert.equal(otherCitySheet[3][7].height, 22.5);
   assert.equal(otherCitySheet[3][7].backgroundColor, '#1F65A8');
   assert.equal(otherCitySheet[3][8], null);
+
+  const shippedCampusLahoreSheet = orderSheet(sampleOrders, { includeMobile: true });
+  assert.equal(shippedCampusLahoreSheet.length, 4);
+  assert.equal(shippedCampusLahoreSheet[0].length, 8);
+  assert.deepEqual(shippedCampusLahoreSheet[0].map((c) => c.value), Array.from(ORDER_EXPORT_COLUMNS_WITH_MOBILE));
+  assert.equal(shippedCampusLahoreSheet[1][2].value, 'Ali Khan');
+  assert.equal(shippedCampusLahoreSheet[1][3].value, '03001234567');
+  assert.equal(shippedCampusLahoreSheet[1][3].rowSpan, 2);
+  assert.equal(shippedCampusLahoreSheet[1][4].value, 'CS101');
+  assert.equal(shippedCampusLahoreSheet[1][7].value, 3);
+  assert.equal(shippedCampusLahoreSheet[3].length, 8);
+  assert.deepEqual(shippedCampusLahoreSheet[3].slice(0, 6), [null, null, null, null, null, null]);
+  assert.equal(shippedCampusLahoreSheet[3][6].value, '(Total Books: 3)');
 });
 test('Real migration enforces pricing categories, totals and atomic stock constraints',()=>{const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');db.exec(fs.readFileSync('drizzle/0000_modern_marrow.sql','utf8'));db.prepare('INSERT INTO pricing_categories(id,rate) VALUES(?,?)').run('A',250);assert.throws(()=>db.prepare('INSERT INTO pricing_categories(id,rate) VALUES(?,?)').run('E',700));db.exec("INSERT INTO books(id,code,course_code,course_name,title,author,description,pages,category,created_at) VALUES('b','CS','CS','Computing','Book','Author','Description',100,'A','2026-01-01');INSERT INTO inventory(book_id,stock,reserved) VALUES('b',1,0)");assert.throws(()=>db.exec("UPDATE inventory SET reserved=2 WHERE book_id='b'"));db.exec('BEGIN');db.exec("UPDATE inventory SET reserved=1 WHERE book_id='b'");try{db.exec("INSERT INTO transaction_guards(id,ok) VALUES('g',0)");assert.fail('guard must fail')}catch{db.exec('ROLLBACK');}assert.equal(db.prepare("SELECT reserved FROM inventory WHERE book_id='b'").get().reserved,0);db.close();});
 

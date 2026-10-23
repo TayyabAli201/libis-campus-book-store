@@ -8,6 +8,17 @@ export const ORDER_EXPORT_COLUMNS = [
   "Total Books",
 ] as const;
 
+export const ORDER_EXPORT_COLUMNS_WITH_MOBILE = [
+  "Sr No",
+  "Order Number",
+  "Student Name",
+  "Mobile Number",
+  "Book Code",
+  "Book Name",
+  "Quantity",
+  "Total Books",
+] as const;
+
 export const ORDER_EXPORT_COLUMNS_WITH_ADDRESS = [
   "Sr No",
   "Order Number",
