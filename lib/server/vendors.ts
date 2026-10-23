@@ -2,7 +2,13 @@ import { z } from "zod";
 import { all, one, stmt, batch, now, uid, AppError, auditStmt } from "./db";
 import { passwordHash, verifyPassword } from "./security";
 import type { User, Vendor, VendorLedger } from "@/lib/contracts";
-import { getVendorWhatsAppMessage, getVendorWhatsAppUrl, isOtherCityOrder } from "@/lib/contracts";
+import {
+  getVendorWhatsAppMessage,
+  getVendorWhatsAppUrl,
+  getVendorPendingBooksWhatsAppMessage,
+  getVendorPendingBooksWhatsAppUrl,
+  isOtherCityOrder,
+} from "@/lib/contracts";
 import { sendVendorOrderAssignedEmail } from "./email";
 
 const vendorSchema = z.object({
@@ -590,6 +596,9 @@ export async function assignOrderToVendor(
   if (order.payment_status !== "VERIFIED") {
     throw new AppError(400, "Only orders with verified payment can be sent to a vendor.");
   }
+  if (["DELIVERED", "CANCELLED", "REJECTED", "SHIPPED"].includes(order.status)) {
+    throw new AppError(400, `Cannot assign order in ${order.status} status to a vendor.`);
+  }
 
   const vendor = await one<any>(
     "SELECT * FROM vendors WHERE id = ? AND active = 1",
@@ -730,6 +739,9 @@ export async function batchAssignOrdersToVendor(
     if (order.payment_status !== "VERIFIED") {
       continue;
     }
+    if (["DELIVERED", "CANCELLED", "REJECTED", "SHIPPED"].includes(order.status)) {
+      continue;
+    }
 
     let nextStatus = order.status;
     if (
@@ -809,5 +821,70 @@ export async function batchAssignOrdersToVendor(
       created_at: vendor.created_at,
     },
     message: `Successfully sent ${assignedCount} verified order(s) to ${vendor.name}.`,
+  };
+}
+
+export async function getVendorPendingBooks(
+  u: User,
+  vendorId?: string,
+) {
+  let targetVendorId = vendorId;
+  if (u.role === "VENDOR") {
+    targetVendorId = u.vendor_id || u.id;
+  } else if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Access denied.");
+  }
+
+  if (!targetVendorId) {
+    throw new AppError(400, "Vendor ID is required.");
+  }
+
+  const vendor = await one<any>("SELECT * FROM vendors WHERE id = ?", targetVendorId);
+  if (!vendor) {
+    throw new AppError(404, "Vendor not found.");
+  }
+
+  const rows = await all<any>(
+    `SELECT 
+      oi.code,
+      oi.title,
+      SUM(oi.quantity) as total_qty,
+      GROUP_CONCAT(DISTINCT COALESCE(o.reference, o.id)) as orders
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.vendor_id = ? 
+      AND o.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED')
+      AND oi.received_from_vendor = 0
+    GROUP BY oi.code, oi.title
+    ORDER BY oi.code ASC`,
+    targetVendorId,
+  );
+
+  const pendingList = rows.map((r: any) => ({
+    code: r.code,
+    title: r.title || "",
+    totalQty: Number(r.total_qty || 0),
+    orders: (r.orders || "").split(",").map((s: string) => s.trim()).filter(Boolean),
+  }));
+
+  const totalPendingQty = pendingList.reduce((sum: number, item: any) => sum + item.totalQty, 0);
+  const totalPendingTitles = pendingList.length;
+
+  const whatsappMessage = getVendorPendingBooksWhatsAppMessage(vendor.name, pendingList);
+  const whatsappUrl = getVendorPendingBooksWhatsAppUrl(vendor.phone || "", vendor.name, pendingList);
+
+  return {
+    ok: true,
+    vendor: {
+      id: vendor.id,
+      name: vendor.name,
+      phone: vendor.phone,
+      email: vendor.email,
+    },
+    pendingBooks: pendingList,
+    totalPendingQty,
+    totalPendingTitles,
+    whatsappMessage,
+    whatsappUrl,
   };
 }

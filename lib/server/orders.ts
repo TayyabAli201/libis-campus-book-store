@@ -377,6 +377,13 @@ export async function getOrder(
             due_status: o.due_status || "NONE",
           }
         : {}),
+      ...(Number(o.refund_due || 0) > 0 || Number(o.refund_amount || 0) > 0
+        ? {
+            refund_due: Number(o.refund_due || 0),
+            refund_amount: Number(o.refund_amount || 0),
+            refund_status: o.refund_status || "NONE",
+          }
+        : {}),
       created_at: o.created_at,
       updated_at: o.updated_at,
       ...(o.courier_name ? { courier_name: o.courier_name } : {}),
@@ -491,18 +498,32 @@ export async function getOrder(
     o.due_amount = Number(o.due_amount || 0);
     o.due_status = o.due_status || "NONE";
     o.due_note = o.due_note || "";
+    o.refund_due = Number(o.refund_due || 0);
+    o.refund_amount = Number(o.refund_amount || 0);
+    o.refund_status = o.refund_status || "NONE";
+    o.refund_note = o.refund_note || "";
+    o.refund_paid_at = o.refund_paid_at || null;
     o.payment_logs = paymentLogs;
   } else if (u?.role === "STUDENT" || owned) {
     o.amount_paid = Number(o.amount_paid || 0);
     o.due_amount = Number(o.due_amount || 0);
     o.due_status = o.due_status || "NONE";
+    o.refund_due = Number(o.refund_due || 0);
+    o.refund_amount = Number(o.refund_amount || 0);
+    o.refund_status = o.refund_status || "NONE";
     delete o.due_note;
+    delete o.refund_note;
     delete o.payment_logs;
   } else {
     delete o.amount_paid;
     delete o.due_amount;
     delete o.due_status;
     delete o.due_note;
+    delete o.refund_due;
+    delete o.refund_amount;
+    delete o.refund_status;
+    delete o.refund_note;
+    delete o.refund_paid_at;
     delete o.payment_logs;
   }
 
@@ -537,7 +558,9 @@ export async function listOrders(
     filters.push("(o.reference LIKE ? OR o.name LIKE ? OR o.phone LIKE ?)");
     args.push(...Array(3).fill("%" + q.slice(0, 100) + "%"));
   }
-  if (status && status !== "all") {
+  if (status === "REFUNDS_DUE") {
+    filters.push("(o.refund_status = 'REFUND_PENDING' OR o.refund_due > 0)");
+  } else if (status && status !== "all") {
     const statuses = status
       .split(",")
       .map((s) => s.trim())
@@ -607,15 +630,23 @@ export async function listOrders(
     delete o.tracking_hash;
     delete o.quote_id;
     delete o.store_snapshot;
-    if (u.role !== "SUPER_ADMIN") {
+    if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
       delete o.amount_paid;
       delete o.due_amount;
       delete o.due_status;
       delete o.due_note;
+      delete o.refund_due;
+      delete o.refund_amount;
+      delete o.refund_status;
+      delete o.refund_note;
+      delete o.refund_paid_at;
     } else {
       o.amount_paid = Number(o.amount_paid || 0);
       o.due_amount = Number(o.due_amount || 0);
       o.due_status = o.due_status || "NONE";
+      o.refund_due = Number(o.refund_due || 0);
+      o.refund_amount = Number(o.refund_amount || 0);
+      o.refund_status = o.refund_status || "NONE";
     }
     if (u.role !== "SUPER_ADMIN" && u.role !== "VENDOR") {
       delete o.actual_courier_charges;
@@ -630,7 +661,7 @@ export async function listOrders(
       const slice = orderIds.slice(i, i + 100);
       const placeholders = slice.map(() => "?").join(",");
       const batchItems = await all(
-        `SELECT order_id,code,title,pages,unit_price,quantity FROM order_items WHERE order_id IN (${placeholders})`,
+        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor FROM order_items WHERE order_id IN (${placeholders})`,
         ...slice,
       );
       allItems.push(...batchItems);
@@ -702,6 +733,12 @@ export async function listOrders(
   );
   status_counts["PROCESSING"] = unprintedRow?.cnt || 0;
   status_counts["PRINTED"] = printedRow?.cnt || 0;
+
+  const refundsDueRow = await one<{ cnt: number }>(
+    `SELECT COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} AND (o.refund_status='REFUND_PENDING' OR o.refund_due > 0)`,
+    ...tabArgs,
+  );
+  status_counts["REFUNDS_DUE"] = refundsDueRow?.cnt || 0;
 
   let vendor_overview: any = null;
   if (u.role === "VENDOR") {
@@ -1536,14 +1573,22 @@ export async function editOrderItems(
   const newDueAmount = newAmountPaid > 0 ? Math.max(0, newTotal - newAmountPaid) : 0;
   const newDueStatus = newAmountPaid > 0 ? (newDueAmount > 0 ? "DUE_PENDING" : "PAID") : (o.due_status || "NONE");
 
+  // Refund calculation when student overpaid advance:
+  const excessPaid = Math.max(0, newAmountPaid - newTotal);
+  const existingRefundPaid = Number(o.refund_amount || 0);
+  const newRefundDue = Math.max(0, excessPaid - existingRefundPaid);
+  const newRefundStatus = excessPaid > 0 ? (newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+
   statements.push(
     stmt(
-      "UPDATE orders SET subtotal=?, total=?, amount_paid=?, due_amount=?, due_status=?, version=version+1, updated_at=? WHERE id=?",
+      "UPDATE orders SET subtotal=?, total=?, amount_paid=?, due_amount=?, due_status=?, refund_due=?, refund_status=?, version=version+1, updated_at=? WHERE id=?",
       newSubtotal,
       newTotal,
       newAmountPaid,
       newDueAmount,
       newDueStatus,
+      newRefundDue,
+      newRefundStatus,
       at,
       o.id,
     ),
@@ -1588,6 +1633,8 @@ export async function editOrderItems(
     subtotal: newSubtotal,
     total: newTotal,
     count: itemsPayload.length,
+    refund_due: newRefundDue,
+    refund_status: newRefundStatus,
     message: `Order updated successfully (${changeParts.join("; ")}). Total is now Rs. ${Number(newTotal).toLocaleString()}.`,
   };
 }
@@ -1598,23 +1645,28 @@ export async function vendorPrint(
   id: string,
   printed = true,
 ) {
-  if (u.role !== "VENDOR") {
-    throw new AppError(403, "Marking print status is reserved for vendors only.");
+  if (u.role !== "VENDOR" && u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Permission denied to update print status.");
   }
   const o = await getOrder(req, id, u);
-  if (o.vendor_id !== (u.vendor_id || u.id)) {
+  if (["DELIVERED", "CANCELLED", "REJECTED"].includes(o.status)) {
+    throw new AppError(400, "Cannot update print status for order in " + (statuses[o.status] || o.status) + " status.");
+  }
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
     throw new AppError(403, "You can only update print status for your assigned orders.");
   }
   const isPrinted = printed !== false;
   const printTime = isPrinted ? now() : null;
-  await batch([
+  const statements = [
     stmt("UPDATE orders SET vendor_printed_at=?, version=version+1 WHERE id=?", printTime, o.id),
     stmt(
       "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
       uid(),
       o.id,
       o.status,
-      isPrinted ? "Marked books as printed by vendor" : "Unmarked printed status",
+      isPrinted
+        ? (u.role === "VENDOR" ? "Marked books as printed by vendor" : "Marked books as printed by admin")
+        : "Unmarked printed status",
       u.email,
       now(),
     ),
@@ -1626,7 +1678,11 @@ export async function vendorPrint(
       { vendor_printed_at: printTime },
       req,
     ),
-  ]);
+  ];
+  if (isPrinted) {
+    statements.push(stmt("UPDATE order_items SET received_from_vendor=1 WHERE order_id=?", o.id));
+  }
+  await batch(statements);
   return { ok: true, vendor_printed_at: printTime };
 }
 
@@ -1691,8 +1747,8 @@ export async function batchVendorPrint(
       },
   legacyPrinted = true,
 ) {
-  if (u.role !== "VENDOR") {
-    throw new AppError(403, "Batch print marking is reserved for vendors only.");
+  if (u.role !== "VENDOR" && u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Permission denied for batch print marking.");
   }
   const isParamsObj = !Array.isArray(paramsOrIds) && typeof paramsOrIds === "object";
   const printed = isParamsObj ? paramsOrIds.printed !== false : legacyPrinted !== false;
@@ -1708,7 +1764,7 @@ export async function batchVendorPrint(
   if (orderIds && orderIds.length > 0) {
     const placeholders = orderIds.map(() => "?").join(",");
     ordersToUpdate = await all<any>(
-      `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE o.id IN (${placeholders}) AND ${s.sql}`,
+      `SELECT o.id, o.status, o.vendor_id, o.vendor_printed_at FROM orders o WHERE o.id IN (${placeholders}) AND o.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED') AND ${s.sql}`,
       ...orderIds,
       ...s.args,
     );
@@ -1768,6 +1824,9 @@ export async function batchVendorPrint(
   for (const o of ordersToUpdate) {
     if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
       continue;
+    }
+    if (isPrinted) {
+      statements.push(stmt("UPDATE order_items SET received_from_vendor=1 WHERE order_id=?", o.id));
     }
     statements.push(
       stmt("UPDATE orders SET vendor_printed_at=?, version=version+1 WHERE id=?", printTime, o.id),
@@ -1877,6 +1936,7 @@ export async function setPrintingQueue(
   u: User,
   id: string,
   inQueue: boolean,
+  reason = "",
 ) {
   const o = await getOrder(req, id, u);
   if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
@@ -1909,13 +1969,31 @@ export async function setPrintingQueue(
     ]);
     return { ok: true, status: "PROCESSING", in_queue: true, vendor_printed_at: null };
   } else {
-    // Remove from Printing Queue -> Reverts to CONFIRMED
+    // Remove from Printing Queue -> Reverts to CONFIRMED and unassigns vendor
     if (o.status !== "PROCESSING") {
       throw new AppError(400, "Only orders currently in printing can be removed from the Printing Queue.");
     }
+
+    const cleanReason = (reason || "").trim();
+    if (u.role === "VENDOR" && (!cleanReason || cleanReason.length < 3)) {
+      throw new AppError(400, "Please provide a valid reason for removing this order from printing.");
+    }
+
+    let vendorName = "Vendor";
+    if (o.vendor_id) {
+      const v = await one<any>("SELECT name FROM vendors WHERE id=?", o.vendor_id);
+      if (v?.name) vendorName = v.name;
+    } else if (u.name) {
+      vendorName = u.name;
+    }
+
+    const historyNote = cleanReason
+      ? `Order removed from Printing Queue and unassigned by ${vendorName}. Reason: ${cleanReason}`
+      : `Order removed from Printing Queue and unassigned by ${vendorName}. Reverted to Confirmed status.`;
+
     await batch([
       stmt(
-        "UPDATE orders SET status='CONFIRMED', vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?",
+        "UPDATE orders SET status='CONFIRMED', vendor_id=NULL, vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?",
         at,
         o.id,
       ),
@@ -1924,13 +2002,27 @@ export async function setPrintingQueue(
         uid(),
         o.id,
         "CONFIRMED",
-        "Removed from Printing Queue. Reverted to Confirmed status.",
+        historyNote,
         u.email,
         at,
       ),
-      auditStmt(u.email, "ORDER_PRINT_QUEUE_REMOVE", o.id, { status: o.status }, { status: "CONFIRMED" }, req),
+      auditStmt(
+        u.email,
+        "ORDER_PRINT_QUEUE_REMOVE",
+        o.id,
+        { status: o.status, vendor_id: o.vendor_id },
+        { status: "CONFIRMED", vendor_id: null, reason: cleanReason },
+        req,
+      ),
     ]);
-    return { ok: true, status: "CONFIRMED", in_queue: false, vendor_printed_at: null };
+    return {
+      ok: true,
+      status: "CONFIRMED",
+      in_queue: false,
+      vendor_id: null,
+      vendor_printed_at: null,
+      message: "Order removed from printing queue and unassigned successfully ✓",
+    };
   }
 }
 
@@ -1939,7 +2031,12 @@ export async function batchSetPrintingQueue(
   u: User,
   orderIds: string[],
   inQueue: boolean,
+  reason = "",
 ) {
+  const cleanReason = (reason || "").trim();
+  if (!inQueue && u.role === "VENDOR" && (!cleanReason || cleanReason.length < 3)) {
+    throw new AppError(400, "Please provide a valid reason for removing orders from printing.");
+  }
   if (!orderIds || !orderIds.length) {
     throw new AppError(400, "Please select at least one order.");
   }
@@ -1975,7 +2072,9 @@ export async function batchSetPrintingQueue(
   for (const o of eligible) {
     statements.push(
       stmt(
-        "UPDATE orders SET status=?, vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?",
+        inQueue
+          ? "UPDATE orders SET status=?, vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?"
+          : "UPDATE orders SET status=?, vendor_id=NULL, vendor_printed_at=NULL, vendor_dispatched_at=NULL, updated_at=?, version=version+1 WHERE id=?",
         targetStatus,
         at,
         o.id,
@@ -1987,7 +2086,9 @@ export async function batchSetPrintingQueue(
         targetStatus,
         inQueue
           ? "Added to Printing Queue (batch)."
-          : "Removed from Printing Queue. Reverted to Confirmed status (batch).",
+          : cleanReason
+            ? `Removed from Printing Queue and unassigned (batch). Reason: ${cleanReason}`
+            : "Removed from Printing Queue and unassigned (batch). Reverted to Confirmed status.",
         u.email,
         at,
       ),
@@ -2176,4 +2277,188 @@ export async function batchChangeStatus(
   ]);
 
   return { count: orders.length, status: toStatus };
+}
+
+
+export async function toggleOrderItemReceived(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+  received: boolean,
+) {
+  if (u.role !== "SUPER_ADMIN" && u.role !== "VENDOR" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Permission denied to update book delivery status.");
+  }
+  const o = await getOrder(req, orderId, u);
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only update books for your assigned orders.");
+  }
+  const it = await one<any>("SELECT * FROM order_items WHERE id=? AND order_id=?", itemId, orderId);
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  const recVal = received ? 1 : 0;
+  const at = now();
+  const statements: any[] = [
+    stmt("UPDATE order_items SET received_from_vendor=? WHERE id=? AND order_id=?", recVal, itemId, orderId),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,1,?)",
+      uid(),
+      orderId,
+      o.status,
+      received
+        ? `Book marked received from vendor: ${it.code} (${it.title})`
+        : `Book marked pending from vendor: ${it.code} (${it.title})`,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_RECEIVED_TOGGLE",
+      itemId,
+      { received_from_vendor: it.received_from_vendor },
+      { received_from_vendor: recVal, order_id: orderId, code: it.code },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return { ok: true, itemId, received_from_vendor: recVal };
+}
+
+export async function setAllOrderItemsReceived(
+  req: Request,
+  u: User,
+  orderId: string,
+  received: boolean,
+) {
+  if (u.role !== "SUPER_ADMIN" && u.role !== "VENDOR" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Permission denied to update book delivery status.");
+  }
+  const o = await getOrder(req, orderId, u);
+  if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
+    throw new AppError(403, "You can only update books for your assigned orders.");
+  }
+  const recVal = received ? 1 : 0;
+  const at = now();
+  const statements: any[] = [
+    stmt("UPDATE order_items SET received_from_vendor=? WHERE order_id=?", recVal, orderId),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,1,?)",
+      uid(),
+      orderId,
+      o.status,
+      received ? "All books marked received from vendor" : "All books marked pending from vendor",
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ALL_ITEMS_RECEIVED",
+      orderId,
+      null,
+      { received_from_vendor: recVal },
+      req,
+    ),
+  ];
+  await batch(statements);
+  return { ok: true, received_from_vendor: recVal };
+}
+
+export async function recordStudentRefund(
+  req: Request,
+  u: User,
+  orderId: string,
+  amount: number,
+  method = "JazzCash",
+  reference = "",
+  note = "",
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Only Super Admin can record student refunds.");
+  }
+  const cleanAmount = Math.round(Number(amount));
+  if (!Number.isFinite(cleanAmount) || cleanAmount <= 0) {
+    throw new AppError(400, "Refund amount must be greater than 0.");
+  }
+
+  const o = await getOrder(req, orderId, u);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  const currentRefundDue = Number(o.refund_due || 0);
+  const currentRefundAmount = Number(o.refund_amount || 0);
+  const currentPaid = Number(o.amount_paid || 0);
+
+  const at = now();
+  const cleanMethod = (method || "JazzCash").trim();
+  const cleanRef = (reference || "").trim();
+  const cleanNote = (note || "").trim();
+
+  const newRefundAmount = currentRefundAmount + cleanAmount;
+  const newRefundDue = Math.max(0, currentRefundDue - cleanAmount);
+  const newRefundStatus = newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING";
+  const newAmountPaid = Math.max(Number(o.total || 0), currentPaid - cleanAmount);
+
+  const refDetails = cleanRef ? ` (Ref: ${cleanRef})` : "";
+  const noteDetails = cleanNote ? ` Note: ${cleanNote}` : "";
+  const combinedRefundNote = [cleanMethod, cleanRef ? `Ref: ${cleanRef}` : "", cleanNote].filter(Boolean).join(" - ");
+  const historyText = `Refund of Rs. ${cleanAmount.toLocaleString()} paid to student via ${cleanMethod}${refDetails}.${noteDetails}`;
+
+  const statements = [
+    guard(
+      "EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)",
+      o.id,
+      o.version,
+    ),
+    stmt(
+      "UPDATE orders SET amount_paid=?, refund_due=?, refund_amount=?, refund_status=?, refund_note=?, refund_paid_at=?, version=version+1, updated_at=? WHERE id=?",
+      newAmountPaid,
+      newRefundDue,
+      newRefundAmount,
+      newRefundStatus,
+      combinedRefundNote,
+      at,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_payment_logs(id,order_id,amount,type,note,actor,payment_date,created_at) VALUES(?,?,?,?,?,?,?,?)",
+      uid(),
+      o.id,
+      -cleanAmount,
+      "STUDENT_REFUND",
+      `${cleanMethod}${cleanRef ? ` - Ref: ${cleanRef}` : ""}${cleanNote ? ` - ${cleanNote}` : ""}`,
+      u.email,
+      at,
+      at,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,created_at,internal) VALUES(?,?,?,?,?,?,0)",
+      uid(),
+      o.id,
+      o.status,
+      historyText,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "STUDENT_REFUND_RECORDED",
+      o.id,
+      { refund_due: currentRefundDue, refund_amount: currentRefundAmount, amount_paid: currentPaid },
+      { refund_due: newRefundDue, refund_amount: newRefundAmount, amount_paid: newAmountPaid, method: cleanMethod, reference: cleanRef },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+
+  return {
+    ok: true,
+    refund_due: newRefundDue,
+    refund_amount: newRefundAmount,
+    refund_status: newRefundStatus,
+    amount_paid: newAmountPaid,
+    message: `Refund of Rs. ${cleanAmount.toLocaleString()} recorded successfully ✓`,
+  };
 }

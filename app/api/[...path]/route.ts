@@ -56,6 +56,9 @@ import {
   editOrderItems,
   recordDuePayment,
   updateDueNote,
+  toggleOrderItemReceived,
+  setAllOrderItemsReceived,
+  recordStudentRefund,
 } from "@/lib/server/orders";
 import {
   listVendors,
@@ -67,6 +70,7 @@ import {
   getVendorLedger,
   createVendorPayment,
   deleteVendorPayment,
+  getVendorPendingBooks,
 } from "@/lib/server/vendors";
 import { upload } from "@/lib/server/uploads";
 import { bootstrap } from "@/lib/server/seed";
@@ -657,9 +661,10 @@ async function handle(req: Request) {
           .object({
             orderIds: z.array(z.string()).min(1),
             inQueue: z.boolean(),
+            reason: z.string().trim().max(2000).optional(),
           })
           .parse(body);
-        return ok(await batchSetPrintingQueue(req, u, parsed.orderIds, parsed.inQueue));
+        return ok(await batchSetPrintingQueue(req, u, parsed.orderIds, parsed.inQueue, parsed.reason));
       }
       if (id === "batch-assign-vendor" && method === "POST") {
         const body = await json(req);
@@ -742,13 +747,21 @@ async function handle(req: Request) {
               "edit_items",
               "record_due_payment",
               "update_due_note",
+              "toggle_item_received",
+              "set_all_items_received",
+              "record_refund",
             ]),
+            item_id: z.string().trim().optional(),
+            received: z.boolean().optional(),
+            method: z.string().trim().max(100).optional(),
+            reference: z.string().trim().max(200).optional(),
             status: z.string().optional(),
             courier_name: z.string().trim().max(100).optional(),
             courier_tracking_id: z.string().trim().max(100).optional(),
             actual_courier_charges: z.coerce.number().min(0).max(100000).optional(),
             vendor_id: z.string().trim().optional(),
             note: z.string().trim().max(2000).default(""),
+            reason: z.string().trim().max(2000).optional(),
             version: z.number().int().optional(),
             printed: z.boolean().optional(),
             in_queue: z.boolean().optional(),
@@ -772,7 +785,7 @@ async function handle(req: Request) {
           return ok(await editOrderItems(req, u, id, b.items, b.note));
         }
         if (b.action === "printing_queue") {
-          return ok(await setPrintingQueue(req, u, id, b.in_queue !== false));
+          return ok(await setPrintingQueue(req, u, id, b.in_queue !== false, b.reason || b.note));
         }
         if (b.action === "vendor_print") {
           return ok(await vendorPrint(req, u, id, b.printed));
@@ -836,6 +849,17 @@ async function handle(req: Request) {
               b.actual_courier_charges ?? 0,
             ),
           );
+        if (b.action === "toggle_item_received") {
+          if (!b.item_id) throw new AppError(400, "Item ID is required.");
+          return ok(await toggleOrderItemReceived(req, u, id, b.item_id, b.received !== false));
+        }
+        if (b.action === "set_all_items_received") {
+          return ok(await setAllOrderItemsReceived(req, u, id, b.received !== false));
+        }
+        if (b.action === "record_refund") {
+          if (!b.amount || b.amount <= 0) throw new AppError(400, "Valid refund amount is required.");
+          return ok(await recordStudentRefund(req, u, id, b.amount, b.method || "JazzCash", b.reference || "", b.note || ""));
+        }
         if (b.action === "record_due_payment") {
           if (u.role !== "SUPER_ADMIN")
             throw new AppError(403, "Only Super Admin can record due payments.");
@@ -1140,6 +1164,14 @@ async function handle(req: Request) {
       }
       if (method === "DELETE" && id) {
         return ok(await deleteVendor(req, u, id));
+      }
+    }
+    if (section === "vendor-pending-books") {
+      const u = await user(req);
+      const url = new URL(req.url);
+      if (method === "GET") {
+        const vendorId = url.searchParams.get("vendor_id") || undefined;
+        return ok(await getVendorPendingBooks(u, vendorId));
       }
     }
     if (section === "vendor-ledger" || section === "vendor-payments") {

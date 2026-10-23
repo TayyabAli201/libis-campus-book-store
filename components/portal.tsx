@@ -51,6 +51,8 @@ import {
   RotateCcw,
   XCircle,
   Receipt,
+  Banknote,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -104,6 +106,9 @@ import {
   getVendorWhatsAppUrl,
   formatWhatsAppPhone,
   isOtherCityOrder,
+  getStudentRefundWhatsAppUrl,
+  getVendorPendingBooksWhatsAppMessage,
+  getVendorPendingBooksWhatsAppUrl,
   isCampusOrder,
   isLahoreOrder,
   type User,
@@ -2997,13 +3002,50 @@ function AdminOrderBooksPanel({
     "REJECTED",
     "REFUND_REQUESTED",
   ].includes(o.status);
-  const canEdit = canUpdate && !isPrinted && !isLockedStatus;
+  const canEdit = canUpdate && (!isPrinted || admin) && !isLockedStatus;
 
   const [isEditing, setIsEditing] = useState(false);
   const [itemsDraft, setItemsDraft] = useState<any[]>([]);
   const [editNote, setEditNote] = useState("");
+  const [editReasonCategory, setEditReasonCategory] = useState("Out of Print / Market Unavailable");
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
+
+  const toggleItemReceived = async (itemId: string, received: boolean) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "toggle_item_received",
+        item_id: itemId,
+        received,
+      });
+      toast.success(received ? "Book marked received from vendor ✓" : "Book marked pending from vendor");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
+  const setAllItemsReceived = async (received: boolean) => {
+    setTogglingItemId("ALL");
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "set_all_items_received",
+        received,
+      });
+      toast.success(received ? "All books marked received from vendor ✓" : "All books marked pending from vendor");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
 
   const rawItems: any[] = o?.items || [];
   const totalBooks = rawItems.reduce(
@@ -3093,7 +3135,9 @@ function AdminOrderBooksPanel({
           id: it.id,
           quantity: it.quantity,
         })),
-        note: editNote.trim(),
+        note: (editReasonCategory && editReasonCategory !== "OTHER" && !editNote.includes(editReasonCategory)
+          ? `${editReasonCategory} - ${editNote.trim()}`
+          : editNote.trim()) || editReasonCategory,
       });
       toast.success(res.message || "Order items and total updated successfully ✓");
       notifyOrdersUpdated();
@@ -3147,7 +3191,7 @@ function AdminOrderBooksPanel({
             <BookOpen size={17} />
           </div>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>
                 Ordered Books
               </h3>
@@ -3163,6 +3207,42 @@ function AdminOrderBooksPanel({
                 {isEditing ? draftBooksCount : totalBooks}{" "}
                 {(isEditing ? draftBooksCount : totalBooks) === 1 ? "book" : "books"}
               </span>
+              {!isEditing && totalBooks > 0 && (() => {
+                const rcvCount = rawItems.filter((it: any) => it.received_from_vendor).reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+                const isAllRcvd = rcvCount === totalBooks;
+                const isPartRcvd = rcvCount > 0 && rcvCount < totalBooks;
+                return (
+                  <span
+                    className="mono-pill"
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      background: isAllRcvd
+                        ? "rgba(22, 163, 74, 0.15)"
+                        : isPartRcvd
+                          ? "rgba(245, 158, 11, 0.15)"
+                          : "rgba(100, 116, 139, 0.12)",
+                      color: isAllRcvd
+                        ? "#15803d"
+                        : isPartRcvd
+                          ? "#b45309"
+                          : "var(--muted-foreground)",
+                      border: isAllRcvd
+                        ? "1px solid #86efac"
+                        : isPartRcvd
+                          ? "1px solid #fde68a"
+                          : "1px solid var(--border)",
+                    }}
+                    title={`${rcvCount} of ${totalBooks} books delivered by vendor`}
+                  >
+                    {isAllRcvd
+                      ? `All ${totalBooks} Books Received ✓`
+                      : isPartRcvd
+                        ? `Partially Received (${rcvCount}/${totalBooks} Books · ${totalBooks - rcvCount} Pending from Vendor)`
+                        : `0/${totalBooks} Received (Pending from Vendor)`}
+                  </span>
+                );
+              })()}
             </div>
             <p className="small-text muted" style={{ margin: "2px 0 0" }}>
               {isEditing
@@ -3194,20 +3274,46 @@ function AdminOrderBooksPanel({
               </button>
             </div>
           ) : canEdit ? (
-            <button
-              type="button"
-              className="btn compact"
-              onClick={startEditing}
-              title="Edit quantities or exclude books"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontWeight: 600,
-              }}
-            >
-              <Pencil size={13} /> Edit Books / Qty
-            </button>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {canUpdate && totalBooks > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="btn compact"
+                    style={{ fontSize: "0.74rem", padding: "3px 8px" }}
+                    disabled={!!togglingItemId}
+                    onClick={() => setAllItemsReceived(true)}
+                    title="Mark all books in this order as received from vendor"
+                  >
+                    <CheckCircle2 size={12} /> Mark All Received
+                  </button>
+                  <button
+                    type="button"
+                    className="btn compact"
+                    style={{ fontSize: "0.74rem", padding: "3px 8px" }}
+                    disabled={!!togglingItemId}
+                    onClick={() => setAllItemsReceived(false)}
+                    title="Reset all books in this order to pending from vendor"
+                  >
+                    <RotateCcw size={11} /> Reset All
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className="btn compact"
+                onClick={startEditing}
+                title="Edit quantities or exclude books"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontWeight: 600,
+                }}
+              >
+                <Pencil size={13} /> Edit Books / Qty
+              </button>
+            </div>
           ) : (
             <span
               className="mono-pill"
@@ -3325,6 +3431,18 @@ function AdminOrderBooksPanel({
                 >
                   Total
                 </th>
+                {!isEditing && (
+                  <th
+                    style={{
+                      padding: "8px 10px",
+                      fontWeight: 600,
+                      textAlign: "center",
+                      width: "135px",
+                    }}
+                  >
+                    Vendor Delivery
+                  </th>
+                )}
                 {isEditing && (
                   <th
                     style={{
@@ -3478,6 +3596,50 @@ function AdminOrderBooksPanel({
                     >
                       {money(lineTotal)}
                     </td>
+                    {!isEditing && (
+                      <td style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          disabled={togglingItemId === it.id || !canUpdate}
+                          onClick={() => toggleItemReceived(it.id, !it.received_from_vendor)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: 9999,
+                            cursor: canUpdate ? "pointer" : "default",
+                            background: it.received_from_vendor
+                              ? "rgba(22, 163, 74, 0.15)"
+                              : "rgba(245, 158, 11, 0.15)",
+                            color: it.received_from_vendor ? "#15803d" : "#b45309",
+                            border: it.received_from_vendor
+                              ? "1px solid #86efac"
+                              : "1px solid #fde68a",
+                            transition: "all 0.15s ease",
+                          }}
+                          title={
+                            it.received_from_vendor
+                              ? "Received from vendor. Click to mark as pending."
+                              : "Pending from vendor. Click to mark as received."
+                          }
+                        >
+                          {togglingItemId === it.id ? (
+                            "Saving…"
+                          ) : it.received_from_vendor ? (
+                            <>
+                              <CheckCircle2 size={11} /> Received ✓
+                            </>
+                          ) : (
+                            <>
+                              <Clock size={11} /> Pending ⏳
+                            </>
+                          )}
+                        </button>
+                      </td>
+                    )}
                     {isEditing && (
                       <td style={{ padding: "8px 10px", textAlign: "center" }}>
                         <button
@@ -3533,6 +3695,7 @@ function AdminOrderBooksPanel({
                 >
                   {money(isEditing ? draftSubtotal : (o.subtotal || 0))}
                 </td>
+                {!isEditing && <td />}
                 {isEditing && <td />}
               </tr>
             </tfoot>
@@ -3608,12 +3771,41 @@ function AdminOrderBooksPanel({
             </span>
           </div>
 
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: "0.80rem", fontWeight: 700, color: "var(--foreground)" }}>
+                Reason:
+              </span>
+              <select
+                value={editReasonCategory}
+                onChange={(e) => {
+                  setEditReasonCategory(e.target.value);
+                  if (e.target.value !== "OTHER") {
+                    setEditNote(e.target.value);
+                  }
+                }}
+                className="toolbar-search-input"
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--card)",
+                  color: "var(--foreground)",
+                  fontWeight: 600,
+                }}
+              >
+                <option value="Out of Print / Market Unavailable">📚 Out of Print / Market Unavailable</option>
+                <option value="Student Requested Removal">🙋 Student Requested Removal</option>
+                <option value="Defective Print / Damaged by Press">⚠️ Defective Print / Damaged by Press</option>
+                <option value="OTHER">✍️ Custom Reason…</option>
+              </select>
+            </div>
             <input
               type="text"
               value={editNote}
               onChange={(e) => setEditNote(e.target.value)}
-              placeholder="Reason for change (e.g. Student ordered 5 copies by mistake, adjusted to 1)"
+              placeholder="Detailed note / comments (optional)"
               className="toolbar-search-input"
               style={{
                 width: "100%",
@@ -3662,6 +3854,280 @@ function AdminOrderBooksPanel({
         description={`Order total will update from ${money(o.total || 0)} to ${money(draftTotal)}. The books list, vendor fulfillment, and order history will auto-update.`}
         onConfirm={handleSave}
       />
+    </div>
+  );
+}
+
+
+function StudentRefundManagementPanel({
+  o,
+  user,
+  onUpdated,
+}: {
+  o: any;
+  user: User;
+  onUpdated: () => Promise<void> | void;
+}) {
+  const isAdmin = user.role === "SUPER_ADMIN" || user.permissions?.includes("orders.update");
+  if (!isAdmin || !o) return null;
+
+  const refundDue = Number(o.refund_due || 0);
+  const refundAmount = Number(o.refund_amount || 0);
+  const isPending = refundDue > 0 || o.refund_status === "REFUND_PENDING";
+  const hasRefund = isPending || refundAmount > 0;
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [amount, setAmount] = useState<string>(refundDue > 0 ? String(refundDue / 100) : "");
+  const [method, setMethod] = useState("JazzCash");
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (refundDue > 0) {
+      setAmount(String(refundDue / 100));
+    }
+  }, [refundDue]);
+
+  if (!hasRefund) return null;
+
+  const handleRecordRefund = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanRs = Number(amount);
+    if (!cleanRs || isNaN(cleanRs) || cleanRs <= 0) {
+      toast.error("Please enter a valid refund amount.");
+      return;
+    }
+    const cleanCents = Math.round(cleanRs * 100);
+    setSaving(true);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "record_refund",
+        amount: cleanCents,
+        method,
+        reference,
+        note,
+      });
+      toast.success(`Refund of Rs. ${cleanRs.toLocaleString()} recorded successfully ✓`);
+      setModalOpen(false);
+      setReference("");
+      setNote("");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="panel stack no-print"
+      style={{
+        border: isPending ? "2px solid #ef4444" : "1px solid #86efac",
+        background: isPending
+          ? "linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, var(--card) 100%)"
+          : "rgba(22, 163, 74, 0.05)",
+        padding: "16px",
+        borderRadius: 10,
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: isPending ? "rgba(239, 68, 68, 0.15)" : "rgba(22, 163, 74, 0.15)",
+              color: isPending ? "#dc2626" : "#15803d",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Banknote size={18} />
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700, color: isPending ? "#dc2626" : "#15803d" }}>
+              {isPending ? "Student Advance Refund Pending" : "Student Refund Settled ✓"}
+            </h4>
+            <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+              {isPending
+                ? "Books were cancelled/adjusted. Return excess advance payment to student."
+                : `Refund of ${money(refundAmount)} was processed to student.`}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {isPending && (
+            <button
+              type="button"
+              className="btn primary compact"
+              style={{ background: "#dc2626", borderColor: "#dc2626" }}
+              onClick={() => {
+                setAmount(String(refundDue / 100));
+                setModalOpen(true);
+              }}
+            >
+              <Send size={13} /> Record Refund to Student
+            </button>
+          )}
+          {o.phone && (
+            <a
+              href={getStudentRefundWhatsAppUrl(
+                o,
+                refundDue > 0 ? refundDue : refundAmount,
+                method || "JazzCash / EasyPaisa",
+                reference || "",
+                o.refund_note || ""
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn compact"
+              style={{
+                background: "#25D366",
+                borderColor: "#25D366",
+                color: "#fff",
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                textDecoration: "none",
+              }}
+              title="Send automated refund receipt & message to student on WhatsApp"
+            >
+              <MessageCircle size={13} /> WhatsApp Refund Notice
+            </a>
+          )}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 10,
+          background: "var(--muted)",
+          padding: "10px 14px",
+          borderRadius: 8,
+        }}
+      >
+        <div>
+          <span className="small-text muted">Refund Due:</span>
+          <div style={{ fontWeight: 800, fontSize: "1.05rem", color: isPending ? "#dc2626" : "var(--foreground)" }}>
+            {money(refundDue)}
+          </div>
+        </div>
+        <div>
+          <span className="small-text muted">Total Refunded:</span>
+          <div style={{ fontWeight: 700, fontSize: "1rem", color: "#15803d" }}>
+            {money(refundAmount)}
+          </div>
+        </div>
+        <div>
+          <span className="small-text muted">Refund Status:</span>
+          <div>
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                background: isPending ? "rgba(239, 68, 68, 0.15)" : "rgba(22, 163, 74, 0.15)",
+                color: isPending ? "#dc2626" : "#15803d",
+              }}
+            >
+              {isPending ? "REFUND PENDING" : "REFUNDED ✓"}
+            </span>
+          </div>
+        </div>
+        {o.refund_paid_at && (
+          <div>
+            <span className="small-text muted">Paid At:</span>
+            <div style={{ fontSize: "0.82rem", fontWeight: 600 }}>
+              {formatDateDMY(o.refund_paid_at)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {o.refund_note && (
+        <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", background: "var(--card)", padding: "6px 10px", borderRadius: 6 }}>
+          <strong>Refund Note:</strong> {o.refund_note}
+        </div>
+      )}
+
+      {/* Record Refund Modal Dialog */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent style={{ maxWidth: 450 }}>
+          <DialogHeader>
+            <DialogTitle>Record Student Refund</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleRecordRefund} className="stack" style={{ gap: 14 }}>
+            <div>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Refund Amount (Rs.)</label>
+              <input
+                type="number"
+                min={1}
+                required
+                className="input"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                style={{ width: "100%", marginTop: 4 }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Payment Method</label>
+              <select
+                className="input"
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+                style={{ width: "100%", marginTop: 4 }}
+              >
+                <option value="JazzCash">JazzCash</option>
+                <option value="EasyPaisa">EasyPaisa</option>
+                <option value="Meezan Bank">Meezan Bank</option>
+                <option value="Bank Transfer">Bank Transfer (Other)</option>
+                <option value="Cash">Cash</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Transaction ID / Ref (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. TID-9823412 or bank receipt #"
+                className="input"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                style={{ width: "100%", marginTop: 4 }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Notes (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Pak301 unavailable, sent to student phone"
+                className="input"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                style={{ width: "100%", marginTop: 4 }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+              <button type="button" className="btn compact" onClick={() => setModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn primary compact" disabled={saving} style={{ background: "#dc2626" }}>
+                {saving ? "Recording…" : "Confirm Refund"}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -4851,7 +5317,7 @@ function OrderModalPopup({
                         border: "1px solid #93c5fd",
                       }}
                     >
-                      <Building2 size={12} /> Dispatched to Office
+                      <Building2 size={12} /> Dispatched to Campus
                     </span>
                   )}
                 </div>
@@ -4899,6 +5365,7 @@ function OrderModalPopup({
                       )}
 
                       <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
+                      <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} />
                       <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
 
                       <div className="print-only">
@@ -5078,9 +5545,9 @@ function OrderModalPopup({
                             lineHeight: 1.45,
                           }}
                         >
-                          <strong>🏛️ Deliver to Bookstore Office:</strong>
+                          <strong>🏛️ Send to Campus:</strong>
                           <p style={{ margin: "4px 0 8px" }}>
-                            This order is for Lahore / VU Qanchi Campus. Once books are printed, click below to mark this batch as dispatched to the Bookstore Office.
+                            This order is for Lahore / VU Qanchi Campus. Once books are printed, click below to mark this batch as dispatched to Campus.
                           </p>
                           {o.status === "PROCESSING" ? (
                             <button
@@ -5093,7 +5560,7 @@ function OrderModalPopup({
                                   await api(`manage/orders/${o.id}`, {
                                     action: "vendor_dispatch_office",
                                   });
-                                  toast.success("Order dispatched to Bookstore Office ✓");
+                                  toast.success("Order dispatched to Campus ✓");
                                   await reload();
                                 } catch (e) {
                                   toast.error(errorText(e));
@@ -5103,7 +5570,7 @@ function OrderModalPopup({
                               }}
                               style={{ gap: 6, background: "linear-gradient(135deg, #1d64b4 0%, #154c8a 100%)", borderColor: "#16467c", color: "#ffffff" }}
                             >
-                              <Building2 size={14} /> Send to Bookstore Office
+                              <Building2 size={14} /> Send to Campus
                             </button>
                           ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
@@ -5142,7 +5609,7 @@ function OrderModalPopup({
                           )}
                           {o.vendor_dispatched_at && (
                             <span className="mono-pill" style={{ background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "1px solid var(--status-info-border)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                              <Building2 size={13} /> Dispatched by Vendor to Office ({formatDateDMY(o.vendor_dispatched_at)})
+                              <Building2 size={13} /> Dispatched by Vendor to Campus ({formatDateDMY(o.vendor_dispatched_at)})
                             </span>
                           )}
                         </div>
@@ -5499,6 +5966,7 @@ const ORDER_WORKFLOW_TABS: WorkflowTab[] = [
   { id: "CANCELLED", label: "Cancelled", title: "Cancelled Orders", icon: "❌", statuses: ["CANCELLED"], color: "cancelled" },
   { id: "REJECTED", label: "Rejected", title: "Rejected Orders", icon: "🚫", statuses: ["REJECTED"], color: "rejected" },
   { id: "REFUND_REQUESTED", label: "Refunded", title: "Refund Requested / Processed", icon: "💸", statuses: ["REFUND_REQUESTED"], color: "refunded" },
+  { id: "REFUNDS_DUE", label: "Refunds Pending", title: "Orders with pending student advance refund", icon: "⚠️", statuses: ["REFUNDS_DUE"], urgent: true, color: "pending" },
 ];
 
 const ORDER_DELIVERY_CHIPS = [
@@ -5650,6 +6118,162 @@ const VENDOR_DELIVERY_CHIPS = [
   { id: "campus_lahore", label: "Qanchi Campus Lahore", icon: "🏛️" },
 ];
 
+
+function VendorRemoveQueueModal({
+  order,
+  onClose,
+  onSuccess,
+}: {
+  order: any;
+  onClose: () => void;
+  onSuccess: () => Promise<void> | void;
+}) {
+  const [reasonCategory, setReasonCategory] = useState("Paper / Cover Stock Shortage");
+  const [detailNote, setDetailNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalReason =
+      reasonCategory === "OTHER"
+        ? detailNote.trim()
+        : detailNote.trim()
+          ? `${reasonCategory} — ${detailNote.trim()}`
+          : reasonCategory;
+
+    if (!finalReason || finalReason.length < 3) {
+      toast.error("Please enter a valid reason for removing this order from printing.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await api(`manage/orders/${order.id}`, {
+        action: "printing_queue",
+        in_queue: false,
+        reason: finalReason,
+      });
+      toast.success(res.message || "Order removed from printing and returned to unassigned queue ✓");
+      notifyOrdersUpdated();
+      await onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
+      <DialogContent style={{ maxWidth: 460 }}>
+        <DialogHeader>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                background: "rgba(239, 68, 68, 0.12)",
+                color: "#dc2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <XCircle size={18} />
+            </div>
+            <div>
+              <DialogTitle style={{ fontSize: "1.05rem", margin: 0 }}>
+                Remove from Printing Queue
+              </DialogTitle>
+              <DialogDescription style={{ fontSize: "0.80rem", marginTop: 2 }}>
+                Order #{order.reference || order.id} · Student: {order.name}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="stack" style={{ gap: 14 }}>
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 6,
+              background: "rgba(239, 68, 68, 0.08)",
+              border: "1px dashed rgba(239, 68, 68, 0.35)",
+              fontSize: "0.80rem",
+              color: "#b91c1c",
+              lineHeight: 1.4,
+            }}
+          >
+            ⚠️ <strong>Notice:</strong> This order will be unassigned from your vendor account and returned to the Bookstore Administration Confirmed queue for reassignment.
+          </div>
+
+          <Field label="Reason for Removal (Required)">
+            <select
+              value={reasonCategory}
+              onChange={(e) => setReasonCategory(e.target.value)}
+              className="toolbar-search-input"
+              style={{
+                width: "100%",
+                fontSize: "0.84rem",
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: "var(--card)",
+                color: "var(--foreground)",
+                fontWeight: 600,
+              }}
+            >
+              <option value="Paper / Cover Stock Shortage">📦 Paper / Cover Stock Shortage (Kaghaz / Cover khatam hai)</option>
+              <option value="Printing Machine Maintenance / Breakdown">⚙️ Printing Machine Breakdown / Maintenance (Machine kharab hai)</option>
+              <option value="Binding Delay / Spiral Shortage">⏳ Binding Delay / Spiral Shortage (Binding ka masla hai)</option>
+              <option value="Book PDF / Margin Defect">📄 Book PDF / Margin Defect (File / Page margin ka issue hai)</option>
+              <option value="OTHER">✍️ Other / Custom Reason (Apni waja likhein)</option>
+            </select>
+          </Field>
+
+          <Field label={reasonCategory === "OTHER" ? "Detailed Reason (Required)" : "Additional Notes (Optional)"}>
+            <input
+              type="text"
+              required={reasonCategory === "OTHER"}
+              placeholder={
+                reasonCategory === "OTHER"
+                  ? "Explain why this order cannot be printed…"
+                  : "Optional remarks for Bookstore Office…"
+              }
+              value={detailNote}
+              onChange={(e) => setDetailNote(e.target.value)}
+              className="toolbar-search-input"
+              style={{
+                width: "100%",
+                fontSize: "0.84rem",
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+              }}
+            />
+          </Field>
+
+          <div className="actions" style={{ marginTop: 6, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button type="button" className="btn compact" disabled={submitting} onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn compact primary"
+              disabled={submitting}
+              style={{ background: "#dc2626", borderColor: "#dc2626", color: "#fff" }}
+            >
+              {submitting ? "Removing…" : "Confirm & Remove from Queue"}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Orders({
   base,
   payments = false,
@@ -5724,7 +6348,13 @@ function Orders({
     [bulkAssigningOrders, setBulkAssigningOrders] = useState<any[] | null>(null),
     [printingBusyId, setPrintingBusyId] = useState<string | null>(null),
     [dispatchOfficeOrder, setDispatchOfficeOrder] = useState<any | null>(null),
-    [dispatchingOffice, setDispatchingOffice] = useState(false);
+    [dispatchingOffice, setDispatchingOffice] = useState(false),
+    [removingQueueOrder, setRemovingQueueOrder] = useState<any | null>(null),
+    [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [activeTab, page, q, campus, statusList, deliveryTypeList]);
 
   const handleVendorPrint = async (ord: any, markAsPrinted: boolean) => {
     setPrintingBusyId(ord.id);
@@ -5884,7 +6514,7 @@ function Orders({
       await api(`manage/orders/${dispatchOfficeOrder.id}`, {
         action: "vendor_dispatch_office",
       });
-      toast.success("Order dispatched to Bookstore Office ✓");
+      toast.success("Order dispatched to Campus ✓");
       setDispatchOfficeOrder(null);
       notifyOrdersUpdated();
       await reload();
@@ -6181,6 +6811,9 @@ function Orders({
     if (tab.id === "PROCESSING") {
       return data.status_counts.PROCESSING || 0;
     }
+    if (tab.id === "REFUNDS_DUE") {
+      return data.status_counts.REFUNDS_DUE || 0;
+    }
     if (tab.id === "ALL") {
       return data.status_counts.ALL ?? data.total ?? 0;
     }
@@ -6245,8 +6878,44 @@ function Orders({
     setBulkAssigningOrders(targetOrders);
   };
 
+  const currentOrderRows: any[] = data?.rows || [];
+  const allVisibleSelected = currentOrderRows.length > 0 && currentOrderRows.every((r: any) => selectedIds.includes(r.id));
+  const someVisibleSelected = currentOrderRows.some((r: any) => selectedIds.includes(r.id));
+
+  const toggleSelectOrder = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      const visibleSet = new Set(currentOrderRows.map((r: any) => r.id));
+      setSelectedIds((prev) => prev.filter((id) => !visibleSet.has(id)));
+    } else {
+      const newIds = new Set([...selectedIds, ...currentOrderRows.map((r: any) => r.id)]);
+      setSelectedIds(Array.from(newIds));
+    }
+  };
+
+  const selectAllCheckbox = (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
+      <input
+        type="checkbox"
+        checked={allVisibleSelected}
+        ref={(el) => {
+          if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+        }}
+        onChange={toggleSelectAll}
+        title="Select / Deselect all actionable orders"
+        style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#2563eb" }}
+      />
+    </div>
+  );
+
   const headers = isVendor
     ? [
+        selectAllCheckbox,
         "Order",
         "Student",
         "Books & Pages",
@@ -6258,6 +6927,7 @@ function Orders({
       ]
     : isPendingView
       ? [
+          selectAllCheckbox,
           "Order",
           "Student",
           "Books",
@@ -6268,6 +6938,7 @@ function Orders({
           ...(isAdmin ? ["Actions"] : []),
         ]
       : [
+          selectAllCheckbox,
           "Order",
           "Student",
           "Books",
@@ -6512,7 +7183,10 @@ function Orders({
                 onClick={() => {
                   setPage(1);
                   setActiveTab(tab.id);
-                  if (tab.id === "PROCESSING") {
+                  if (tab.id === "REFUNDS_DUE") {
+                    setStatusList(["REFUNDS_DUE"]);
+                    setPrintedFilter("");
+                  } else if (tab.id === "PROCESSING") {
                     setStatusList(["PROCESSING"]);
                     setPrintedFilter("0");
                   } else if (tab.id === "PRINTED") {
@@ -6845,10 +7519,133 @@ function Orders({
           </button>
         )}
       </div>
+      {selectedIds.length > 0 && (() => {
+        const selectedRows = (data?.rows || []).filter((r: any) => selectedIds.includes(r.id));
+        const printableOrders = selectedRows.filter((r: any) => r.status === "PROCESSING" && !r.vendor_printed_at);
+        const unprintableOrders = selectedRows.filter((r: any) => r.status === "PROCESSING" && !!r.vendor_printed_at);
+        const assignableOrders = selectedRows.filter((r: any) => r.status === "CONFIRMED" || (r.status === "PROCESSING" && !r.vendor_id));
+
+        return (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              padding: "10px 16px",
+              background: "rgba(37, 99, 235, 0.08)",
+              border: "1.5px solid #3b82f6",
+              borderRadius: 8,
+              marginBottom: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 20,
+                  height: 20,
+                  borderRadius: 9999,
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                }}
+              >
+                ✓
+              </span>
+              <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--foreground)" }}>
+                <strong>{selectedIds.length}</strong> {selectedIds.length === 1 ? "order" : "orders"} selected
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {canUpdate && printableOrders.length > 0 && (
+                <button
+                  type="button"
+                  className="btn compact primary"
+                  disabled={batchPrinting}
+                  onClick={() => handleBatchVendorPrint(printableOrders.map((o: any) => o.id), true)}
+                  style={{ background: "#16a34a", borderColor: "#16a34a", fontWeight: 600 }}
+                  title={`Mark selected ${printableOrders.length} order(s) as printed`}
+                >
+                  <CheckCircle2 size={13} />
+                  {batchPrinting ? "Saving…" : `Mark Selected as Printed (${printableOrders.length})`}
+                </button>
+              )}
+
+              {canUpdate && unprintableOrders.length > 0 && (
+                <button
+                  type="button"
+                  className="btn compact"
+                  disabled={batchPrinting}
+                  onClick={() => handleBatchVendorPrint(unprintableOrders.map((o: any) => o.id), false)}
+                  style={{ fontWeight: 600 }}
+                  title={`Clear printed status for selected ${unprintableOrders.length} order(s)`}
+                >
+                  <RotateCcw size={13} /> Unmark Printed ({unprintableOrders.length})
+                </button>
+              )}
+
+              {isAdmin && !isVendor && assignableOrders.length > 0 && (
+                <button
+                  type="button"
+                  className="btn compact"
+                  onClick={() => setBulkAssigningOrders(assignableOrders)}
+                  style={{ fontWeight: 600 }}
+                  title={`Assign selected ${assignableOrders.length} order(s) to a vendor`}
+                >
+                  <Send size={13} /> Send to Vendor ({assignableOrders.length})
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="btn compact"
+                onClick={() => setSelectedIds([])}
+                style={{
+                  fontSize: "0.76rem",
+                  color: "var(--muted-foreground)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  marginLeft: "auto",
+                }}
+              >
+                Clear selection
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       <Result loading={loading} error={error}>
         <DataTable
           headers={headers}
           rows={(data?.rows || []).map((o: any) => {
+            const isTerminalOrder = ["DELIVERED", "CANCELLED", "REJECTED"].includes(o.status);
+            const selectCell = (
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={!isTerminalOrder && selectedIds.includes(o.id)}
+                  disabled={isTerminalOrder}
+                  onChange={() => !isTerminalOrder && toggleSelectOrder(o.id)}
+                  title={isTerminalOrder ? "Delivered or terminal orders cannot be modified" : `Select order ${o.reference || o.id}`}
+                  style={{
+                    cursor: isTerminalOrder ? "not-allowed" : "pointer",
+                    width: 16,
+                    height: 16,
+                    accentColor: "#2563eb",
+                    opacity: isTerminalOrder ? 0.35 : 1,
+                  }}
+                />
+              </div>
+            );
             const mapUrl = getMapLocation(o);
             const isCampus =
               o.delivery_type === "campus" ||
@@ -7016,12 +7813,22 @@ function Orders({
                     .join("\n")
                 : `${booksCount} book(s) ordered`;
 
+            const rawOrderItems: any[] = o.items || [];
+            const rcvdItemsCount = rawOrderItems
+              .filter((it: any) => it.received_from_vendor)
+              .reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+            const isPartiallyDelivered = rcvdItemsCount > 0 && rcvdItemsCount < booksCount;
+            const isAllDelivered = booksCount > 0 && rcvdItemsCount === booksCount;
+
+            const orderItems: any[] = o.items || [];
+            const pendingItems = orderItems.filter((it: any) => !it.received_from_vendor);
             const booksCell = (
               <div
                 style={{
                   display: "inline-flex",
                   flexDirection: "column",
-                  cursor: (o.items || []).length > 0 ? "help" : "default",
+                  gap: 3,
+                  cursor: orderItems.length > 0 ? "help" : "default",
                   whiteSpace: "nowrap",
                 }}
                 title={booksTooltip}
@@ -7032,6 +7839,61 @@ function Orders({
                     {booksCount === 1 ? "book" : "books"}
                   </span>
                 </div>
+                {isPartiallyDelivered && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        background: "rgba(245, 158, 11, 0.15)",
+                        color: "#b45309",
+                        border: "1px solid #fde68a",
+                        width: "fit-content",
+                      }}
+                      title={`${rcvdItemsCount} of ${booksCount} books delivered by vendor. ${booksCount - rcvdItemsCount} pending.`}
+                    >
+                      ⚠️ {rcvdItemsCount}/{booksCount} Rcvd
+                    </span>
+                    {pendingItems.map((p: any) => (
+                      <span
+                        key={p.id || p.code}
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 600,
+                          background: "rgba(239, 68, 68, 0.10)",
+                          color: "#dc2626",
+                          border: "1px solid #fca5a5",
+                          padding: "1px 6px",
+                          width: "fit-content",
+                          whiteSpace: "normal",
+                          maxWidth: 220,
+                          lineHeight: 1.25,
+                        }}
+                        title={`Pending from vendor: ${p.code} - ${p.title || ""}`}
+                      >
+                        ⏳ Pending: <strong>{p.code}</strong>{p.title ? ` (${p.title.length > 20 ? p.title.slice(0, 18) + "…" : p.title})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {isAllDelivered && booksCount > 1 && (
+                  <span
+                    className="mono-pill"
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      background: "rgba(22, 163, 74, 0.12)",
+                      color: "#15803d",
+                      border: "1px solid #86efac",
+                      width: "fit-content",
+                    }}
+                    title={`All ${booksCount} books received from vendor`}
+                  >
+                    ✓ All {booksCount} Rcvd
+                  </span>
+                )}
               </div>
             );
 
@@ -7042,41 +7904,83 @@ function Orders({
                 orderItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0)
               );
 
+              const vPendingItems = orderItems.filter((it: any) => !it.received_from_vendor);
+              const vRcvdCount = orderItems.filter((it: any) => !!it.received_from_vendor).length;
+              const vIsPartial = vRcvdCount > 0 && vPendingItems.length > 0;
+              const vIsAllRcvd = orderItems.length > 0 && vRcvdCount === orderItems.length;
+
               const vendorBooksCell = (
                 <div
                   style={{
                     display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    flexWrap: "nowrap",
+                    flexDirection: "column",
+                    gap: 3,
                     whiteSpace: "nowrap",
                   }}
                   title={booksTooltip}
                 >
-                  <span
-                    className="mono-pill"
-                    style={{
-                      fontWeight: 700,
-                      fontSize: "0.76rem",
-                      background: "rgba(59, 130, 246, 0.12)",
-                      color: "#1d4ed8",
-                      padding: "3px 8px",
-                    }}
-                  >
-                    {booksCount} {booksCount === 1 ? "book" : "books"}
-                  </span>
-                  {totalPages > 0 && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                     <span
                       className="mono-pill"
                       style={{
-                        fontWeight: 600,
-                        fontSize: "0.74rem",
-                        background: "var(--muted)",
-                        color: "var(--foreground)",
+                        fontWeight: 700,
+                        fontSize: "0.76rem",
+                        background: "rgba(59, 130, 246, 0.12)",
+                        color: "#1d4ed8",
                         padding: "3px 8px",
                       }}
                     >
-                      {totalPages.toLocaleString()} pages
+                      {booksCount} {booksCount === 1 ? "book" : "books"}
+                    </span>
+                    {totalPages > 0 && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "0.74rem",
+                          background: "var(--muted)",
+                          color: "var(--foreground)",
+                          padding: "3px 8px",
+                        }}
+                      >
+                        {totalPages.toLocaleString()} pages
+                      </span>
+                    )}
+                  </div>
+                  {vIsPartial && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          background: "rgba(239, 68, 68, 0.12)",
+                          color: "#dc2626",
+                          border: "1px solid #fca5a5",
+                          padding: "1px 6px",
+                          width: "fit-content",
+                        }}
+                        title={`Office received ${vRcvdCount} of ${orderItems.length} books. ${vPendingItems.map((p: any) => p.code).join(", ")} still pending.`}
+                      >
+                        ⚠️ Pending at Office: {vPendingItems.map((p: any) => p.code).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  {vIsAllRcvd && (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 600,
+                        background: "rgba(22, 163, 74, 0.10)",
+                        color: "#15803d",
+                        border: "1px solid #86efac",
+                        padding: "1px 6px",
+                        width: "fit-content",
+                      }}
+                      title="All books in this order have been received by the Bookstore Office"
+                    >
+                      ✓ All Received by Office
                     </span>
                   )}
                 </div>
@@ -7165,7 +8069,7 @@ function Orders({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSetPrintingQueue(o, false);
+                          setRemovingQueueOrder(o);
                         }}
                         disabled={queueBusyId === o.id}
                         style={{
@@ -7183,10 +8087,10 @@ function Orders({
                           transition: "all 0.15s ease",
                           width: "fit-content",
                         }}
-                        title="Remove from Printing (reverts to Confirmed)"
+                        title="Remove from Printing Queue (unassigns vendor and returns to Confirmed)"
                       >
                         <XCircle size={10} color="#dc2626" />
-                        {queueBusyId === o.id ? "Reverting…" : "Remove from Printing"}
+                        Remove from Printing
                       </button>
                     </div>
                   )}
@@ -7194,6 +8098,7 @@ function Orders({
               );
 
               return [
+                selectCell,
                 refCell,
                 <div>
                   <strong>{o.name}</strong>
@@ -7303,7 +8208,7 @@ function Orders({
                         }}
                         title="Mark printed order as dispatched to Bookstore Office"
                       >
-                        <Building2 size={12} /> Send to Office
+                        <Building2 size={12} /> Send to Campus
                       </button>
                     ) : o.vendor_dispatched_at || ["SHIPPED", "DELIVERED"].includes(o.status) ? (
                       <span
@@ -7315,17 +8220,17 @@ function Orders({
                           color: "#1d4ed8",
                           borderColor: "#93c5fd",
                         }}
-                        title="Batch dispatched to Bookstore Office"
+                        title="Batch dispatched to Campus"
                       >
-                        <Building2 size={12} /> Sent to Office ✓
+                        <Building2 size={12} /> Sent to Campus ✓
                       </span>
                     ) : (
                       <span
                         className="map-pin-pill campus-badge"
                         style={{ fontSize: "0.75rem", padding: "3px 8px" }}
-                        title="Deliver this batch to Bookstore Administration Office"
+                        title="Deliver this batch to Campus"
                       >
-                        <Building2 size={12} /> Deliver to Office
+                        <Building2 size={12} /> Send to Campus
                       </span>
                     )}
                   </div>
@@ -7346,47 +8251,76 @@ function Orders({
                 <Status value={o.status} />
                 {o.status === "PROCESSING" && (
                   <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
-                    {o.vendor_printed_at ? (
-                      <span
-                        className="mono-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          background: "rgba(22, 163, 74, 0.15)",
-                          color: "#15803d",
-                          border: "1px solid #86efac",
-                          width: "fit-content",
-                        }}
-                        title={`Printed by vendor on ${formatDateDMY(o.vendor_printed_at)}`}
-                      >
-                        <CheckCircle2 size={11} /> Printed
-                      </span>
-                    ) : (
-                      <span
-                        className="mono-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          background: "rgba(245, 158, 11, 0.15)",
-                          color: "#b45309",
-                          border: "1px solid #fde68a",
-                          width: "fit-content",
-                        }}
-                        title="In vendor printing queue"
-                      >
-                        <Clock size={11} /> In Printing Queue
-                      </span>
-                    )}
+                  {o.vendor_printed_at ? (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 9999,
+                        background: "rgba(22, 163, 74, 0.15)",
+                        color: "#15803d",
+                        border: "1px solid #86efac",
+                        width: "fit-content",
+                      }}
+                      title={`Printed on ${formatDateDMY(o.vendor_printed_at)}`}
+                    >
+                      <CheckCircle2 size={11} /> Printed
+                    </span>
+                  ) : (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 9999,
+                        background: "rgba(245, 158, 11, 0.15)",
+                        color: "#b45309",
+                        border: "1px solid #fde68a",
+                        width: "fit-content",
+                      }}
+                      title="Pending print"
+                    >
+                      <Clock size={11} /> In Printing Queue
+                    </span>
+                  )}
+                  {canUpdate && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleVendorPrint(o, !o.vendor_printed_at);
+                      }}
+                      disabled={printingBusyId === o.id}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: "0.70rem",
+                        fontWeight: 600,
+                        padding: "1px 7px",
+                        borderRadius: 9999,
+                        cursor: "pointer",
+                        background: o.vendor_printed_at ? "rgba(245, 158, 11, 0.12)" : "rgba(22, 163, 74, 0.12)",
+                        color: o.vendor_printed_at ? "#b45309" : "#15803d",
+                        border: o.vendor_printed_at ? "1px solid #fde68a" : "1px solid #86efac",
+                        transition: "all 0.15s ease",
+                        width: "fit-content",
+                      }}
+                      title={o.vendor_printed_at ? "Click to unmark as printed" : "Click to mark as printed"}
+                    >
+                      {o.vendor_printed_at ? <RotateCcw size={10} /> : <CheckCircle2 size={10} color="currentColor" />}
+                      {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark" : "Mark Printed"}
+                    </button>
+                  )}
                     {o.vendor_dispatched_at && (
                       <span
                         className="mono-pill"
@@ -7415,6 +8349,7 @@ function Orders({
 
             return isPendingView
               ? [
+                  selectCell,
                   refCell,
                   <div>
                     {o.name}
@@ -7480,6 +8415,7 @@ function Orders({
                     : []),
                 ]
               : [
+                  selectCell,
                   refCell,
                   <div>
                     {o.name}
@@ -7519,6 +8455,23 @@ function Orders({
                         title={`Paid: ${money(o.amount_paid || 0)} · Due: ${money(o.due_amount)}`}
                       >
                         Due: {money(o.due_amount)}
+                      </span>
+                    )}
+                    {isAdmin && (Number(o.refund_due || 0) > 0 || o.refund_status === "REFUND_PENDING") && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          background: "rgba(239, 68, 68, 0.15)",
+                          color: "#dc2626",
+                          border: "1px solid #fca5a5",
+                          padding: "1px 5px",
+                          width: "fit-content",
+                        }}
+                        title={`Student refund pending: ${money(o.refund_due)}`}
+                      >
+                        Refund Due: {money(o.refund_due)}
                       </span>
                     )}
                   </div>,
@@ -7783,10 +8736,17 @@ function Orders({
       <Confirm
         open={!!dispatchOfficeOrder}
         onClose={() => setDispatchOfficeOrder(null)}
-        title={`Dispatch Order ${dispatchOfficeOrder?.reference || ""} to Bookstore Office?`}
-        description="Mark this Lahore / VU Qanchi Campus order as printed and handed over / dispatched to the Bookstore Office. The admin will be notified and can track receipt."
+        title={`Send Order ${dispatchOfficeOrder?.reference || ""} to Campus?`}
+        description="Mark this Lahore / VU Qanchi Campus order as printed and sent to the Campus Office. The admin will be notified and can track receipt."
         onConfirm={handleDispatchOffice}
       />
+      {removingQueueOrder && (
+        <VendorRemoveQueueModal
+          order={removingQueueOrder}
+          onClose={() => setRemovingQueueOrder(null)}
+          onSuccess={reload}
+        />
+      )}
     </>
   );
 }
@@ -7799,7 +8759,8 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
     [assignVendorOpen, setAssignVendorOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [partialPaidInput, setPartialPaidInput] = useState<string>(""),
-    [partialDueNote, setPartialDueNote] = useState<string>("");
+    [partialDueNote, setPartialDueNote] = useState<string>(""),
+    [removeQueueOpen, setRemoveQueueOpen] = useState(false);
 
   useEffect(() => {
     if (o && o.status === "PAYMENT_PENDING") {
@@ -8201,21 +9162,9 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       type="button"
                       className="btn compact"
                       disabled={busy}
-                      onClick={async () => {
-                        setBusy(true);
-                        try {
-                          await api(`manage/orders/${o.id}`, { action: "printing_queue", in_queue: false });
-                          toast.success("Order removed from Printing Queue (reverted to Confirmed) ✓");
-                          notifyOrdersUpdated();
-                          await reload();
-                        } catch (e) {
-                          toast.error(errorText(e));
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
+                      onClick={() => setRemoveQueueOpen(true)}
                       style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--destructive)" }}
-                      title="Remove from Printing and send back to Confirmed status"
+                      title="Remove from Printing Queue (unassigns vendor and returns to Confirmed)"
                     >
                       <XCircle size={13} /> Remove from Printing
                     </button>
@@ -8777,6 +9726,13 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
               onAssigned={reload}
             />
           )}
+          {removeQueueOpen && (
+            <VendorRemoveQueueModal
+              order={o}
+              onClose={() => setRemoveQueueOpen(false)}
+              onSuccess={reload}
+            />
+          )}
         </>
       )}
     </Result>
@@ -8995,11 +9951,217 @@ function Campuses() {
   );
 }
 
+
+function VendorPendingBooksModal({
+  vendor,
+  onClose,
+}: {
+  vendor: any;
+  onClose: () => void;
+}) {
+  const { data, loading, error } = useData<any>(
+    `manage/vendor-pending-books?vendor_id=${vendor.id}`
+  );
+
+  const pendingBooks: any[] = data?.pendingBooks || [];
+  const totalQty = data?.totalPendingQty ?? 0;
+  const totalTitles = data?.totalPendingTitles ?? 0;
+  const whatsappUrl = data?.whatsappUrl;
+  const whatsappMessage = data?.whatsappMessage || "";
+
+  const copyToClipboard = () => {
+    if (!whatsappMessage) return;
+    navigator.clipboard.writeText(whatsappMessage);
+    toast.success("Pending books checklist copied to clipboard ✓");
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent style={{ maxWidth: 640 }}>
+        <DialogHeader>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 8,
+                background: "rgba(37, 99, 235, 0.12)",
+                color: "var(--primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <ClipboardList size={20} />
+            </div>
+            <div>
+              <DialogTitle style={{ fontSize: "1.15rem", margin: 0 }}>
+                Pending Books Checklist — {vendor.name}
+              </DialogTitle>
+              <DialogDescription style={{ fontSize: "0.82rem", marginTop: 2 }}>
+                Consolidated summary of books currently waiting for intake at Bookstore Office
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <Result loading={loading} error={error}>
+          {pendingBooks.length === 0 ? (
+            <div
+              style={{
+                padding: "30px 20px",
+                textAlign: "center",
+                background: "rgba(22, 163, 74, 0.06)",
+                borderRadius: 8,
+                border: "1px dashed #86efac",
+              }}
+            >
+              <CheckCircle2 size={36} color="#16a34a" style={{ margin: "0 auto 8px" }} />
+              <strong style={{ display: "block", color: "#15803d", fontSize: "1rem" }}>
+                All Books Received!
+              </strong>
+              <p className="small-text muted" style={{ marginTop: 4 }}>
+                There are no pending books waiting from {vendor.name}. All active orders are fulfilled.
+              </p>
+            </div>
+          ) : (
+            <div className="stack" style={{ gap: 14 }}>
+              {/* Summary Stats Pill Banner */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "var(--muted)",
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  fontSize: "0.85rem",
+                }}
+              >
+                <div>
+                  <span className="muted">Total Pending Books: </span>
+                  <strong style={{ color: "#d97706", fontSize: "1rem" }}>
+                    {totalQty} {totalQty === 1 ? "copy" : "copies"}
+                  </strong>
+                </div>
+                <div>
+                  <span className="muted">Across: </span>
+                  <strong style={{ color: "var(--foreground)" }}>
+                    {totalTitles} {totalTitles === 1 ? "title" : "titles"}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Table of Pending Books */}
+              <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                  <thead>
+                    <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                      <th style={{ padding: "8px 10px", width: 35 }}>#</th>
+                      <th style={{ padding: "8px 10px", width: 90 }}>Code</th>
+                      <th style={{ padding: "8px 10px" }}>Title / Course</th>
+                      <th style={{ padding: "8px 10px", textAlign: "center", width: 70 }}>Qty</th>
+                      <th style={{ padding: "8px 10px", width: 140 }}>Order(s)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingBooks.map((b: any, idx: number) => (
+                      <tr
+                        key={b.code + idx}
+                        style={{
+                          borderBottom: idx < pendingBooks.length - 1 ? "1px solid var(--border)" : "none",
+                          background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                        }}
+                      >
+                        <td style={{ padding: "7px 10px", color: "var(--muted-foreground)" }}>{idx + 1}</td>
+                        <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
+                          <span
+                            className="mono-pill"
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "0.76rem",
+                              background: "rgba(37, 99, 235, 0.10)",
+                              color: "var(--primary)",
+                            }}
+                          >
+                            {b.code}
+                          </span>
+                        </td>
+                        <td style={{ padding: "7px 10px", fontWeight: 500 }}>{b.title || "—"}</td>
+                        <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                          <span
+                            className="mono-pill"
+                            style={{
+                              fontWeight: 700,
+                              background: "rgba(245, 158, 11, 0.15)",
+                              color: "#b45309",
+                              padding: "2px 7px",
+                            }}
+                          >
+                            ×{b.totalQty}
+                          </span>
+                        </td>
+                        <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "var(--muted-foreground)" }}>
+                          {b.orders.join(", ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn compact"
+                  onClick={copyToClipboard}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <Copy size={13} /> Copy Text Checklist
+                </button>
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button type="button" className="btn compact" onClick={onClose}>
+                    Close
+                  </button>
+                  {whatsappUrl && (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn compact primary"
+                      style={{
+                        background: "#25D366",
+                        borderColor: "#25D366",
+                        color: "#fff",
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        textDecoration: "none",
+                      }}
+                      title="Send consolidated checklist directly to vendor on WhatsApp"
+                    >
+                      <MessageCircle size={14} /> Send via WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Result>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Vendors() {
   const { data, error, loading, reload } = useData<any[]>("manage/vendors");
   const [edit, setEdit] = useState<any>(null);
   const [remove, setRemove] = useState<any>(null);
   const [ledgerVendor, setLedgerVendor] = useState<any>(null);
+  const [pendingBooksVendor, setPendingBooksVendor] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -9362,6 +10524,28 @@ function Vendors() {
                   <span style={{ color: "#ffffff", textDecoration: "none", fontWeight: 600 }}>Ledger</span>
                 </button>
                 <button
+                  type="button"
+                  className="btn compact"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: "0.75rem",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    background: "rgba(37, 99, 235, 0.08)",
+                    color: "var(--primary)",
+                    border: "1px solid rgba(37, 99, 235, 0.3)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setPendingBooksVendor(v)}
+                  title={`View pending books checklist for ${v.name}`}
+                >
+                  <ClipboardList size={13} />
+                  <span>Pending</span>
+                </button>
+                <button
                   onClick={() =>
                     setEdit({
                       id: v.id,
@@ -9612,6 +10796,12 @@ function Vendors() {
           vendor={ledgerVendor}
           onClose={() => setLedgerVendor(null)}
           onUpdated={() => reload()}
+        />
+      )}
+      {pendingBooksVendor && (
+        <VendorPendingBooksModal
+          vendor={pendingBooksVendor}
+          onClose={() => setPendingBooksVendor(null)}
         />
       )}
 
@@ -10104,6 +11294,7 @@ function VendorLedgerModal({
 }
 
 function VendorDashboard({ user, base }: { user: User; base: string }) {
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const { data: ledger, error: ledgerError, loading: ledgerLoading, reload: reloadLedger } =
     useData<VendorLedger>("manage/vendor-ledger");
   const { data: ordersData, error: ordersError, loading: ordersLoading, reload: reloadOrders } =
@@ -10158,6 +11349,24 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           <span className="mono-pill" style={{ background: "var(--status-good-bg)", color: "var(--status-good-text)", border: "1px solid var(--status-good-border)", fontWeight: 700, fontSize: "0.78rem" }}>
             Binding: Rs. {Number(summary.binding_rate).toFixed(2)} / book
           </span>
+          <button
+            type="button"
+            className="btn compact"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontWeight: 600,
+              background: "rgba(37, 99, 235, 0.10)",
+              color: "var(--primary)",
+              borderColor: "rgba(37, 99, 235, 0.3)",
+            }}
+            onClick={() => setShowPendingModal(true)}
+            title="View checklist of all books currently pending intake at Bookstore Office"
+          >
+            <ClipboardList size={14} />
+            Pending Books Checklist
+          </button>
           <button
             type="button"
             className="btn compact"
@@ -10726,6 +11935,12 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           )}
         </div>
       </Result>
+      {showPendingModal && (
+        <VendorPendingBooksModal
+          vendor={{ id: user.vendor_id || user.id, name: user.name || "Vendor" }}
+          onClose={() => setShowPendingModal(false)}
+        />
+      )}
     </div>
   );
 }

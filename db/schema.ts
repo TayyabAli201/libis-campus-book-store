@@ -170,6 +170,11 @@ export const orders = sqliteTable(
     status: text("status").notNull(),
     courierName: text("courier_name"),
     courierTrackingId: text("courier_tracking_id"),
+    refundDue: integer("refund_due").notNull().default(0),
+    refundAmount: integer("refund_amount").notNull().default(0),
+    refundStatus: text("refund_status").notNull().default("NONE"),
+    refundNote: text("refund_note"),
+    refundPaidAt: text("refund_paid_at"),
     // RELEASED means no stock commitment; legacy rows retain their recorded state.
     inventoryState: text("inventory_state").notNull().default("RESERVED"),
     createdAt: stamp(),
@@ -211,6 +216,7 @@ export const items = sqliteTable(
     rate: integer("rate").notNull(),
     unitPrice: integer("unit_price").notNull(),
     quantity: integer("quantity").notNull(),
+    receivedFromVendor: integer("received_from_vendor").notNull().default(0),
   },
   (t) => [
     index("idx_items_order").on(t.orderId),

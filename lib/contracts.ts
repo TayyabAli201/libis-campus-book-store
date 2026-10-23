@@ -425,3 +425,73 @@ export function formatReceiptBookTitle(
   }
   return `${c} - ${t}`;
 }
+
+export function getStudentRefundWhatsAppMessage(
+  o: any,
+  refundAmount?: number,
+  method = "JazzCash",
+  reference = "",
+  note = "",
+): string {
+  const studentName = (o?.name || "Student").trim();
+  const ref = o?.reference || o?.id || "Order";
+  const amount = refundAmount !== undefined ? refundAmount : Number(o?.refund_amount || o?.refund_due || 0);
+  const formattedAmount = money(amount);
+  const methodStr = method ? ` via ${method}` : "";
+  const refStr = reference ? ` (Ref: ${reference})` : "";
+  const noteStr = note ? `\nNote: ${note}` : "";
+
+  return `Assalam-o-Alaikum ${studentName}!
+
+Regarding your Order #${ref} at Campus Bookstore:
+An advance refund of ${formattedAmount} has been processed for you${methodStr}${refStr}.${noteStr}
+
+Your remaining order items are being fulfilled as scheduled.
+Thank you for your patience!
+- Campus Bookstore Operations`;
+}
+
+export function getStudentRefundWhatsAppUrl(
+  o: any,
+  refundAmount?: number,
+  method = "JazzCash",
+  reference = "",
+  note = "",
+): string {
+  const phone = formatWhatsAppPhone(o?.phone || "");
+  const message = getStudentRefundWhatsAppMessage(o, refundAmount, method, reference, note);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+export function getVendorPendingBooksWhatsAppMessage(
+  vendorName: string,
+  pendingList: Array<{ code: string; title?: string; totalQty: number; orders: string[] }>,
+): string {
+  const name = (vendorName || "Vendor").trim();
+  const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+  const lines = pendingList.map((p, idx) => {
+    const ordersStr = p.orders.length > 0 ? ` [${p.orders.join(", ")}]` : "";
+    return `${idx + 1}. *${p.code}* - ${p.totalQty} cop${p.totalQty === 1 ? "y" : "ies"}${p.title ? ` (${p.title})` : ""}${ordersStr}`;
+  }).join("\n");
+
+  return `Salam ${name}!
+
+*Pending Books Checklist (${dateStr}):*
+Campus Bookstore Office mein aap ki taraf se mandarja zail books abhi tak pending / not received hain:
+
+${lines}
+
+Baraye meharbani yeh remaining books jald print kar ke deliver/dispatch karwayen.
+Shukriya - Campus Bookstore Office`;
+}
+
+export function getVendorPendingBooksWhatsAppUrl(
+  vendorPhone: string,
+  vendorName: string,
+  pendingList: any[],
+): string {
+  const phone = formatWhatsAppPhone(vendorPhone || "");
+  const message = getVendorPendingBooksWhatsAppMessage(vendorName, pendingList);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}

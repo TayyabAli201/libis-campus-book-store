@@ -64,6 +64,9 @@ const {
   editOrderItems,
   recordDuePayment,
   updateDueNote,
+  toggleOrderItemReceived,
+  setAllOrderItemsReceived,
+  recordStudentRefund,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -75,6 +78,7 @@ const {
   getVendorLedger,
   createVendorPayment,
   deleteVendorPayment,
+  getVendorPendingBooks,
 } = await import("../lib/server/vendors.ts");
 const {
   getVendorWhatsAppMessage,
@@ -82,6 +86,10 @@ const {
   getOrderWhatsAppMessage,
   formatWhatsAppPhone,
   isOtherCityOrder,
+  getStudentRefundWhatsAppMessage,
+  getStudentRefundWhatsAppUrl,
+  getVendorPendingBooksWhatsAppMessage,
+  getVendorPendingBooksWhatsAppUrl,
 } = await import("../lib/contracts.ts");
 const { GET, POST, DELETE } = await import("../app/api/[...path]/route.ts");
 const { hash } = await import("../lib/server/security.ts");
@@ -131,6 +139,7 @@ function database(t) {
     "0009_vendor_ledger.sql",
     "0010_due_payments.sql",
     "0011_actual_courier_charges.sql",
+    "0012_item_received_and_refunds.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -1662,15 +1671,32 @@ test("Vendor Printing Rules: Admin assigns vendor -> defaults to Printing Queue;
   assert.equal(dbAfterAssign.vendor_id, vRes.vendor.id);
   assert.equal(dbAfterAssign.vendor_printed_at, null, "Vendor printed status is null by default in printing queue");
 
-  // 4. Super Admin CANNOT mark order as printed (reserved for vendor)
+    // 4. Customer CANNOT mark order as printed, but Super Admin CAN mark order as printed
+  const custUser = {
+    id: "cust-test",
+    name: "Customer",
+    email: "customer@example.invalid",
+    role: "CUSTOMER",
+    vendor_id: null,
+    campus_id: null,
+    permissions: [],
+  };
   await assert.rejects(
-    () => vendorPrint(testReq, adminUser, ord1.id, true),
-    /reserved for vendors only/
+    () => vendorPrint(testReq, custUser, ord1.id, true),
+    /Permission denied to update print status/
   );
   await assert.rejects(
-    () => batchVendorPrint(testReq, adminUser, [ord1.id], true),
-    /reserved for vendors only/
+    () => batchVendorPrint(testReq, custUser, [ord1.id], true),
+    /Permission denied for batch print marking/
   );
+
+  // Super Admin CAN mark order as printed
+  const adminPrintRes = await vendorPrint(testReq, adminUser, ord1.id, true);
+  assert.equal(adminPrintRes.ok, true);
+  const adminBatchPrintRes = await batchVendorPrint(testReq, adminUser, [ord1.id], true);
+  assert.equal(adminBatchPrintRes.ok, true);
+  // Revert back for subsequent vendor test steps
+  await vendorPrint(testReq, adminUser, ord1.id, false);
 
   // 5. Vendor CAN mark order as printed
   const printRes = await vendorPrint(testReq, vendorUser, ord1.id, true);
@@ -2774,4 +2800,400 @@ test("Site logo branding can be uploaded, saved in settings, and updated or clea
 
   const afterClear = await getSettings();
   assert.equal(afterClear.settings.logo_url, null);
+});
+
+test("Item Received Tracking and Student Refund Workflow: admin item-level delivery and refund on unavailable books", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/orders");
+  const adminUser = { id: "admin", email: "admin@vu.edu.pk", role: "SUPER_ADMIN", permissions: ["orders.update", "orders.manage"] };
+
+  // 1. Create vendor and two books
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Master Prints",
+    phone: "03211112222",
+    email: "masterprints@example.com",
+    password: "Password123!",
+    page_rate: 1.5,
+    binding_rate: 50,
+    active: true,
+  });
+
+  const { id: book1Id } = await saveBook(bookInput("BOOK101", { title: "Math", pages: 100 }), adminUser, request);
+  const { id: book2Id } = await saveBook(bookInput("BOOK102", { title: "Physics", pages: 200 }), adminUser, request);
+
+  // 2. Customer places order with 2 books
+  const cart = {
+    name: "Ahmed Ali",
+    phone: "03009998877",
+    city: "Lahore",
+    address: "Model Town Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: book1Id, quantity: 1 },
+      { id: book2Id, quantity: 1 },
+    ],
+  };
+
+  const q = await quote(request, cart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const orderId = placed.id;
+
+  // 3. Mark payment accepted in full (advance paid)
+  const ordBeforePay = await getOrder(request, orderId, adminUser);
+  await decidePayment(request, adminUser, orderId, "approve", "Full advance paid via EasyPaisa", ordBeforePay.version);
+
+  // Assign to vendor
+  await assignOrderToVendor(testReq, adminUser, orderId, vRes.vendor.id, "Please print fast");
+
+  // Verify order details: 2 items, received_from_vendor = 0
+  let currentOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(currentOrder.items.length, 2);
+  assert.equal(currentOrder.items[0].received_from_vendor, 0);
+  assert.equal(currentOrder.items[1].received_from_vendor, 0);
+  assert.equal(currentOrder.refund_due, 0);
+  assert.equal(currentOrder.refund_status, "NONE");
+
+  // 4. Partial Book Arrival: Vendor delivers book 1, but book 2 is still pending
+  const item1Id = currentOrder.items[0].id;
+  const item2Id = currentOrder.items[1].id;
+  
+  const toggleRes1 = await toggleOrderItemReceived(testReq, adminUser, orderId, item1Id, true);
+  assert.equal(toggleRes1.ok, true);
+  assert.equal(toggleRes1.received_from_vendor, 1);
+
+  currentOrder = await getOrder(request, orderId, adminUser);
+  const foundItem1 = currentOrder.items.find(i => i.id === item1Id);
+  const foundItem2 = currentOrder.items.find(i => i.id === item2Id);
+  assert.equal(foundItem1.received_from_vendor, 1);
+  assert.equal(foundItem2.received_from_vendor, 0);
+
+  // Toggle all received
+  await setAllOrderItemsReceived(testReq, adminUser, orderId, true);
+  currentOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(currentOrder.items.every(i => i.received_from_vendor === 1), true);
+
+  // Reset all received
+  await setAllOrderItemsReceived(testReq, adminUser, orderId, false);
+  currentOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(currentOrder.items.every(i => i.received_from_vendor === 0), true);
+
+  // 5. Unavailable Book Scenario:
+  // Book 2 is unavailable/out of stock. Admin removes Book 2 from order items.
+  const editRes = await editOrderItems(request, adminUser, orderId, [
+    { id: item1Id, quantity: 1 },
+  ]);
+    assert.equal(editRes.ok, true);
+  assert.ok(editRes.refund_due > 0, "Refund due is calculated when items removed from paid order");
+  assert.equal(editRes.refund_status, "REFUND_PENDING");
+
+  currentOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(currentOrder.items.length, 1);
+  const refundDueAmount = currentOrder.refund_due;
+  assert.ok(refundDueAmount > 0);
+  assert.equal(currentOrder.refund_status, "REFUND_PENDING");
+
+  // Check vendor ledger: vendor cost now only includes Book 1 (100 pages), Book 2 (200 pages) is EXCLUDED
+  const ledger = await getVendorLedger(adminUser, vRes.vendor.id);
+  const orderLedgerRow = ledger.orders.find(o => o.id === orderId);
+  assert.ok(orderLedgerRow);
+  assert.equal(orderLedgerRow.total_pages, 100, "Ledger total_pages excludes deleted book");
+  assert.equal(orderLedgerRow.total_books, 1, "Ledger total_books excludes deleted book");
+
+  // 6. Record Student Refund
+  const refundRes = await recordStudentRefund(
+    testReq,
+    adminUser,
+    orderId,
+    refundDueAmount,
+    "JazzCash",
+    "TID-987654321",
+    "Refunded for unavailable Physics book"
+  );
+  assert.equal(refundRes.ok, true);
+  assert.equal(refundRes.refund_status, "REFUNDED");
+  assert.equal(refundRes.refund_amount, refundDueAmount);
+
+  // Verify DB state after refund
+  currentOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(currentOrder.refund_status, "REFUNDED");
+  assert.equal(currentOrder.refund_amount, refundDueAmount);
+  assert.ok(currentOrder.refund_note.includes("TID-987654321"));
+  assert.ok(currentOrder.refund_paid_at);
+
+  // Non-admin cannot record refund
+  const custUser = { id: "cust", email: "cust@example.invalid", role: "CUSTOMER" };
+  await assert.rejects(
+    () => recordStudentRefund(testReq, custUser, orderId, 100, "Cash", "", ""),
+    /Only Super Admin can record student refunds/
+  );
+});
+
+test("Delivered orders protection: terminal delivered orders cannot be marked as printed or sent to vendor", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/orders");
+  const adminUser = { id: "admin", email: "admin@vu.edu.pk", role: "SUPER_ADMIN", permissions: ["orders.update", "orders.manage"] };
+
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Terminal Test Vendor",
+    phone: "03009990000",
+    email: "terminalvendor@example.com",
+    password: "Password123!",
+  });
+
+  const { id: bookId } = await saveBook(bookInput("TERM101", { title: "Terminal Book", pages: 120 }), adminUser, request);
+
+  const cart = {
+    name: "Terminal Student",
+    phone: "03210001122",
+    city: "Lahore",
+    address: "Johar Town, Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 1 }],
+  };
+
+  const q = await quote(request, cart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const orderId = placed.id;
+
+  const ord = await getOrder(request, orderId, adminUser);
+  await decidePayment(request, adminUser, orderId, "approve", "Approved", ord.version);
+
+  // Move order to DELIVERED status
+  sqlite.prepare("UPDATE orders SET status='DELIVERED', updated_at=datetime('now') WHERE id=?").run(orderId);
+
+  // 1. vendorPrint must reject delivered orders
+  await assert.rejects(
+    () => vendorPrint(testReq, adminUser, orderId, true),
+    /Cannot update print status for order in Delivered status/
+  );
+
+  // 2. assignOrderToVendor must reject delivered orders
+  await assert.rejects(
+    () => assignOrderToVendor(testReq, adminUser, orderId, vRes.vendor.id),
+    /Cannot assign order in DELIVERED status to a vendor/
+  );
+
+  // 3. batchVendorPrint must safely filter out delivered orders and not touch them
+  const batchPrintRes = await batchVendorPrint(testReq, adminUser, [orderId], true);
+  assert.equal(batchPrintRes.ok, true);
+  assert.equal(batchPrintRes.count, 0);
+
+  // 4. batchAssignOrdersToVendor must skip delivered orders
+  const batchAssignRes = await batchAssignOrdersToVendor(testReq, adminUser, [orderId], vRes.vendor.id);
+  assert.equal(batchAssignRes.ok, true);
+  assert.equal(batchAssignRes.count, 0);
+});
+
+test("Admin Enhancements: student refund WhatsApp notification, vendor pending books summary, and REFUNDS_DUE tab", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/orders");
+  const adminUser = { id: "admin", email: "admin@vu.edu.pk", role: "SUPER_ADMIN", permissions: ["orders.update", "orders.manage"] };
+
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Pending Summary Vendor",
+    phone: "03001234567",
+    email: "summaryvendor@example.com",
+    password: "Password123!",
+  });
+  const vendorId = vRes.vendor.id;
+
+  const { id: b1 } = await saveBook(bookInput("ENH101", { title: "Enhancement Book 1", pages: 100 }), adminUser, request);
+  const { id: b2 } = await saveBook(bookInput("ENH102", { title: "Enhancement Book 2", pages: 150 }), adminUser, request);
+
+  const cart = {
+    name: "Refund Student",
+    phone: "03112223344",
+    address: "Johar Town, Lahore",
+    city: "Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: b1, code: "ENH101", quantity: 1 },
+      { id: b2, code: "ENH102", quantity: 2 },
+    ],
+  };
+
+  const q = await quote(request, cart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const orderId = placed.id;
+
+  const ord = await getOrder(request, orderId, adminUser);
+  await decidePayment(request, adminUser, orderId, "approve", "Approved", ord.version);
+  await assignOrderToVendor(testReq, adminUser, orderId, vendorId);
+
+  // 1. Verify getVendorPendingBooks returns the 2 books assigned to vendor
+  const pendingSummary = await getVendorPendingBooks(adminUser, vendorId);
+  assert.equal(pendingSummary.ok, true);
+  assert.equal(pendingSummary.vendor.id, vendorId);
+  assert.equal(pendingSummary.totalPendingQty, 3); // 1 copy of ENH101 + 2 copies of ENH102
+  assert.equal(pendingSummary.totalPendingTitles, 2);
+  assert.ok(pendingSummary.whatsappMessage.includes("ENH101"));
+  assert.ok(pendingSummary.whatsappMessage.includes("ENH102"));
+  assert.ok(pendingSummary.whatsappUrl.includes("03001234567"));
+
+  // 2. Student advance refund scenario:
+  // Admin edits order items (e.g. ENH102 is out of print, removed from order) with standardized reason tag
+  const item1Id = ord.items.find(i => i.code === "ENH101").id;
+  const editRes = await editOrderItems(
+    request,
+    adminUser,
+    orderId,
+    [{ id: item1Id, quantity: 1 }],
+    "Out of Print / Market Unavailable - Student informed book not needed"
+  );
+  assert.equal(editRes.ok, true);
+  assert.ok(editRes.refund_due > 0);
+  assert.equal(editRes.refund_status, "REFUND_PENDING");
+
+  // Verify listOrders with status="REFUNDS_DUE" filter returns this order and count > 0
+  const refundOrders = await listOrders(adminUser, "", "REFUNDS_DUE");
+  assert.ok(refundOrders.rows.some(o => o.id === orderId));
+  assert.ok(refundOrders.status_counts["REFUNDS_DUE"] >= 1);
+
+  // 3. Verify getStudentRefundWhatsAppUrl helper
+  const updatedOrder = await getOrder(request, orderId, adminUser);
+  const refundWaUrl = getStudentRefundWhatsAppUrl(
+    updatedOrder,
+    updatedOrder.refund_due,
+    "JazzCash",
+    "TID-999888",
+    "Out of Print / Market Unavailable"
+  );
+  assert.ok(refundWaUrl.includes("wa.me/03112223344"));
+  assert.ok(refundWaUrl.includes(encodeURIComponent("Assalam-o-Alaikum Refund Student!")));
+  assert.ok(refundWaUrl.includes(encodeURIComponent("JazzCash")));
+
+  // 4. Record refund and verify REFUNDS_DUE count decrements
+  await recordStudentRefund(
+    testReq,
+    adminUser,
+    orderId,
+    updatedOrder.refund_due,
+    "JazzCash",
+    "TID-999888",
+    "Refund processed"
+  );
+  const afterRefundOrders = await listOrders(adminUser, "", "REFUNDS_DUE");
+  assert.ok(!afterRefundOrders.rows.some(o => o.id === orderId));
+});
+
+test("Vendor Remove from Printing: requires mandatory reason and unassigns vendor from order", async (t) => {
+  const sqlite = database(t);
+  const testReq = new Request("http://127.0.0.1:5173/api/orders");
+  const adminUser = { id: "admin", email: "admin@vu.edu.pk", role: "SUPER_ADMIN", permissions: ["orders.update", "orders.manage"] };
+
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Al-Huda Press",
+    phone: "03221114455",
+    email: "alhuda@example.com",
+    password: "Password123!",
+  });
+  const vendorId = vRes.vendor.id;
+  const vendorUser = { id: vRes.vendor.user_id, vendor_id: vendorId, email: "alhuda@example.com", role: "VENDOR" };
+
+  const { id: bookId } = await saveBook(bookInput("UNAS101", { title: "Unassign Book", pages: 180 }), adminUser, request);
+
+  const cart = {
+    name: "Revert Student",
+    phone: "03335557788",
+    address: "Model Town, Lahore",
+    city: "Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 1 }],
+  };
+
+  const q = await quote(request, cart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+  const orderId = placed.id;
+
+  const ord = await getOrder(request, orderId, adminUser);
+  await decidePayment(request, adminUser, orderId, "approve", "Approved", ord.version);
+
+  // Assign order to Al-Huda Press -> status is now PROCESSING
+  await assignOrderToVendor(testReq, adminUser, orderId, vendorId);
+  const inQueueOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(inQueueOrder.status, "PROCESSING");
+  assert.equal(inQueueOrder.vendor_id, vendorId);
+
+  // 1. Vendor attempts to remove from printing WITHOUT a reason -> MUST FAIL with 400
+  await assert.rejects(
+    () => setPrintingQueue(testReq, vendorUser, orderId, false, ""),
+    /Please provide a valid reason for removing this order from printing/
+  );
+
+  await assert.rejects(
+    () => setPrintingQueue(testReq, vendorUser, orderId, false, "  "),
+    /Please provide a valid reason for removing this order from printing/
+  );
+
+  // 2. Vendor provides reason and removes from printing
+  const removeRes = await setPrintingQueue(
+    testReq,
+    vendorUser,
+    orderId,
+    false,
+    "Paper / Cover Stock Shortage - 80gsm paper out of stock"
+  );
+  assert.equal(removeRes.ok, true);
+  assert.equal(removeRes.status, "CONFIRMED");
+  assert.equal(removeRes.vendor_id, null);
+
+  // 3. Verify order in DB has vendor_id = NULL
+  const revertedOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(revertedOrder.status, "CONFIRMED");
+  assert.equal(revertedOrder.vendor_id, null);
+  assert.equal(revertedOrder.vendor_printed_at, null);
+
+  // Verify order history records vendor name and exact reason
+  const history = sqlite.prepare("SELECT * FROM order_history WHERE order_id=? ORDER BY created_at DESC").all(orderId);
+  const latestHistory = history[0];
+  assert.ok(latestHistory.note.includes("Al-Huda Press"));
+  assert.ok(latestHistory.note.includes("Paper / Cover Stock Shortage"));
+
+  // 4. Verify listOrders shows order in CONFIRMED and without vendor assignment (ready to be reassigned)
+  const confirmedList = await listOrders(adminUser, "", "CONFIRMED");
+  const confirmedRow = confirmedList.rows.find(o => o.id === orderId);
+  assert.ok(confirmedRow);
+  assert.equal(confirmedRow.vendor_id, null);
+  assert.equal(confirmedRow.vendor_name, null);
+
+  // 5. Admin can now re-assign this order to another vendor!
+  const vRes2 = await createVendor(testReq, adminUser, {
+    name: "Target Press 2",
+    phone: "03330001122",
+    email: "target2@example.com",
+    password: "Password123!",
+  });
+  const reassignRes = await assignOrderToVendor(testReq, adminUser, orderId, vRes2.vendor.id);
+  assert.equal(reassignRes.ok, true);
+  const reassignedOrder = await getOrder(request, orderId, adminUser);
+  assert.equal(reassignedOrder.status, "PROCESSING");
+  assert.equal(reassignedOrder.vendor_id, vRes2.vendor.id);
 });
