@@ -86,13 +86,27 @@ export function orderSheet(
             },
           ];
 
-    const orderTotalBooks = items.reduce(
+    const hasAnyReceivedOrDispatched =
+      items.some((it: any) => Boolean(it.received_from_vendor)) ||
+      Boolean(o.vendor_dispatched_at) ||
+      ["SHIPPED", "DELIVERED"].includes(o.status);
+
+    const hasShortage =
+      hasAnyReceivedOrDispatched &&
+      items.some((it: any) => !it.received_from_vendor);
+
+    // Option A: If order has shortages / missing books, only export the missing books
+    const exportItems = hasShortage
+      ? items.filter((it: any) => !it.received_from_vendor)
+      : items;
+
+    const orderTotalBooks = exportItems.reduce(
       (sum: number, it: any) => sum + (Number(it.quantity) || 1),
       0,
     );
     grandTotalBooks += orderTotalBooks;
 
-    const N = items.length;
+    const N = exportItems.length;
     const srNo = orderIdx + 1;
 
     const fullAddress = o.address
@@ -124,16 +138,7 @@ export function orderSheet(
       wrap: true,
     };
 
-    const hasAnyReceivedOrDispatched =
-      items.some((it: any) => Boolean(it.received_from_vendor)) ||
-      Boolean(o.vendor_dispatched_at) ||
-      ["SHIPPED", "DELIVERED"].includes(o.status);
-
-    const hasShortage =
-      hasAnyReceivedOrDispatched &&
-      items.some((it: any) => !it.received_from_vendor);
-
-    items.forEach((item: any, idx: number) => {
+    exportItems.forEach((item: any, idx: number) => {
       const isMissing = hasShortage && !item.received_from_vendor;
       const missingBg = "#FEE2E2"; // soft red highlight for missing book
       const missingText = "#991B1B"; // dark red text
@@ -340,7 +345,7 @@ export function bookSummarySheet(orders: any[]) {
   >();
 
   orders.forEach((o) => {
-    const items =
+    const rawItems =
       o.items && o.items.length > 0
         ? o.items
         : [
@@ -350,6 +355,20 @@ export function bookSummarySheet(orders: any[]) {
               quantity: 1,
             },
           ];
+
+    const hasAnyReceivedOrDispatched =
+      rawItems.some((it: any) => Boolean(it.received_from_vendor)) ||
+      Boolean(o.vendor_dispatched_at) ||
+      ["SHIPPED", "DELIVERED"].includes(o.status);
+
+    const hasShortage =
+      hasAnyReceivedOrDispatched &&
+      rawItems.some((it: any) => !it.received_from_vendor);
+
+    // Only summarize missing books for shortage orders
+    const items = hasShortage
+      ? rawItems.filter((it: any) => !it.received_from_vendor)
+      : rawItems;
 
     items.forEach((item: any) => {
       const rawCode = String(item.code || "").trim();

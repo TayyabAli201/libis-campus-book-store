@@ -2589,6 +2589,16 @@ export function printOrderReceiptSlip(order: any) {
           <dt>Grand total</dt>
           <dd>${escapeHtml(money(order.total, order.currency))}</dd>
         </div>
+        ${Number(order.refund_due || 0) > 0 ? `
+          <div style="border-top: 1px dashed #d1d5db; margin-top: 6px; padding-top: 6px;">
+            <dt style="font-size: 0.88rem; color: #4b5563;">Advance Paid</dt>
+            <dd style="font-size: 0.88rem; color: #16a34a; font-weight: 600;">${escapeHtml(money(order.amount_paid || 0, order.currency))}</dd>
+          </div>
+          <div style="background: #fee2e2; border: 1.5px solid #dc2626; padding: 6px 10px; border-radius: 4px; margin-top: 6px;">
+            <dt style="color: #991b1b; font-weight: 800; font-size: 0.92rem;">⚠️ CASH REFUND TO STUDENT</dt>
+            <dd style="color: #991b1b; font-weight: 900; font-size: 1.15rem;">${escapeHtml(money(order.refund_due, order.currency))}</dd>
+          </div>
+        ` : ""}
         ${Number(order.due_amount || 0) > 0 ? `
           <div style="border-top: 1px dashed #d1d5db; margin-top: 6px; padding-top: 6px;">
             <dt style="font-size: 0.88rem; color: #4b5563;">Advance Paid</dt>
@@ -2837,6 +2847,12 @@ export function OrderReceipt({ o }: { o: any }) {
             <dt>Grand total</dt>
             <dd>{money(o.total, o.currency)}</dd>
           </div>
+          {Number(o.refund_due || 0) > 0 && (
+            <div style={{ background: "#fee2e2", border: "1.5px solid #dc2626", padding: "6px 10px", borderRadius: 4, marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <dt style={{ color: "#991b1b", fontWeight: 800, fontSize: "0.92rem" }}>⚠️ CASH REFUND TO STUDENT</dt>
+              <dd style={{ color: "#991b1b", fontWeight: 900, fontSize: "1.15rem" }}>{money(o.refund_due, o.currency)}</dd>
+            </div>
+          )}
         </dl>
       </div>
       {(o.delivery_type === "lahore" || o.delivery_type === "other") && (

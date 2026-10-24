@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {compareAmount} from '../lib/payment-status.ts';
 import {money,checkoutInput,transitions,getOrderWhatsAppMessage,formatWhatsAppPhone,getWhatsAppUrl,formatReceiptBookTitle} from '../lib/contracts.ts';
-import {orderSheet, ORDER_EXPORT_COLUMNS, ORDER_EXPORT_COLUMNS_WITH_MOBILE, ORDER_EXPORT_COLUMNS_WITH_ADDRESS} from '../lib/orders-spreadsheet.ts';
+import {orderSheet, bookSummarySheet, ORDER_EXPORT_COLUMNS, ORDER_EXPORT_COLUMNS_WITH_MOBILE, ORDER_EXPORT_COLUMNS_WITH_ADDRESS} from '../lib/orders-spreadsheet.ts';
 test('OCR outcomes distinguish exact, lower, higher, unreadable amounts and never claim verification',()=>{assert.equal(compareAmount(400000,400000).status,'AMOUNT_MATCHED');assert.equal(compareAmount(399999,400000).status,'AMOUNT_MISMATCH');assert.equal(compareAmount(500000,400000).status,'AMOUNT_MISMATCH');assert.equal(compareAmount(null,400000).status,'OCR_FAILED');for(const amount of [0,400000,500000,null])assert.notEqual(compareAmount(amount,400000).status,'VERIFIED');});
 test('Currency formatting is deterministic between server and browser locales',()=>{assert.equal(money(122500),'Rs. 1,225');assert.equal(money(250),'Rs. 2.50');assert.equal(money(0),'Rs. 0');assert.equal(money(-80000),'Rs. -800');});
 test('Checkout rejects fractional or negative quantities',()=>{const data={name:'Student',phone:'03001234567',city:'Lahore',address:'Campus Road',delivery_type:'lahore',campus_id:null,items:[{id:crypto.randomUUID(),quantity:0.5}]};assert.equal(checkoutInput.safeParse(data).success,false);data.items[0].quantity=-2;assert.equal(checkoutInput.safeParse(data).success,false);});
@@ -207,17 +207,14 @@ test('orderSheet highlights missing books with red fill and keeps normal style w
   ];
 
   const sheet = orderSheet(partiallyReceivedOrder);
+  // Option A: Only missing book is exported for shortage order
   // Row 0: Header
-  // Row 1: CS101 (Received -> no red fill)
-  // Row 2: MTH101 (Missing -> red fill #FEE2E2 & text #991B1B)
-  const receivedRow = sheet[1];
-  const missingRow = sheet[2];
+  // Row 1: MTH101 (Missing -> red fill #FEE2E2 & text #991B1B)
+  // Row 2: Grand total
+  assert.equal(sheet.length, 3);
+  const missingRow = sheet[1];
 
-  // CS101 Code cell (index 3 in standard 7-col sheet)
-  assert.equal(receivedRow[3].value, 'CS101');
-  assert.equal(receivedRow[3].backgroundColor, undefined);
-
-  // MTH101 Code cell (index 3 in subsequent row)
+  // MTH101 Code cell (index 3 in standard 7-col sheet)
   assert.equal(missingRow[3].value, 'MTH101');
   assert.equal(missingRow[3].backgroundColor, '#FEE2E2');
   assert.equal(missingRow[3].textColor, '#991B1B');
@@ -231,6 +228,12 @@ test('orderSheet highlights missing books with red fill and keeps normal style w
   assert.equal(missingRow[5].value, 1);
   assert.equal(missingRow[5].backgroundColor, '#FEE2E2');
   assert.equal(missingRow[5].textColor, '#991B1B');
+
+  // Summary sheet also only summarizes missing books
+  const summary = bookSummarySheet(partiallyReceivedOrder);
+  assert.equal(summary.length, 3);
+  assert.equal(summary[1][1].value, 'MTH101');
+  assert.equal(summary[1][3].value, 1);
 
   // Full received order: no background color on any item
   const allReceivedOrder = [

@@ -3411,6 +3411,25 @@ function AdminOrderBooksPanel({
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {Number(o?.refund_due || 0) > 0 && (
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.74rem",
+                fontWeight: 700,
+                padding: "4px 9px",
+                background: "#fee2e2",
+                color: "#b91c1c",
+                border: "1.5px solid #ef4444",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+              title={`Student paid advance. Overpayment to return: ${money(o.refund_due)}`}
+            >
+              💸 RETURN TO STUDENT: {money(o.refund_due)}
+            </span>
+          )}
           <span
             className="mono-pill"
             style={{
@@ -8789,6 +8808,28 @@ function Orders({
                         "—"
                       )}
                     </p>
+                    {isAdmin && (Number(o.refund_due || 0) > 0 || o.refund_status === "REFUND_PENDING") && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          border: "1.5px solid #f87171",
+                          padding: "2px 6px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          marginTop: 3,
+                          borderRadius: 4,
+                          width: "fit-content",
+                        }}
+                        title={`Student paid advance. Excess amount to return: ${money(o.refund_due)}${o.refund_note ? ` (${o.refund_note})` : ""}`}
+                      >
+                        💸 Return to Student: {money(o.refund_due)}
+                      </span>
+                    )}
                   </div>,
                   booksCell,
                   formatDateDMY(o.created_at),
