@@ -8457,7 +8457,7 @@ function Orders({
                         }}
                         title={`Partially received in Campus: ${rcvdItemsCount} of ${booksCount} books arrived. ${booksCount - rcvdItemsCount} book(s) missing or misprinted.`}
                       >
-                        <Building2 size={10} /> Partially Received in Campus (${rcvdItemsCount}/${booksCount})
+                        <Building2 size={10} /> Partially Received in Campus ({rcvdItemsCount}/{booksCount})
                       </span>
                     ) : (
                       <span
