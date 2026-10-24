@@ -7817,14 +7817,15 @@ function Orders({
             const rcvdItemsCount = rawOrderItems
               .filter((it: any) => it.received_from_vendor)
               .reduce((s: number, it: any) => s + (it.quantity || 1), 0);
-            const isPartiallyDelivered = rcvdItemsCount > 0 && rcvdItemsCount < booksCount;
             const isAllDelivered = booksCount > 0 && rcvdItemsCount === booksCount;
+            const hasShortage = booksCount > 0 && rcvdItemsCount < booksCount;
+            const isPartiallyDelivered = hasShortage && (rcvdItemsCount > 0 || !!o.vendor_dispatched_at);
 
             const orderItems: any[] = o.items || [];
             const pendingItems = orderItems.filter((it: any) => !it.received_from_vendor);
             const pendingTooltip =
               pendingItems.length > 0
-                ? `Pending from Vendor (${pendingItems.length} books):\n${pendingItems
+                ? `Pending from Vendor (${pendingItems.length} book${pendingItems.length === 1 ? "" : "s"}):\n${pendingItems
                     .map(
                       (p: any) =>
                         `• [${p.code}] ${p.title || "Book"}${p.quantity > 1 ? ` × ${p.quantity}` : ""}`,
@@ -7844,7 +7845,7 @@ function Orders({
                 }}
                 title={booksTooltip}
               >
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <strong style={{ fontSize: "0.88rem" }}>{booksCount}</strong>{" "}
                   <span className="small-text muted" style={{ fontSize: "0.78rem" }}>
                     {booksCount === 1 ? "book" : "books"}
@@ -7861,12 +7862,12 @@ function Orders({
                         padding: "1px 6px",
                         borderRadius: 9999,
                       }}
-                      title={`${rcvdItemsCount} of ${booksCount} books received at office. ${booksCount - rcvdItemsCount} still pending from vendor.`}
+                      title={`${rcvdItemsCount} of ${booksCount} book(s) received at office. ${booksCount - rcvdItemsCount} still pending from vendor.`}
                     >
                       {rcvdItemsCount}/{booksCount} Rcvd
                     </span>
                   )}
-                  {isAllDelivered && booksCount > 1 && (
+                  {isAllDelivered && (
                     <span
                       className="mono-pill"
                       style={{
@@ -7878,9 +7879,9 @@ function Orders({
                         padding: "1px 6px",
                         borderRadius: 9999,
                       }}
-                      title={`All ${booksCount} books received from vendor`}
+                      title={`All ${booksCount} book(s) received from vendor`}
                     >
-                      ✓ All Rcvd
+                      ✓ {booksCount === 1 ? "1 Rcvd" : "All Rcvd"}
                     </span>
                   )}
                 </div>
@@ -7975,7 +7976,7 @@ function Orders({
 
               const vPendingItems = orderItems.filter((it: any) => !it.received_from_vendor);
               const vRcvdCount = orderItems.filter((it: any) => !!it.received_from_vendor).length;
-              const vIsPartial = vRcvdCount > 0 && vPendingItems.length > 0;
+              const vIsPartial = vPendingItems.length > 0 && (vRcvdCount > 0 || !!o.vendor_dispatched_at);
               const vIsAllRcvd = orderItems.length > 0 && vRcvdCount === orderItems.length;
 
               const vendorBooksCell = (
