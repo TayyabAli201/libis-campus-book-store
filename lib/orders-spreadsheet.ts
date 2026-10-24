@@ -124,7 +124,20 @@ export function orderSheet(
       wrap: true,
     };
 
+    const hasAnyReceivedOrDispatched =
+      items.some((it: any) => Boolean(it.received_from_vendor)) ||
+      Boolean(o.vendor_dispatched_at) ||
+      ["SHIPPED", "DELIVERED"].includes(o.status);
+
+    const hasShortage =
+      hasAnyReceivedOrDispatched &&
+      items.some((it: any) => !it.received_from_vendor);
+
     items.forEach((item: any, idx: number) => {
+      const isMissing = hasShortage && !item.received_from_vendor;
+      const missingBg = "#FEE2E2"; // soft red highlight for missing book
+      const missingText = "#991B1B"; // dark red text
+
       if (idx === 0) {
         // First row of the order: contains merged cells spanning N rows
         dataRows.push([
@@ -172,25 +185,30 @@ export function orderSheet(
             alignVertical: "center" as const,
             borderColor: border,
             borderStyle: "thin" as const,
+            ...(isMissing ? { backgroundColor: missingBg, textColor: missingText } : {}),
           },
           {
             value: item.title || "—",
             fontFamily: FONT_FAMILY,
             height: ROW_HEIGHT,
+            fontWeight: isMissing ? ("bold" as const) : undefined,
             align: "left" as const,
             alignVertical: "center" as const,
             borderColor: border,
             borderStyle: "thin" as const,
+            ...(isMissing ? { backgroundColor: missingBg, textColor: missingText } : {}),
           },
           {
             value: Number(item.quantity) || 1,
             type: Number,
             fontFamily: FONT_FAMILY,
             height: ROW_HEIGHT,
+            fontWeight: isMissing ? ("bold" as const) : undefined,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
             borderStyle: "thin" as const,
+            ...(isMissing ? { backgroundColor: missingBg, textColor: missingText } : {}),
           },
           {
             value: orderTotalBooks,
@@ -221,25 +239,30 @@ export function orderSheet(
             alignVertical: "center" as const,
             borderColor: border,
             borderStyle: "thin" as const,
+            ...(isMissing ? { backgroundColor: missingBg, textColor: missingText } : {}),
           },
           {
             value: item.title || "—",
             fontFamily: FONT_FAMILY,
             height: ROW_HEIGHT,
+            fontWeight: isMissing ? ("bold" as const) : undefined,
             align: "left" as const,
             alignVertical: "center" as const,
             borderColor: border,
             borderStyle: "thin" as const,
+            ...(isMissing ? { backgroundColor: missingBg, textColor: missingText } : {}),
           },
           {
             value: Number(item.quantity) || 1,
             type: Number,
             fontFamily: FONT_FAMILY,
             height: ROW_HEIGHT,
+            fontWeight: isMissing ? ("bold" as const) : undefined,
             align: "center" as const,
             alignVertical: "center" as const,
             borderColor: border,
             borderStyle: "thin" as const,
+            ...(isMissing ? { backgroundColor: missingBg, textColor: missingText } : {}),
           },
           null,
         ]);

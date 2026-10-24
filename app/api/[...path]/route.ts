@@ -59,6 +59,7 @@ import {
   toggleOrderItemReceived,
   setAllOrderItemsReceived,
   recordStudentRefund,
+  changeDeliveryType,
 } from "@/lib/server/orders";
 import {
   listVendors,
@@ -750,6 +751,7 @@ async function handle(req: Request) {
               "toggle_item_received",
               "set_all_items_received",
               "record_refund",
+              "change_delivery_type",
             ]),
             item_id: z.string().trim().optional(),
             received: z.boolean().optional(),
@@ -768,6 +770,10 @@ async function handle(req: Request) {
             amount: z.number().optional(),
             amount_paid: z.number().optional(),
             due_note: z.string().trim().max(2000).optional(),
+            delivery_type: z.enum(["campus", "lahore", "other"]).optional(),
+            campus_id: z.string().trim().optional(),
+            city: z.string().trim().optional(),
+            address: z.string().trim().optional(),
             items: z
               .array(
                 z.object({
@@ -778,6 +784,21 @@ async function handle(req: Request) {
               .optional(),
           })
           .parse(await json(req));
+        if (b.action === "change_delivery_type") {
+          if (!b.delivery_type) throw new AppError(400, "Delivery type is required.");
+          return ok(
+            await changeDeliveryType(
+              req,
+              u,
+              id,
+              b.delivery_type,
+              b.campus_id,
+              b.address,
+              b.city,
+              b.note,
+            ),
+          );
+        }
         if (b.action === "edit_items") {
           if (!b.items || !b.items.length) {
             throw new AppError(400, "Order must retain at least one book.");

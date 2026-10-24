@@ -2982,6 +2982,216 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
   );
 }
 
+
+function ChangeDeliveryTypeModal({
+  order,
+  onClose,
+  onSaved,
+}: {
+  order: any;
+  onClose: () => void;
+  onSaved?: () => Promise<void> | void;
+}) {
+  const currentType =
+    order.delivery_type === "campus"
+      ? "campus"
+      : order.delivery_type === "other"
+        ? "other"
+        : "lahore";
+  const [deliveryType, setDeliveryType] = useState<string>(currentType);
+  const [address, setAddress] = useState<string>(order.address || "");
+  const [city, setCity] = useState<string>(order.city || (currentType === "other" ? "" : "Lahore"));
+  const [note, setNote] = useState<string>("");
+  const [busy, setBusy] = useState<boolean>(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api(`manage/orders/${order.id}`, {
+        action: "change_delivery_type",
+        delivery_type: deliveryType,
+        address: deliveryType === "campus" ? "Pickup from Bookstore Office, VU Qanchi Campus Lahore" : address,
+        city: deliveryType === "other" ? (city || "Other City") : "Lahore",
+        note,
+      });
+      toast.success("Delivery type updated successfully ✓");
+      notifyOrdersUpdated();
+      if (onSaved) await onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent style={{ maxWidth: 520 }}>
+        <DialogHeader>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "1.1rem" }}>
+              <Truck size={18} style={{ color: "var(--primary)" }} /> Change Delivery Type
+            </DialogTitle>
+            <button type="button" className="btn-icon" onClick={onClose} title="Close">
+              <X size={16} />
+            </button>
+          </div>
+          <DialogDescription style={{ fontSize: "0.84rem", marginTop: 4 }}>
+            Update fulfillment delivery method for order <strong>{order.reference || order.id}</strong> ({order.name}).
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 8 }}>
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 6,
+              background: "rgba(37, 99, 235, 0.08)",
+              border: "1px solid rgba(37, 99, 235, 0.25)",
+              fontSize: "0.82rem",
+              lineHeight: 1.45,
+            }}
+          >
+            <strong style={{ color: "var(--primary)" }}>💳 Advance Payment Invariant:</strong>
+            <p style={{ margin: "2px 0 0", color: "var(--foreground)" }}>
+              The student has already paid advance payment of <strong>{money(order.total)}</strong>.
+              Order total, subtotal, and payment balance will remain completely identical.
+            </p>
+          </div>
+
+          <Field label="Select New Delivery Type">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 6,
+                  border: deliveryType === "campus" ? "2px solid var(--primary)" : "1px solid var(--border)",
+                  background: deliveryType === "campus" ? "rgba(37, 99, 235, 0.06)" : "var(--card)",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deliveryType"
+                  value="campus"
+                  checked={deliveryType === "campus"}
+                  onChange={() => setDeliveryType("campus")}
+                />
+                <div>
+                  <strong>🏛️ Qanchi Campus (Pickup)</strong>
+                  <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                    Student will collect books directly from Bookstore Office at Qanchi Campus.
+                  </div>
+                </div>
+              </label>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 6,
+                  border: deliveryType === "lahore" ? "2px solid var(--primary)" : "1px solid var(--border)",
+                  background: deliveryType === "lahore" ? "rgba(37, 99, 235, 0.06)" : "var(--card)",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deliveryType"
+                  value="lahore"
+                  checked={deliveryType === "lahore"}
+                  onChange={() => setDeliveryType("lahore")}
+                />
+                <div>
+                  <strong>🛵 Lahore Route (Home Delivery)</strong>
+                  <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                    Rider will deliver parcel to student address within Lahore city route.
+                  </div>
+                </div>
+              </label>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 6,
+                  border: deliveryType === "other" ? "2px solid var(--primary)" : "1px solid var(--border)",
+                  background: deliveryType === "other" ? "rgba(37, 99, 235, 0.06)" : "var(--card)",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deliveryType"
+                  value="other"
+                  checked={deliveryType === "other"}
+                  onChange={() => setDeliveryType("other")}
+                />
+                <div>
+                  <strong>📦 Parcels (Courier Dispatch)</strong>
+                  <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                    Bookstore / Vendor will ship via external courier service (TCS, Leopards, Trax).
+                  </div>
+                </div>
+              </label>
+            </div>
+          </Field>
+
+          {deliveryType !== "campus" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Field label="City">
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder={deliveryType === "lahore" ? "Lahore" : "Enter destination city"}
+                  required
+                />
+              </Field>
+              <Field label="Street Address">
+                <textarea
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter full street address for delivery"
+                  required
+                />
+              </Field>
+            </div>
+          )}
+
+          <Field label="Reason / Note (Optional)">
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Student requested campus pickup over phone call"
+            />
+          </Field>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+            <button type="button" className="btn" onClick={onClose} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="btn primary" disabled={busy}>
+              {busy ? "Saving…" : "Save Delivery Type"}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AdminOrderBooksPanel({
   o,
   user,
@@ -3011,6 +3221,15 @@ function AdminOrderBooksPanel({
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
+  const [changeDeliveryOpen, setChangeDeliveryOpen] = useState(false);
+
+  const isCampus =
+    o?.delivery_type === "campus" ||
+    (o?.city && o.city.toLowerCase().includes("campus")) ||
+    (o?.address && o.address.toLowerCase().includes("campus"));
+  const isOther =
+    o?.delivery_type === "other" ||
+    (!isCampus && o?.city && !o.city.toLowerCase().includes("lahore"));
 
   const toggleItemReceived = async (itemId: string, received: boolean) => {
     setTogglingItemId(itemId);
@@ -3163,6 +3382,85 @@ function AdminOrderBooksPanel({
         transition: "border-color 0.2s ease",
       }}
     >
+      {/* Student & Delivery Summary Bar with Change Delivery Type */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 14px",
+          borderRadius: 8,
+          background: "var(--muted)",
+          border: "1px solid var(--border)",
+          flexWrap: "wrap",
+          marginBottom: 4,
+        }}
+      >
+        <div>
+          <span style={{ fontSize: "0.70rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 700 }}>
+            Student / Customer
+          </span>
+          <div style={{ fontSize: "0.96rem", fontWeight: 700, color: "var(--foreground)" }}>
+            {o?.name || "Customer"}{o?.phone ? ` · 📱 ${o.phone}` : ""}
+          </div>
+          {o?.address && !isCampus && (
+            <div style={{ fontSize: "0.80rem", color: "var(--muted-foreground)", marginTop: 2 }}>
+              <span>📍 {o.address}{o.city ? `, ${o.city}` : ""}</span>
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span
+            className="mono-pill"
+            style={{
+              fontSize: "0.74rem",
+              fontWeight: 600,
+              padding: "4px 9px",
+              background: isCampus
+                ? "var(--status-info-bg)"
+                : isOther
+                  ? "var(--status-warn-bg)"
+                  : "var(--status-good-bg)",
+              color: isCampus ? "var(--status-info-text)" : isOther ? "var(--status-warn-text)" : "var(--status-good-text)",
+              border: `1px solid ${isCampus ? "var(--status-info-border)" : isOther ? "var(--status-warn-border)" : "var(--status-good-border)"}`,
+            }}
+          >
+            {isCampus
+              ? "🏛️ Qanchi Campus (Pickup)"
+              : isOther
+                ? `📦 ${o?.city || "Parcels"} (Courier)`
+                : "🛵 Lahore Route"}
+          </span>
+          {canUpdate && (
+            <button
+              type="button"
+              className="btn compact"
+              onClick={() => setChangeDeliveryOpen(true)}
+              style={{
+                fontSize: "0.74rem",
+                padding: "3px 9px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontWeight: 600,
+              }}
+              title="Change Delivery Type (e.g. Lahore Route ↔ Campus Pickup ↔ Parcels)"
+            >
+              <Pencil size={11} /> Change Delivery Type
+            </button>
+          )}
+        </div>
+      </div>
+
+      {changeDeliveryOpen && (
+        <ChangeDeliveryTypeModal
+          order={o}
+          onClose={() => setChangeDeliveryOpen(false)}
+          onSaved={onUpdated}
+        />
+      )}
+
       {/* Header */}
       <div
         style={{
@@ -5154,7 +5452,7 @@ function OrderModalPopup({
               })()}
 
               {/* Vendor Printing Queue Card (Vendor only - interactive) */}
-              {isVendor && o.status === "PROCESSING" && (
+              {isVendor && o.status === "PROCESSING" && !o.vendor_dispatched_at && (
                 <div
                   className="printing-queue-banner"
                   style={{
@@ -5434,28 +5732,30 @@ function OrderModalPopup({
                           <span style={{ fontSize: "0.85rem" }}>Print Status:</span>
                           <strong>{o.vendor_printed_at ? "Printed ✓" : "Pending Print"}</strong>
                         </div>
-                        <button
-                          type="button"
-                          className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              await api(`manage/orders/${o.id}`, {
-                                action: "vendor_print",
-                                printed: !o.vendor_printed_at,
-                              });
-                              toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared");
-                              await reload();
-                            } catch (e) {
-                              toast.error(errorText(e));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {o.vendor_printed_at ? "Unmark" : "Mark as Printed"}
-                        </button>
+                        {o.status === "PROCESSING" && !o.vendor_dispatched_at && !(o.items && o.items.length > 0 && o.items.every((it: any) => Boolean(it.received_from_vendor))) && (
+                          <button
+                            type="button"
+                            className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                            disabled={busy}
+                            onClick={async () => {
+                              setBusy(true);
+                              try {
+                                await api(`manage/orders/${o.id}`, {
+                                  action: "vendor_print",
+                                  printed: !o.vendor_printed_at,
+                                });
+                                toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared");
+                                await reload();
+                              } catch (e) {
+                                toast.error(errorText(e));
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            {o.vendor_printed_at ? "Unmark" : "Mark as Printed"}
+                          </button>
+                        )}
                       </div>
 
                       {isOtherCityOrder(o) ? (
@@ -6114,7 +6414,7 @@ const VENDOR_STAGES_CONFIG: {
 
 const VENDOR_DELIVERY_CHIPS = [
   { id: "all", label: "All Orders", icon: "🌐" },
-  { id: "other", label: "Other Cities (Courier Dispatch)", icon: "📦" },
+  { id: "other", label: "Parcels (Courier Dispatch)", icon: "📦" },
   { id: "campus_lahore", label: "Qanchi Campus Lahore", icon: "🏛️" },
 ];
 
@@ -6572,8 +6872,8 @@ function Orders({
           deliveryPrefix = "Lahore";
           sheetName = "Lahore";
         } else if (deliveryTypeList[0] === "other") {
-          deliveryPrefix = "Other City";
-          sheetName = "Other City";
+          deliveryPrefix = "Parcels";
+          sheetName = "Parcels";
         }
       } else if (deliveryTypeList.length > 1) {
         deliveryPrefix = deliveryTypeList
@@ -7687,7 +7987,7 @@ function Orders({
               <span className="other-static-pill">
                 <BadgeIcon size={11} /> {badgeLabel}
               </span>
-            ) : mapUrl ? (
+            ) : isAdmin && mapUrl ? (
               <a
                 href={mapUrl}
                 target="_blank"
@@ -7698,7 +7998,15 @@ function Orders({
               >
                 <BadgeIcon size={12} /> {badgeLabel}
               </a>
-            ) : null;
+            ) : (
+              <span
+                className={`map-pin-pill ${badgeClass}`}
+                style={{ cursor: "default" }}
+                title="Lahore Route (Handled by Bookstore Rider)"
+              >
+                <BadgeIcon size={12} /> {badgeLabel}
+              </span>
+            );
 
             const vendorBadgeContent = isAdmin && (
               o.vendor_name ? (
@@ -8080,7 +8388,7 @@ function Orders({
                       ))}
                     </div>
                   )}
-                  {vIsAllRcvd && (
+                  {!isOther && vIsAllRcvd && (
                     <span
                       className="mono-pill"
                       style={{
@@ -8151,7 +8459,7 @@ function Orders({
               const vendorStatusCell = (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <Status value={o.status} />
-                  {o.status === "PROCESSING" && (
+                  {o.status === "PROCESSING" && !vIsAllRcvd && !o.vendor_dispatched_at && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <button
                         type="button"
@@ -8179,33 +8487,6 @@ function Orders({
                       >
                         {o.vendor_printed_at ? <RotateCcw size={11} /> : <CheckCircle2 size={11} color="currentColor" />}
                         {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRemovingQueueOrder(o);
-                        }}
-                        disabled={queueBusyId === o.id}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 3,
-                          fontSize: "0.70rem",
-                          fontWeight: 500,
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          cursor: "pointer",
-                          background: "rgba(239, 68, 68, 0.08)",
-                          color: "#dc2626",
-                          border: "1px dashed rgba(239, 68, 68, 0.45)",
-                          transition: "all 0.15s ease",
-                          width: "fit-content",
-                        }}
-                        title="Remove from Printing Queue (unassigns vendor and returns to Confirmed)"
-                      >
-                        <XCircle size={10} color="#dc2626" />
-                        Remove from Printing
                       </button>
                     </div>
                   )}
@@ -9297,16 +9578,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       {o.vendor_printed_at ? <RotateCcw size={13} /> : <CheckCircle2 size={14} />}
                       {o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
                     </button>
-                    <button
-                      type="button"
-                      className="btn compact"
-                      disabled={busy}
-                      onClick={() => setRemoveQueueOpen(true)}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--destructive)" }}
-                      title="Remove from Printing Queue (unassigns vendor and returns to Confirmed)"
-                    >
-                      <XCircle size={13} /> Remove from Printing
-                    </button>
+
                   </>
                 )}
               </div>
@@ -9395,28 +9667,30 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       <span style={{ fontSize: "0.85rem" }}>Print Status:</span>
                       <strong>{o.vendor_printed_at ? "Printed ✓" : "Pending Print"}</strong>
                     </div>
-                    <button
-                      type="button"
-                      className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
-                      disabled={busy}
-                      onClick={async () => {
-                        setBusy(true);
-                        try {
-                          await api(`manage/orders/${o.id}`, {
-                            action: "vendor_print",
-                            printed: !o.vendor_printed_at,
-                          });
-                          toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared");
-                          await reload();
-                        } catch (e) {
-                          toast.error(errorText(e));
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      {o.vendor_printed_at ? "Unmark" : "Mark as Printed"}
-                    </button>
+                    {o.status === "PROCESSING" && !o.vendor_dispatched_at && !(o.items && o.items.length > 0 && o.items.every((it: any) => Boolean(it.received_from_vendor))) && (
+                      <button
+                        type="button"
+                        className={`btn compact ${o.vendor_printed_at ? "" : "primary"}`}
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await api(`manage/orders/${o.id}`, {
+                              action: "vendor_print",
+                              printed: !o.vendor_printed_at,
+                            });
+                            toast.success(!o.vendor_printed_at ? "Marked as Printed ✓" : "Print status cleared");
+                            await reload();
+                          } catch (e) {
+                            toast.error(errorText(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        {o.vendor_printed_at ? "Unmark" : "Mark as Printed"}
+                      </button>
+                    )}
                   </div>
 
                   {isOtherCityOrder(o) ? (

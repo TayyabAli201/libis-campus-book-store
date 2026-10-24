@@ -2470,3 +2470,114 @@ export async function recordStudentRefund(
     message: `Refund of Rs. ${cleanAmount.toLocaleString()} recorded successfully ✓`,
   };
 }
+
+export async function changeDeliveryType(
+  req: Request,
+  u: User,
+  orderId: string,
+  deliveryType: string,
+  campusId?: string | null,
+  address?: string | null,
+  city?: string | null,
+  note = "",
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Admin access required to change delivery type.");
+  }
+  const cleanType = String(deliveryType || "").trim().toLowerCase();
+  const validTypes = ["campus", "lahore", "other"];
+  if (!validTypes.includes(cleanType)) {
+    throw new AppError(400, "Invalid delivery type. Must be campus, lahore, or other.");
+  }
+
+  const o = await getOrder(req, orderId, u);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  const oldType = o.delivery_type || "campus";
+  const oldCampusId = o.campus_id || null;
+  const oldCity = o.city || "";
+  const oldAddress = o.address || "";
+
+  let newCampusId: string | null = null;
+  if (cleanType === "campus") {
+    if (campusId) {
+      const camp = await one<any>("SELECT id FROM campuses WHERE id=?", campusId);
+      if (camp) newCampusId = camp.id;
+    }
+    if (!newCampusId && o.campus_id) {
+      newCampusId = o.campus_id;
+    }
+  }
+  const newCity =
+    city !== undefined && city !== null && city.trim() !== ""
+      ? city.trim()
+      : cleanType === "campus" || cleanType === "lahore"
+        ? "Lahore"
+        : o.city || "";
+  const newAddress =
+    address !== undefined && address !== null ? address.trim() : o.address;
+
+  const labelOld =
+    oldType === "campus"
+      ? "Campus Pickup"
+      : oldType === "lahore"
+        ? "Lahore Route"
+        : "Parcels (Courier)";
+  const labelNew =
+    cleanType === "campus"
+      ? "Campus Pickup"
+      : cleanType === "lahore"
+        ? "Lahore Route"
+        : "Parcels (Courier)";
+
+  const cleanNote = note?.trim();
+  const historyText = cleanNote
+    ? `Delivery type changed from ${labelOld} to ${labelNew} by Admin. Note: ${cleanNote} (Payment unchanged).`
+    : `Delivery type changed from ${labelOld} to ${labelNew} by Admin (Payment unchanged).`;
+
+  const at = now();
+  const statements = [
+    guard(
+      "EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)",
+      o.id,
+      o.version,
+    ),
+    stmt(
+      "UPDATE orders SET delivery_type=?, campus_id=?, city=?, address=?, updated_at=?, version=version+1 WHERE id=?",
+      cleanType,
+      newCampusId,
+      newCity,
+      newAddress,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,created_at,internal) VALUES(?,?,?,?,?,?,0)",
+      uid(),
+      o.id,
+      o.status,
+      historyText,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "CHANGE_DELIVERY_TYPE",
+      o.id,
+      { delivery_type: oldType, campus_id: oldCampusId, city: oldCity, address: oldAddress },
+      { delivery_type: cleanType, campus_id: newCampusId, city: newCity, address: newAddress },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+
+  return {
+    ok: true,
+    delivery_type: cleanType,
+    campus_id: newCampusId,
+    city: newCity,
+    address: newAddress,
+    message: `Delivery type changed to ${labelNew} successfully ✓`,
+  };
+}

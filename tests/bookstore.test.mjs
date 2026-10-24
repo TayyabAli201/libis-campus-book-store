@@ -67,6 +67,7 @@ const {
   toggleOrderItemReceived,
   setAllOrderItemsReceived,
   recordStudentRefund,
+  changeDeliveryType,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -3335,4 +3336,60 @@ test("Vendor Pending Books Checklist: clean format, shortage vs printing breakdo
   assert.equal(emptyPending.totalPendingQty, 0);
   assert.equal(emptyPending.pendingBooks.length, 0);
   assert.ok(emptyPending.whatsappMessage.includes("All pending books for Campus have been received"));
+});
+
+test("Admin can change delivery type while preserving payment amounts unchanged", async (t) => {
+  const sqlite = database(t);
+  const adminUser = { email: "admin@example.com", role: "SUPER_ADMIN", permissions: ["orders.update"] };
+
+  const { id: bookId } = await saveBook(bookInput("CHG101", { title: "Change Delivery Book", pages: 100, active: true }), admin, request);
+  const lahoreCart = {
+    name: "Zainab Bibi",
+    phone: "03009876543",
+    city: "Lahore",
+    address: "Model Town, Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [{ id: bookId, quantity: 1 }],
+  };
+  const q = await quote(request, lahoreCart);
+  const slip = crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  const initialOrder = await getOrder(request, placed.id, adminUser);
+  const initialTotal = initialOrder.total;
+  const initialSubtotal = initialOrder.subtotal;
+  const initialDelivery = initialOrder.delivery;
+
+  // Student calls and asks to switch to Campus Pickup
+  const changeRes = await changeDeliveryType(
+    request,
+    adminUser,
+    placed.id,
+    "campus",
+    "campus-qanchi",
+    "Pickup from Bookstore Office, VU Qanchi Campus Lahore",
+    "Lahore",
+    "Student called: will collect from campus directly",
+  );
+  assert.equal(changeRes.ok, true);
+  assert.equal(changeRes.delivery_type, "campus");
+
+  const updatedOrder = await getOrder(request, placed.id, adminUser);
+  assert.equal(updatedOrder.delivery_type, "campus");
+  // Total and subtotal remain 100% UNCHANGED
+  assert.equal(updatedOrder.total, initialTotal);
+  assert.equal(updatedOrder.subtotal, initialSubtotal);
+  assert.equal(updatedOrder.delivery, initialDelivery);
+
+  // Order history notes the change
+  const historyEntries = updatedOrder.history || [];
+  const latestNote = historyEntries[historyEntries.length - 1]?.note || "";
+  assert.ok(latestNote.includes("Delivery type changed from Lahore Route to Campus Pickup"));
+  assert.ok(latestNote.includes("Payment unchanged"));
 });

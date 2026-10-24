@@ -191,4 +191,59 @@ test('formatReceiptBookTitle prefixes book code to book title and normalizes dup
   assert.equal(formatReceiptBookTitle('CS101', null), 'CS101');
 });
 
+test('orderSheet highlights missing books with red fill and keeps normal style when all received', () => {
+  const partiallyReceivedOrder = [
+    {
+      reference: 'ORD-SHORTAGE',
+      name: 'Ahmed Raza',
+      phone: '03001234567',
+      status: 'PROCESSING',
+      vendor_dispatched_at: '2026-10-25T00:00:00.000Z',
+      items: [
+        { code: 'CS101', title: 'Intro to CS', quantity: 1, received_from_vendor: 1 },
+        { code: 'MTH101', title: 'Calculus', quantity: 1, received_from_vendor: 0 },
+      ],
+    },
+  ];
 
+  const sheet = orderSheet(partiallyReceivedOrder);
+  // Row 0: Header
+  // Row 1: CS101 (Received -> no red fill)
+  // Row 2: MTH101 (Missing -> red fill #FEE2E2 & text #991B1B)
+  const receivedRow = sheet[1];
+  const missingRow = sheet[2];
+
+  // CS101 Code cell (index 3 in standard 7-col sheet)
+  assert.equal(receivedRow[3].value, 'CS101');
+  assert.equal(receivedRow[3].backgroundColor, undefined);
+
+  // MTH101 Code cell (index 3 in subsequent row)
+  assert.equal(missingRow[3].value, 'MTH101');
+  assert.equal(missingRow[3].backgroundColor, '#FEE2E2');
+  assert.equal(missingRow[3].textColor, '#991B1B');
+
+  // MTH101 Title cell (index 4)
+  assert.equal(missingRow[4].value, 'Calculus');
+  assert.equal(missingRow[4].backgroundColor, '#FEE2E2');
+  assert.equal(missingRow[4].textColor, '#991B1B');
+
+  // MTH101 Quantity cell (index 5)
+  assert.equal(missingRow[5].value, 1);
+  assert.equal(missingRow[5].backgroundColor, '#FEE2E2');
+  assert.equal(missingRow[5].textColor, '#991B1B');
+
+  // Full received order: no background color on any item
+  const allReceivedOrder = [
+    {
+      reference: 'ORD-COMPLETE',
+      name: 'Sara Khan',
+      status: 'PROCESSING',
+      vendor_dispatched_at: '2026-10-25T00:00:00.000Z',
+      items: [
+        { code: 'CS101', title: 'Intro to CS', quantity: 1, received_from_vendor: 1 },
+      ],
+    },
+  ];
+  const allSheet = orderSheet(allReceivedOrder);
+  assert.equal(allSheet[1][3].backgroundColor, undefined);
+});
