@@ -3257,14 +3257,14 @@ test("Vendor Pending Books Checklist: clean format, shortage vs printing breakdo
     ],
   });
 
-  // Vendor clicks "Send to Campus" for Order 2
+  // Vendor clicks "Send to Campus" for Order 2 -> auto-marks all books in order as received in campus!
   await vendorDispatchOffice(testReq, vendorUser, o2Id);
+  const o2Dispatched = await getOrder(request, o2Id, adminUser);
+  assert.equal(o2Dispatched.items.every(i => i.received_from_vendor === 1), true);
 
-  // Admin marks ENG101 as received at office, but MTH101 is missing from box (remains received_from_vendor = 0)
-  const o2Details = await getOrder(request, o2Id, adminUser);
-  const eng101Item = o2Details.items.find(i => i.code === "ENG101");
-  const mth101Item = o2Details.items.find(i => i.code === "MTH101");
-  await toggleOrderItemReceived(testReq, adminUser, o2Id, eng101Item.id, true);
+  // Admin opens physical box, finds MTH101 is missing / misprinted, and unmarks it as missing/shortage
+  const mth101Item = o2Dispatched.items.find(i => i.code === "MTH101");
+  await toggleOrderItemReceived(testReq, adminUser, o2Id, mth101Item.id, false);
 
   // 3. Order 3: Other City Courier Order (5x CS101) -> Directly shipped to customer, MUST BE EXCLUDED from campus checklist
   const o3Id = await placeAndAssign({

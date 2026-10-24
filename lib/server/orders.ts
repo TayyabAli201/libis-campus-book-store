@@ -1710,13 +1710,17 @@ export async function vendorDispatchOffice(
       o.id,
     ),
     stmt(
+      "UPDATE order_items SET received_from_vendor=1 WHERE order_id=?",
+      o.id,
+    ),
+    stmt(
       "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
       uid(),
       o.id,
       "SHIPPED",
       note?.trim()
-        ? `Dispatched by vendor to Bookstore Office: ${note.trim()}`
-        : "Dispatched by vendor to Bookstore Office",
+        ? `Sent to Campus by vendor: ${note.trim()}`
+        : "Sent to Campus by vendor (All books received in Campus by default)",
       u.email,
       at,
     ),
@@ -1907,13 +1911,17 @@ export async function batchVendorDispatchOffice(
         o.id,
       ),
       stmt(
+        "UPDATE order_items SET received_from_vendor=1 WHERE order_id=?",
+        o.id,
+      ),
+      stmt(
         "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
         uid(),
         o.id,
         "SHIPPED",
         note?.trim()
-          ? `Dispatched by vendor to Bookstore Office (batch): ${note.trim()}`
-          : "Dispatched by vendor to Bookstore Office (batch)",
+          ? `Sent to Campus by vendor (batch): ${note.trim()}`
+          : "Sent to Campus by vendor (batch - All books received in Campus by default)",
         u.email,
         at,
       ),

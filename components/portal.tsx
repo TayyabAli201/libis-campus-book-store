@@ -3622,19 +3622,19 @@ function AdminOrderBooksPanel({
                           }}
                           title={
                             it.received_from_vendor
-                              ? "Received from vendor. Click to mark as pending."
-                              : "Pending from vendor. Click to mark as received."
+                              ? "Received in Campus. Click if this book was missing or misprinted."
+                              : "Missing / Pending from vendor. Click to mark as received in Campus."
                           }
                         >
                           {togglingItemId === it.id ? (
                             "Saving…"
                           ) : it.received_from_vendor ? (
                             <>
-                              <CheckCircle2 size={11} /> Received ✓
+                              <CheckCircle2 size={11} /> Received in Campus ✓
                             </>
                           ) : (
                             <>
-                              <Clock size={11} /> Pending ⏳
+                              <Clock size={11} /> Missing / Shortage ⏳
                             </>
                           )}
                         </button>
@@ -5583,10 +5583,10 @@ function OrderModalPopup({
                                   fontWeight: 600,
                                 }}
                               >
-                                <Building2 size={12} /> Dispatched to Office
+                                <Building2 size={12} /> Sent to Campus ✓
                               </span>
                               <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                                Awaiting admin verification & delivery
+                                Batch sent to Bookstore Office for student delivery
                               </span>
                             </div>
                           )}
@@ -8365,77 +8365,101 @@ function Orders({
                 <Status value={o.status} />
                 {o.status === "PROCESSING" && (
                   <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
-                  {o.vendor_printed_at ? (
-                    <span
-                      className="mono-pill"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 9999,
-                        background: "rgba(22, 163, 74, 0.15)",
-                        color: "#15803d",
-                        border: "1px solid #86efac",
-                        width: "fit-content",
-                      }}
-                      title={`Printed on ${formatDateDMY(o.vendor_printed_at)}`}
-                    >
-                      <CheckCircle2 size={11} /> Printed
-                    </span>
-                  ) : (
-                    <span
-                      className="mono-pill"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 9999,
-                        background: "rgba(245, 158, 11, 0.15)",
-                        color: "#b45309",
-                        border: "1px solid #fde68a",
-                        width: "fit-content",
-                      }}
-                      title="Pending print"
-                    >
-                      <Clock size={11} /> In Printing Queue
-                    </span>
-                  )}
-                  {canUpdate && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleVendorPrint(o, !o.vendor_printed_at);
-                      }}
-                      disabled={printingBusyId === o.id}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: "0.70rem",
-                        fontWeight: 600,
-                        padding: "1px 7px",
-                        borderRadius: 9999,
-                        cursor: "pointer",
-                        background: o.vendor_printed_at ? "rgba(245, 158, 11, 0.12)" : "rgba(22, 163, 74, 0.12)",
-                        color: o.vendor_printed_at ? "#b45309" : "#15803d",
-                        border: o.vendor_printed_at ? "1px solid #fde68a" : "1px solid #86efac",
-                        transition: "all 0.15s ease",
-                        width: "fit-content",
-                      }}
-                      title={o.vendor_printed_at ? "Click to unmark as printed" : "Click to mark as printed"}
-                    >
-                      {o.vendor_printed_at ? <RotateCcw size={10} /> : <CheckCircle2 size={10} color="currentColor" />}
-                      {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark" : "Mark Printed"}
-                    </button>
-                  )}
-                    {o.vendor_dispatched_at && (
+                    {o.vendor_printed_at ? (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "rgba(22, 163, 74, 0.15)",
+                          color: "#15803d",
+                          border: "1px solid #86efac",
+                          width: "fit-content",
+                        }}
+                        title={`Printed on ${formatDateDMY(o.vendor_printed_at)}`}
+                      >
+                        <CheckCircle2 size={11} /> Printed
+                      </span>
+                    ) : (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                          width: "fit-content",
+                        }}
+                        title="Pending print"
+                      >
+                        <Clock size={11} /> In Printing Queue
+                      </span>
+                    )}
+                    {canUpdate && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVendorPrint(o, !o.vendor_printed_at);
+                        }}
+                        disabled={printingBusyId === o.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.70rem",
+                          fontWeight: 600,
+                          padding: "1px 7px",
+                          borderRadius: 9999,
+                          cursor: "pointer",
+                          background: o.vendor_printed_at ? "rgba(245, 158, 11, 0.12)" : "rgba(22, 163, 74, 0.12)",
+                          color: o.vendor_printed_at ? "#b45309" : "#15803d",
+                          border: o.vendor_printed_at ? "1px solid #fde68a" : "1px solid #86efac",
+                          transition: "all 0.15s ease",
+                          width: "fit-content",
+                        }}
+                        title={o.vendor_printed_at ? "Click to unmark as printed" : "Click to mark as printed"}
+                      >
+                        {o.vendor_printed_at ? <RotateCcw size={10} /> : <CheckCircle2 size={10} color="currentColor" />}
+                        {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark" : "Mark Printed"}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {o.vendor_dispatched_at && (
+                  <div style={{ marginTop: 4 }}>
+                    {isPartiallyDelivered ? (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: "0.70rem",
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: 9999,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                          width: "fit-content",
+                        }}
+                        title={`Partially received in Campus: ${rcvdItemsCount} of ${booksCount} books arrived. ${booksCount - rcvdItemsCount} book(s) missing or misprinted.`}
+                      >
+                        <Building2 size={10} /> Partially Received in Campus (${rcvdItemsCount}/${booksCount})
+                      </span>
+                    ) : (
                       <span
                         className="mono-pill"
                         style={{
@@ -8451,9 +8475,9 @@ function Orders({
                           border: "1px solid #93c5fd",
                           width: "fit-content",
                         }}
-                        title={`Vendor dispatched this order to the Bookstore Office on ${formatDateDMY(o.vendor_dispatched_at)}`}
+                        title={`Received in Campus from vendor on ${formatDateDMY(o.vendor_dispatched_at)}`}
                       >
-                        <Building2 size={10} /> Dispatched to Office
+                        <Building2 size={10} /> Received in Campus ✓
                       </span>
                     )}
                   </div>
@@ -9481,7 +9505,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         lineHeight: 1.45,
                       }}
                     >
-                      <strong>🏛️ Deliver to Bookstore Office:</strong>
+                      <strong>🏛️ Send to Campus:</strong>
                       <p style={{ margin: "4px 0 8px" }}>
                         This order is for Lahore / VU Qanchi Campus. Once books are printed, click below to mark this batch as dispatched to the Bookstore Office.
                       </p>
@@ -9496,7 +9520,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                               await api(`manage/orders/${o.id}`, {
                                 action: "vendor_dispatch_office",
                               });
-                              toast.success("Order dispatched to Bookstore Office ✓");
+                              toast.success("Order dispatched to Campus ✓");
                               await reload();
                             } catch (e) {
                               toast.error(errorText(e));
@@ -9506,7 +9530,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                           }}
                           style={{ gap: 6, background: "#2563eb" }}
                         >
-                          <Building2 size={14} /> Send to Bookstore Office
+                          <Building2 size={14} /> Send to Campus
                         </button>
                       ) : (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
@@ -9518,10 +9542,10 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                               fontWeight: 600,
                             }}
                           >
-                            <Building2 size={12} /> Dispatched to Office
+                            <Building2 size={12} /> Sent to Campus ✓
                           </span>
                           <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                            Awaiting admin verification & delivery
+                            Batch sent to Campus for student delivery
                           </span>
                         </div>
                       )}
