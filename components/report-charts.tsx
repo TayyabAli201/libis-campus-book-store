@@ -8,6 +8,7 @@ import {
   Building2,
   ShieldCheck,
   ShoppingBag,
+  Truck,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -68,10 +69,10 @@ export default function Charts({ data }: { data: any }) {
         animate={animate}
       />
       <Chart
-        title="Campus order distribution"
-        description="Where your orders are coming from"
-        icon={Building2}
-        rows={data.campus}
+        title="Delivery distribution"
+        description="Orders grouped by delivery destination"
+        icon={Truck}
+        rows={data.delivery || data.campus || []}
         bars
         animate={animate}
       />
@@ -80,7 +81,7 @@ export default function Charts({ data }: { data: any }) {
         description="A closer look at payment reviews"
         icon={ShieldCheck}
         animate={animate}
-        rows={data.payment.map((d: any) => ({
+        rows={(data.payment || []).map((d: any) => ({
           ...d,
           label: statuses[d.label] || d.label,
         }))}
@@ -94,7 +95,7 @@ function Chart({
   description,
   icon: Icon,
   animate,
-  rows,
+  rows = [],
   value = "value",
   currency = false,
   bars = false,
@@ -103,11 +104,12 @@ function Chart({
   description: string;
   icon: LucideIcon;
   animate: boolean;
-  rows: any[];
+  rows?: any[];
   value?: string;
   currency?: boolean;
   bars?: boolean;
 }) {
+  const safeRows = Array.isArray(rows) ? rows : [];
   const gradientId = useId().replace(/:/g, "");
   return (
     <section className="panel chart">
@@ -118,7 +120,7 @@ function Chart({
           <p>{description}</p>
         </div>
       </div>
-      {!rows.length ? (
+      {!safeRows.length ? (
         <Blank
           title="No activity in this period"
           description="This chart will fill as orders are submitted."
@@ -127,13 +129,13 @@ function Chart({
         <>
           <div
             role="img"
-            aria-label={`${title}: ${rows.map((r) => `${r.label} ${currency ? money(r[value]) : r[value]}`).join(", ")}`}
+            aria-label={`${title}: ${safeRows.map((r) => `${r.label} ${currency ? money(r[value]) : r[value]}`).join(", ")}`}
             style={{ height: 240, width: "100%" }}
           >
             <ResponsiveContainer width="100%" height="100%">
               {bars ? (
                 <BarChart
-                  data={rows}
+                  data={safeRows}
                   margin={{ left: 0, right: 12, bottom: 10 }}
                 >
                   <CartesianGrid
@@ -168,7 +170,7 @@ function Chart({
                   />
                 </BarChart>
               ) : (
-                <AreaChart data={rows}>
+                <AreaChart data={safeRows}>
                   <defs>
                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                       <stop

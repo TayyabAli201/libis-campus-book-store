@@ -360,6 +360,10 @@ export interface VendorLedgerSummary {
   total_books: number;
   printing_orders?: number;
   printed_orders?: number;
+  queue_orders?: number;
+  queue_pages?: number;
+  queue_books?: number;
+  queue_estimated_cost?: number;
   per_page_rate: number;
   binding_rate: number;
   total_printing_cost?: number;
@@ -385,6 +389,8 @@ export interface VendorLedgerOrder {
   total_pages: number;
   printing_cost: number;
   total_credit: number;
+  is_payable?: boolean;
+  estimated_credit?: number;
   created_at: string;
 }
 

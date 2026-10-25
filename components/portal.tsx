@@ -128,7 +128,6 @@ const nav = [
   ["ledger", "Payment Ledger", Receipt, "vendor"],
   ["books", "Books", Library, "books.read"],
   ["pricing", "Pricing management", Coins, "admin"],
-  ["campuses", "Campuses", Building2, "admin"],
   ["vendors", "Vendors", Factory, "admin"],
   ["students", "Students", Users, "students.read"],
   ["reports", "Reports", BarChart3, "reports.read"],
@@ -972,60 +971,53 @@ const dashboardMetrics: {
   tone: string;
 }[] = [
   {
-    key: "total_sales",
-    label: "Verified sales",
-    hint: "Selected period · PKR",
+    key: "gross_revenue",
+    label: "Total Sales",
+    hint: "Verified student payments",
     icon: Coins,
     tone: "featured",
   },
   {
-    key: "total_orders",
-    label: "Total orders",
-    hint: "Orders in this period",
-    icon: ShoppingBag,
+    key: "total_vendor_cost",
+    label: "Vendor Payment",
+    hint: "Shipped orders (Printing + delivery)",
+    icon: Factory,
+    tone: "amber",
+  },
+  {
+    key: "net_profit",
+    label: "Net Profit",
+    hint: "Total Sales minus Vendor Payment",
+    icon: Banknote,
     tone: "green",
   },
   {
+    key: "total_orders",
+    label: "Orders Overview",
+    hint: "Orders in this period",
+    icon: ShoppingBag,
+    tone: "blue",
+  },
+  {
+    key: "total_print_books",
+    label: "Vendor Production",
+    hint: "Books to print & deliver",
+    icon: BookOpen,
+    tone: "blue",
+  },
+  {
     key: "pending_payments",
-    label: "Payments to review",
-    hint: "Awaiting review in this period",
+    label: "Payments to Review",
+    hint: "Awaiting slip verification",
     icon: ShieldCheck,
     tone: "amber",
   },
   {
     key: "total_books",
-    label: "Books in catalog",
-    hint: "Current catalog total",
+    label: "Catalog Books",
+    hint: "Active courses in catalog",
     icon: Library,
     tone: "blue",
-  },
-  {
-    key: "pending_orders",
-    label: "Pending orders",
-    hint: "Awaiting payment in this period",
-    icon: Clock3,
-    tone: "amber",
-  },
-  {
-    key: "confirmed_orders",
-    label: "Confirmed orders",
-    hint: "Confirmed in this period",
-    icon: CheckCircle2,
-    tone: "green",
-  },
-  {
-    key: "delivered_orders",
-    label: "Delivered orders",
-    hint: "Delivered in this period",
-    icon: Truck,
-    tone: "blue",
-  },
-  {
-    key: "total_campuses",
-    label: "Campuses",
-    hint: "Current campus total",
-    icon: Building2,
-    tone: "green",
   },
 ];
 function Dashboard({
@@ -1038,20 +1030,6 @@ function Dashboard({
   const isAdmin = user.role === "SUPER_ADMIN";
   const base = isAdmin ? "/admin" : "/campus";
   const quickLinks = [
-    {
-      label: "Place Order for Campus",
-      description: `Order books with assigned ${categoryLabel(user.campus_category || "A")} pricing`,
-      href: "/#books",
-      icon: ShoppingBag,
-      allowed: !isAdmin,
-    },
-    {
-      label: "Manage Books",
-      description: "Book catalog & course prices",
-      href: "/books",
-      icon: Library,
-      allowed: isAdmin || user.permissions.includes("books.read"),
-    },
     {
       label: "Live Orders",
       description: "From checkout to delivery",
@@ -1067,17 +1045,24 @@ function Dashboard({
       allowed: isAdmin,
     },
     {
+      label: "Manage Books",
+      description: "Book catalog & course prices",
+      href: "/books",
+      icon: Library,
+      allowed: isAdmin || user.permissions.includes("books.read"),
+    },
+    {
+      label: "Printing Vendors",
+      description: "Vendor rates, print queues & ledgers",
+      href: "/vendors",
+      icon: Factory,
+      allowed: isAdmin,
+    },
+    {
       label: "Pricing Rates",
       description: "Set page rates per category",
       href: "/pricing",
       icon: Coins,
-      allowed: isAdmin,
-    },
-    {
-      label: "Campus Network",
-      description: "Manage campus counters",
-      href: "/campuses",
-      icon: Building2,
       allowed: isAdmin,
     },
     {
@@ -1206,22 +1191,50 @@ function Dashboard({
             {!reportsOnly && (
               <div className="metrics">
                 {dashboardMetrics.map(
-                  ({ key, label, hint, icon: Icon, tone }) => (
-                    <div className={`metric metric-${tone}`} key={key}>
-                      <div className="metric-heading">
-                        <span>{label}</span>
-                        <span className="metric-icon">
-                          <Icon size={19} />
-                        </span>
+                  ({ key, label, hint, icon: Icon, tone }) => {
+                    let mainDisplay: React.ReactNode = "";
+                    let subDisplay: React.ReactNode = hint;
+
+                    if (key === "gross_revenue" || key === "total_sales") {
+                      mainDisplay = money(Number(data.stats[key] || 0));
+                    } else if (key === "total_vendor_cost") {
+                      mainDisplay = money(Number(data.stats.total_vendor_cost || 0));
+                      const paid = Number(data.stats.vendor_total_paid || 0);
+                      const due = Number(data.stats.vendor_remaining_balance || 0);
+                      subDisplay = `Paid: ${money(paid)} · Due: ${money(due)}`;
+                    } else if (key === "net_profit") {
+                      mainDisplay = money(Number(data.stats.net_profit || 0));
+                      subDisplay = "Total Sales minus Vendor Payment";
+                    } else if (key === "total_orders") {
+                      mainDisplay = `${Number(data.stats.total_orders || 0)} Orders`;
+                      const bks = Number(data.stats.total_books_ordered || 0);
+                      const pgs = Number(data.stats.total_pages_printed || 0);
+                      subDisplay = `${bks} ${bks === 1 ? "Book" : "Books"} · ${pgs.toLocaleString()} Pages`;
+                    } else if (key === "total_print_books") {
+                      const printBks = Number(data.stats.total_print_books || 0);
+                      const pgs = Number(data.stats.total_pages_printed || 0);
+                      const shelfBks = Number(data.stats.total_office_stock_books || 0);
+                      mainDisplay = `${printBks} to Print`;
+                      subDisplay = `${pgs.toLocaleString()} pgs · ${shelfBks} from Office Shelf`;
+                    } else if (key === "pending_payments") {
+                      mainDisplay = Number(data.stats.pending_payments || 0).toLocaleString();
+                    } else {
+                      mainDisplay = Number(data.stats[key] || 0).toLocaleString();
+                    }
+
+                    return (
+                      <div className={`metric metric-${tone}`} key={key}>
+                        <div className="metric-heading">
+                          <span>{label}</span>
+                          <span className="metric-icon">
+                            <Icon size={19} />
+                          </span>
+                        </div>
+                        <strong>{mainDisplay}</strong>
+                        <small>{subDisplay}</small>
                       </div>
-                      <strong>
-                        {key === "total_sales"
-                          ? money(Number(data.stats[key]))
-                          : Number(data.stats[key]).toLocaleString()}
-                      </strong>
-                      <small>{hint}</small>
-                    </div>
-                  ),
+                    );
+                  }
                 )}
               </div>
             )}
@@ -6314,6 +6327,60 @@ function OrderModalPopup({
                         </div>
                       </div>
 
+                      {admin && o.admin_financials && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "rgba(22, 163, 74, 0.05)",
+                            border: "1px solid rgba(22, 163, 74, 0.25)",
+                            margin: "4px 0",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>
+                              💰 Admin Profit Breakdown
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.84rem" }}>
+                            <span style={{ color: "var(--muted-foreground)" }}>Student Received (Total):</span>
+                            <strong>{money(o.admin_financials.student_total)}</strong>
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.84rem" }}>
+                            <span style={{ color: "var(--muted-foreground)" }}>
+                              Vendor Payment {o.admin_financials.courier_cost > 0 ? `(Print ${money(o.admin_financials.vendor_printing_cost)} + Delivery ${money(o.admin_financials.courier_cost)})` : ""}:
+                            </span>
+                            <strong style={{ color: "#b45309" }}>- {money(o.admin_financials.vendor_cost)}</strong>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              paddingTop: 6,
+                              borderTop: "1px dashed rgba(22, 163, 74, 0.3)",
+                            }}
+                          >
+                            <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#15803d" }}>Admin Profit:</span>
+                            <strong style={{ fontSize: "1.1rem", color: "#15803d" }}>
+                              {money(o.admin_financials.admin_profit)}
+                            </strong>
+                          </div>
+
+                          {o.admin_financials.office_savings > 0 && (
+                            <div style={{ fontSize: "0.74rem", color: "#166534", background: "#f0fdf4", padding: "4px 8px", borderRadius: 4 }}>
+                              📦 Includes <strong>{o.admin_financials.office_books} book(s)</strong> from Office Shelf (+{money(o.admin_financials.office_savings)} printing saved)
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {admin && o.status === "PAYMENT_PENDING" && (
                         <div
                           style={{
@@ -9451,7 +9518,7 @@ function Orders({
             <div className="orders-pagination-info">
               Showing <strong>{startItem}–{endItem}</strong> of <strong>{totalOrders}</strong> orders
               {data.total_books !== undefined && (
-                <span> · <strong>{data.total_books}</strong> books</span>
+                <span> · <strong>{data.total_books}</strong> {data.total_books === 1 ? "book" : "books"}{data.overview?.total_pages ? ` · ${Number(data.overview.total_pages).toLocaleString()} pages` : ""}</span>
               )}
             </div>
 
@@ -10281,6 +10348,60 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       </strong>
                     </div>
                   </div>
+
+                  {admin && o.admin_financials && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(22, 163, 74, 0.05)",
+                        border: "1px solid rgba(22, 163, 74, 0.25)",
+                        margin: "4px 0",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>
+                          💰 Admin Profit Breakdown
+                        </span>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.84rem" }}>
+                        <span style={{ color: "var(--muted-foreground)" }}>Student Received (Total):</span>
+                        <strong>{money(o.admin_financials.student_total)}</strong>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.84rem" }}>
+                        <span style={{ color: "var(--muted-foreground)" }}>
+                          Vendor Payment {o.admin_financials.courier_cost > 0 ? `(Print ${money(o.admin_financials.vendor_printing_cost)} + Delivery ${money(o.admin_financials.courier_cost)})` : ""}:
+                        </span>
+                        <strong style={{ color: "#b45309" }}>- {money(o.admin_financials.vendor_cost)}</strong>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          paddingTop: 6,
+                          borderTop: "1px dashed rgba(22, 163, 74, 0.3)",
+                        }}
+                      >
+                        <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#15803d" }}>Admin Profit:</span>
+                        <strong style={{ fontSize: "1.1rem", color: "#15803d" }}>
+                          {money(o.admin_financials.admin_profit)}
+                        </strong>
+                      </div>
+
+                      {o.admin_financials.office_savings > 0 && (
+                        <div style={{ fontSize: "0.74rem", color: "#166534", background: "#f0fdf4", padding: "4px 8px", borderRadius: 4 }}>
+                          📦 Includes <strong>{o.admin_financials.office_books} book(s)</strong> from Office Shelf (+{money(o.admin_financials.office_savings)} printing saved)
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {admin && o.status === "PAYMENT_PENDING" && (
                     <div
@@ -12150,8 +12271,12 @@ function VendorLedgerModal({
                               <span style={{ color: "var(--muted-foreground)" }}>—</span>
                             )}
                           </td>
-                          <td style={{ padding: "9px 10px", fontWeight: 700, color: "#15803d", whiteSpace: "nowrap" }}>
-                            Rs. {ord.total_credit.toLocaleString()}
+                          <td style={{ padding: "9px 10px", fontWeight: 700, color: ord.is_payable === false ? "#b45309" : "#15803d", whiteSpace: "nowrap" }}>
+                            {ord.is_payable === false ? (
+                              <span style={{ fontSize: "0.78rem" }}>In Queue (Est: Rs. {Number(ord.estimated_credit || 0).toLocaleString()})</span>
+                            ) : (
+                              `Rs. ${Number(ord.total_credit || 0).toLocaleString()}`
+                            )}
                           </td>
                           <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
                             <span className="mono-pill" style={{ fontSize: "0.72rem" }}>

@@ -507,6 +507,48 @@ export async function getOrder(
     o.refund_note = o.refund_note || "";
     o.refund_paid_at = o.refund_paid_at || null;
     o.payment_logs = paymentLogs;
+
+    const vRate = o.vendor_id
+      ? await one<any>("SELECT per_page_rate, binding_rate FROM vendors WHERE id = ?", o.vendor_id)
+      : null;
+    const perPageRate = Number(vRate?.per_page_rate ?? 1.60);
+    const bindingRate = Number(vRate?.binding_rate ?? 30.00);
+
+    const printableItems = items.filter((it: any) => !it.is_unavailable && !it.in_office_stock);
+    const officeItems = items.filter((it: any) => Boolean(it.in_office_stock));
+    const orderPrintPages = printableItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0);
+    const orderPrintBooks = printableItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+    const officePages = officeItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0);
+    const officeBooks = officeItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+
+    const vendorPrintingCostRupees = Math.round((orderPrintPages * perPageRate) + (orderPrintBooks * bindingRate));
+    const courierCostRupees = Number(o.actual_courier_charges || 0);
+    const totalVendorCostRupees = vendorPrintingCostRupees + courierCostRupees;
+    const studentTotal = Number(o.total || 0);
+
+    // Convert to paisas (x 100) to match database currency units and money() formatting
+    const vendorPrintingCost = vendorPrintingCostRupees * 100;
+    const courierCost = courierCostRupees * 100;
+    const totalVendorCost = totalVendorCostRupees * 100;
+    const adminProfit = studentTotal - totalVendorCost;
+    const profitMarginPct = studentTotal > 0 ? Math.round((adminProfit / studentTotal) * 1000) / 10 : 0;
+    const officeSavings = Math.round((officePages * perPageRate) + (officeBooks * bindingRate)) * 100;
+
+    o.admin_financials = {
+      student_total: studentTotal,
+      vendor_cost: totalVendorCost,
+      vendor_printing_cost: vendorPrintingCost,
+      courier_cost: courierCost,
+      admin_profit: adminProfit,
+      profit_margin_pct: profitMarginPct,
+      office_savings: officeSavings,
+      order_pages: orderPrintPages,
+      order_books: orderPrintBooks,
+      office_books: officeBooks,
+      per_page_rate: perPageRate,
+      binding_rate: bindingRate,
+      vendor_assigned: Boolean(o.vendor_id),
+    };
   } else if (u?.role === "STUDENT" || owned) {
     o.amount_paid = Number(o.amount_paid || 0);
     o.due_amount = Number(o.due_amount || 0);
@@ -616,10 +658,44 @@ export async function listOrders(
     args.push(to + "T23:59:59.999Z");
   }
   const where = filters.join(" AND ");
-  const total = await one<any>(
-    `SELECT COUNT(DISTINCT o.id) AS n, COALESCE(SUM(oi.quantity), 0) AS total_books FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id WHERE ${where}`,
+  const ordersSummary = await one<any>(
+    `SELECT 
+      COUNT(DISTINCT o.id) AS total_orders,
+      COALESCE(SUM(CASE WHEN o.status NOT IN ('CANCELLED', 'REFUND_REQUESTED') THEN o.total ELSE 0 END), 0) AS total_revenue,
+      COALESCE(SUM(o.actual_courier_charges), 0) AS total_courier
+     FROM orders o
+     JOIN payments p ON p.order_id = o.id
+     JOIN payment_slips s ON s.id = p.slip_id
+     WHERE ${where}`,
     ...args,
   );
+
+  const itemsSummary = await one<any>(
+    `SELECT 
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 THEN 0 ELSE oi.quantity END), 0) AS total_books,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.quantity END), 0) AS total_print_books,
+      COALESCE(SUM(CASE WHEN oi.in_office_stock = 1 THEN oi.quantity ELSE 0 END), 0) AS total_office_stock_books,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE (COALESCE(oi.pages, 0) * oi.quantity) END), 0) AS total_pages,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE (COALESCE(oi.pages, 0) * oi.quantity * COALESCE(v.per_page_rate, 1.60)) + (oi.quantity * COALESCE(v.binding_rate, 30.00)) END), 0) AS total_vendor_printing_cost,
+      COALESCE(SUM(CASE WHEN oi.in_office_stock = 1 THEN (COALESCE(oi.pages, 0) * oi.quantity * COALESCE(v.per_page_rate, 1.60)) + (oi.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS office_stock_savings
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     JOIN payments p ON p.order_id = o.id
+     JOIN payment_slips s ON s.id = p.slip_id
+     LEFT JOIN vendors v ON v.id = o.vendor_id
+     WHERE ${where}`,
+    ...args,
+  );
+
+  const totalRevenue = Number(ordersSummary?.total_revenue || 0);
+  const totalVendorCost = Math.round(Number(itemsSummary?.total_vendor_printing_cost || 0) + Number(ordersSummary?.total_courier || 0)) * 100;
+  const totalProfit = totalRevenue - totalVendorCost;
+  const profitMarginPct = totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 1000) / 10 : 0;
+
+  const total = {
+    n: Number(ordersSummary?.total_orders || 0),
+    total_books: Number(itemsSummary?.total_books || 0),
+  };
   const isAll = limit === "all";
   const pageSize = typeof limit === "number" && limit > 0 ? limit : 15;
   const limitClause = isAll ? "LIMIT 10000" : `LIMIT ${pageSize} OFFSET ?`;
@@ -815,8 +891,10 @@ export async function listOrders(
         COUNT(DISTINCT o.id) AS total_assigned,
         COUNT(DISTINCT CASE WHEN o.status = 'PROCESSING' AND o.vendor_printed_at IS NULL THEN o.id END) AS printing_queue_count,
         COUNT(DISTINCT CASE WHEN o.vendor_printed_at IS NOT NULL THEN o.id END) AS printed_count,
-        COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
-        COALESCE(SUM(oi.quantity), 0) AS total_books
+        COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN oi.pages * oi.quantity ELSE 0 END), 0) AS total_pages,
+        COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN oi.quantity ELSE 0 END), 0) AS total_books,
+        COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUND_REQUESTED', 'REFUND_COMPLETED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUND_REQUESTED', 'REFUND_COMPLETED') THEN oi.pages * oi.quantity ELSE 0 END), 0) AS queue_pages,
+        COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUND_REQUESTED', 'REFUND_COMPLETED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUND_REQUESTED', 'REFUND_COMPLETED') THEN oi.quantity ELSE 0 END), 0) AS queue_books
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id
        WHERE o.vendor_id = ?`,
@@ -825,14 +903,17 @@ export async function listOrders(
 
     const totalPagesAll = Number(vendorAggregate?.total_pages || 0);
     const totalBooksAll = Number(vendorAggregate?.total_books || 0);
+    const queuePagesAll = Number(vendorAggregate?.queue_pages || 0);
+    const queueBooksAll = Number(vendorAggregate?.queue_books || 0);
     const totalPrintingCostAll = Math.round((totalPagesAll * perPageRate) + (totalBooksAll * bindingRate));
+    const queueEstimatedCostAll = Math.round((queuePagesAll * perPageRate) + (queueBooksAll * bindingRate));
 
     const courierStats = await one<any>(
       `SELECT 
         COALESCE(SUM(actual_courier_charges), 0) AS total_courier_charges,
         COUNT(CASE WHEN actual_courier_charges > 0 THEN 1 END) AS courier_orders_count
        FROM orders
-       WHERE vendor_id = ?`,
+       WHERE vendor_id = ? AND status IN ('SHIPPED', 'DELIVERED')`,
       vendorId,
     );
     const totalCourierAll = Math.round(Number(courierStats?.total_courier_charges || 0));
@@ -856,6 +937,8 @@ export async function listOrders(
       total_earnings: totalEarningsAll,
       total_paid: totalPaidAll,
       pending_balance: pendingBalanceAll,
+      queue_books: queueBooksAll,
+      queue_estimated_cost: queueEstimatedCostAll,
       per_page_rate: perPageRate,
       binding_rate: bindingRate,
     };
@@ -868,6 +951,18 @@ export async function listOrders(
     page,
     pageSize,
     status_counts,
+    overview: {
+      total_orders: Number(ordersSummary?.total_orders || 0),
+      total_books: Number(itemsSummary?.total_books || 0),
+      total_print_books: Number(itemsSummary?.total_print_books || 0),
+      total_office_stock_books: Number(itemsSummary?.total_office_stock_books || 0),
+      total_pages: Number(itemsSummary?.total_pages || 0),
+      total_revenue: totalRevenue,
+      total_vendor_cost: totalVendorCost,
+      total_profit: totalProfit,
+      profit_margin_pct: profitMarginPct,
+      office_stock_savings: Math.round(Number(itemsSummary?.office_stock_savings || 0)) * 100,
+    },
     ...(vendor_overview ? { vendor_overview } : {}),
   };
 }

@@ -2223,14 +2223,15 @@ test("Vendor Pricing Control, auto-calculation formula, retail price privacy, an
   assert.equal(vendorOrd.detected_amount, undefined);
   assert.equal(vendorOrd.items[0].unit_price, undefined);
 
-  // 7. Vendor lists orders: check vendor_overview
+  // 7. Vendor lists orders: check vendor_overview (Queue has 190 Rs estimated, 0 Rs payable until shipped)
   const vendorList = await listOrders(vendorUser);
   assert.ok(vendorList.vendor_overview);
   assert.equal(vendorList.vendor_overview.total_assigned, 1);
   assert.equal(vendorList.vendor_overview.printing_queue_count, 1);
-  assert.equal(vendorList.vendor_overview.total_earnings, 190);
+  assert.equal(vendorList.vendor_overview.total_earnings, 0);
+  assert.equal(vendorList.vendor_overview.queue_estimated_cost, 190);
   assert.equal(vendorList.vendor_overview.total_paid, 0);
-  assert.equal(vendorList.vendor_overview.pending_balance, 190);
+  assert.equal(vendorList.vendor_overview.pending_balance, 0);
 
   // 8. Dynamic Rate Update: Admin updates vendor per_page_rate to 2.00 Rs and binding to 40 Rs
   await updateVendor(testReq, adminUser, vendorId, {
@@ -2242,6 +2243,10 @@ test("Vendor Pricing Control, auto-calculation formula, retail price privacy, an
   const updatedVendorOrd = await getOrder(testReq, placed.id, vendorUser);
   assert.equal(updatedVendorOrd.vendor_price, 240);
   assert.equal(updatedVendorOrd.vendor_rate_breakdown.formula, "(100 pages × Rs. 2) + (1 books × Rs. 40) = Rs. 240");
+
+  // Vendor ships the order: now the payment is officially credited / earned
+  const currentOrd = await getOrder(testReq, placed.id, adminUser);
+  await changeStatus(testReq, adminUser, placed.id, "SHIPPED", "Dispatched to office", currentOrd.version);
 
   // 9. Payment Ledger: Admin checks vendor ledger
   const initialLedger = await getVendorLedger(adminUser, vendorId);
@@ -2668,8 +2673,9 @@ test("Vendor Ledger automatically credits actual courier delivery charges for Ot
   assert.equal(ledgerBeforeCourier.summary.total_printing_cost, 420);
   assert.equal(ledgerBeforeCourier.summary.total_courier_charges, 0);
   assert.equal(ledgerBeforeCourier.summary.courier_orders_count, 0);
-  assert.equal(ledgerBeforeCourier.summary.total_earned, 420);
-  assert.equal(ledgerBeforeCourier.summary.pending_balance, 420);
+  assert.equal(ledgerBeforeCourier.summary.queue_estimated_cost, 420);
+  assert.equal(ledgerBeforeCourier.summary.total_earned, 0);
+  assert.equal(ledgerBeforeCourier.summary.pending_balance, 0);
 
   // 5. Vendor dispatches via TCS Courier, entering actual courier expense of Rs. 380
   const attachRes = await setCourierTracking(
@@ -2720,15 +2726,16 @@ test("Vendor Ledger automatically credits actual courier delivery charges for Ot
   assert.equal(ledgerAfterUpdate.orders[0].actual_courier_charges, 420);
   assert.equal(ledgerAfterUpdate.orders[0].total_credit, 840);
 
-  // 9. Vendor removes courier tracking: actual_courier_charges resets to 0
+  // 9. Vendor removes courier tracking: actual_courier_charges resets to 0 and order returns to PROCESSING queue
   await removeCourierTracking(request, vendorUser, placed.id);
   const ledgerAfterRemove = await getVendorLedger(adminUser, vendorId);
   assert.equal(ledgerAfterRemove.summary.total_courier_charges, 0);
-  assert.equal(ledgerAfterRemove.summary.total_courier_charges, 0);
-  assert.equal(ledgerAfterRemove.summary.total_earned, 420);
-  assert.equal(ledgerAfterRemove.summary.pending_balance, 420);
+  assert.equal(ledgerAfterRemove.summary.total_earned, 0);
+  assert.equal(ledgerAfterRemove.summary.pending_balance, 0);
+  assert.equal(ledgerAfterRemove.summary.queue_estimated_cost, 420);
   assert.equal(ledgerAfterRemove.orders[0].actual_courier_charges, 0);
-  assert.equal(ledgerAfterRemove.orders[0].total_credit, 420);
+  assert.equal(ledgerAfterRemove.orders[0].total_credit, 0);
+  assert.equal(ledgerAfterRemove.orders[0].estimated_credit, 420);
 });
 
 

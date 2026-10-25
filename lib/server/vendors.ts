@@ -43,7 +43,7 @@ export async function listVendors(u: User): Promise<Vendor[]> {
       COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.quantity END), 0) AS total_books
      FROM orders o
      JOIN order_items oi ON oi.order_id = o.id
-     WHERE o.vendor_id IS NOT NULL
+     WHERE o.vendor_id IS NOT NULL AND o.status IN ('SHIPPED', 'DELIVERED')
      GROUP BY o.vendor_id`
   );
 
@@ -60,7 +60,7 @@ export async function listVendors(u: User): Promise<Vendor[]> {
       o.vendor_id,
       COALESCE(SUM(o.actual_courier_charges), 0) AS total_courier_charges
      FROM orders o
-     WHERE o.vendor_id IS NOT NULL
+     WHERE o.vendor_id IS NOT NULL AND o.status IN ('SHIPPED', 'DELIVERED')
      GROUP BY o.vendor_id`
   );
 
@@ -335,17 +335,22 @@ export async function getVendorLedger(
   const perPageRate = Number(v.per_page_rate ?? 1.60);
   const bindingRate = Number(v.binding_rate ?? 30.00);
 
-  // Compute order statistics and earnings
+  // Compute order statistics and earnings (Active assigned work, with earnings payable on SHIPPED/DELIVERED)
   const orderStats = await one<any>(
     `SELECT 
       COUNT(DISTINCT o.id) AS total_orders,
       COUNT(DISTINCT CASE WHEN o.status = 'PROCESSING' AND o.vendor_printed_at IS NULL THEN o.id END) AS printing_orders,
       COUNT(DISTINCT CASE WHEN o.vendor_printed_at IS NOT NULL THEN o.id END) AS printed_orders,
+      COUNT(DISTINCT CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN o.id END) AS shipped_orders,
       COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.pages * oi.quantity END), 0) AS total_pages,
-      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.quantity END), 0) AS total_books
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.quantity END), 0) AS total_books,
+      COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN oi.pages * oi.quantity ELSE 0 END), 0) AS shipped_pages,
+      COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN oi.quantity ELSE 0 END), 0) AS shipped_books,
+      COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN oi.pages * oi.quantity ELSE 0 END), 0) AS queue_pages,
+      COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (oi.is_unavailable = 1 OR oi.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN oi.quantity ELSE 0 END), 0) AS queue_books
      FROM orders o
      LEFT JOIN order_items oi ON oi.order_id = o.id
-     WHERE o.vendor_id = ?`,
+     WHERE o.vendor_id = ? AND o.status NOT IN ('CANCELLED', 'REFUND_REQUESTED', 'REFUND_COMPLETED')`,
     targetVendorId,
   );
 
@@ -354,16 +359,23 @@ export async function getVendorLedger(
       COALESCE(SUM(actual_courier_charges), 0) AS total_courier_charges,
       COUNT(CASE WHEN actual_courier_charges > 0 THEN 1 END) AS courier_orders_count
      FROM orders 
-     WHERE vendor_id = ?`,
+     WHERE vendor_id = ? AND status IN ('SHIPPED', 'DELIVERED')`,
     targetVendorId,
   );
 
   const totalPages = Number(orderStats?.total_pages || 0);
   const totalBooks = Number(orderStats?.total_books || 0);
+  const shippedPages = Number(orderStats?.shipped_pages || 0);
+  const shippedBooks = Number(orderStats?.shipped_books || 0);
+  const queuePages = Number(orderStats?.queue_pages || 0);
+  const queueBooks = Number(orderStats?.queue_books || 0);
+
   const totalOrders = Number(orderStats?.total_orders || 0);
   const totalCourierCharges = Math.round(Number(courierStats?.total_courier_charges || 0));
   const totalPrintingCost = Math.round((totalPages * perPageRate) + (totalBooks * bindingRate));
-  const totalEarnings = totalPrintingCost + totalCourierCharges;
+  const shippedPrintingCost = Math.round((shippedPages * perPageRate) + (shippedBooks * bindingRate));
+  const queueEstimatedCost = Math.round((queuePages * perPageRate) + (queueBooks * bindingRate));
+  const totalEarnings = shippedPrintingCost + totalCourierCharges;
 
   // Compute payments and ledger entries
   const payments = await all<any>(
@@ -402,8 +414,11 @@ export async function getVendorLedger(
   );
 
   const vendorOrders = vendorOrdersRaw.map((ord) => {
-    const pCost = Math.round((Number(ord.total_pages || 0) * perPageRate) + (Number(ord.total_books || 0) * bindingRate));
+    const isPayable = ord.status === 'SHIPPED' || ord.status === 'DELIVERED';
+    const estCost = Math.round((Number(ord.total_pages || 0) * perPageRate) + (Number(ord.total_books || 0) * bindingRate));
     const cCharges = Math.round(Number(ord.actual_courier_charges || 0));
+    const pCost = isPayable ? estCost : 0;
+    const finalCourier = isPayable ? cCharges : 0;
     return {
       id: ord.id,
       reference: ord.reference || ord.id,
@@ -414,11 +429,13 @@ export async function getVendorLedger(
       status: ord.status,
       courier_name: ord.courier_name || null,
       courier_tracking_id: ord.courier_tracking_id || null,
-      actual_courier_charges: cCharges,
+      actual_courier_charges: finalCourier,
       total_books: Number(ord.total_books || 0),
       total_pages: Number(ord.total_pages || 0),
       printing_cost: pCost,
-      total_credit: pCost + cCharges,
+      total_credit: pCost + finalCourier,
+      estimated_credit: estCost + cCharges,
+      is_payable: isPayable,
       created_at: ord.created_at,
     };
   });
@@ -432,6 +449,9 @@ export async function getVendorLedger(
     per_page_rate: perPageRate,
     binding_rate: bindingRate,
     total_printing_cost: totalPrintingCost,
+    queue_pages: queuePages,
+    queue_books: queueBooks,
+    queue_estimated_cost: queueEstimatedCost,
     total_courier_charges: totalCourierCharges,
     courier_orders_count: Number(courierStats?.courier_orders_count || 0),
     total_earned: totalEarnings,
