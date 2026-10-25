@@ -68,6 +68,7 @@ const {
   setAllOrderItemsReceived,
   recordStudentRefund,
   changeDeliveryType,
+  toggleItemUnavailable,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -141,6 +142,7 @@ function database(t) {
     "0010_due_payments.sql",
     "0011_actual_courier_charges.sql",
     "0012_item_received_and_refunds.sql",
+    "0013_item_unavailable_workflow.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -3392,4 +3394,139 @@ test("Admin can change delivery type while preserving payment amounts unchanged"
   const latestNote = historyEntries[historyEntries.length - 1]?.note || "";
   assert.ok(latestNote.includes("Delivery type changed from Lahore Route to Campus Pickup"));
   assert.ok(latestNote.includes("Payment unchanged"));
+});
+
+
+test("Vendor and Admin can mark book as unavailable / out of stock: auto-recalculates bill, issues student refund, and deducts from vendor billing", async (t) => {
+  const sqlite = database(t);
+  const guest = "b".repeat(64);
+  const request = new Request("http://127.0.0.1:5173/api/checkout", {
+    headers: { cookie: "cbs_guest=" + guest },
+  });
+  const adminUser = admin;
+
+  // 1. Save two distinct books
+  const b1Res = await saveBook(
+    bookInput("UNAV101", { title: "Intro to CS 101", pages: 100, fixed_price: 500 }),
+    adminUser,
+    request,
+  );
+  const b2Res = await saveBook(
+    bookInput("UNAV102", { title: "English Comp 101", pages: 80, fixed_price: 400 }),
+    adminUser,
+    request,
+  );
+
+  // 2. Create a dedicated vendor
+  const vRes = await createVendor(request, adminUser, {
+    name: "UnavPress",
+    phone: "03001237777",
+    email: "unavpress@example.com",
+    password: "Password123!",
+    per_page_rate: 1.60,
+    binding_rate: 30.00,
+  });
+  const vendorId = vRes.vendor.id;
+  const vendorUser = {
+    id: vendorId,
+    vendor_id: vendorId,
+    role: "VENDOR",
+    email: "unavpress@example.com",
+    permissions: [],
+  };
+
+  // 3. Place order with both books
+  const q = await quote(request, {
+    name: "Student Unav",
+    phone: "03009998888",
+    city: "Lahore",
+    address: "Campus Block",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: b1Res.id, quantity: 1 },
+      { id: b2Res.id, quantity: 1 },
+    ],
+  });
+
+  const slip = "slip-unav-" + crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  // Confirm payment & assign to vendor
+  const placedOrder = await getOrder(request, placed.id, adminUser);
+  await decidePayment(request, adminUser, placed.id, "approve", "Verified", placedOrder.version);
+  await assignOrderToVendor(request, adminUser, placed.id, vendorId);
+
+  const initialOrder = await getOrder(request, placed.id, adminUser);
+  const initialTotal = initialOrder.total;
+  assert.ok(initialOrder.items.length === 2);
+  const item1 = initialOrder.items.find(i => i.code === "UNAV101");
+  const item2 = initialOrder.items.find(i => i.code === "UNAV102");
+  assert.ok(item1 && item2);
+
+  // Initial vendor pending books checklist includes both
+  const initialPending = await getVendorPendingBooks(vendorUser, vendorId);
+  assert.ok(initialPending.pendingBooks.some(b => b.code === "UNAV101"));
+  assert.ok(initialPending.pendingBooks.some(b => b.code === "UNAV102"));
+
+  // Initial vendor ledger includes both books (180 pages, 2 books)
+  const initialLedger = await getVendorLedger(vendorUser, vendorId);
+  const initialPrintingCost = initialLedger.summary.total_printing_cost;
+
+  // 4. Vendor marks UNAV101 as unavailable / cannot print
+  const unavRes = await toggleItemUnavailable(
+    request,
+    vendorUser,
+    placed.id,
+    item1.id,
+    true,
+    "Machine fault, paper unavailable",
+  );
+  assert.equal(unavRes.ok, true);
+  assert.equal(unavRes.is_unavailable, 1);
+  assert.equal(unavRes.refund_status, "REFUND_PENDING");
+  assert.ok(unavRes.refund_due > 0);
+  assert.equal(unavRes.total, initialTotal - Number(item1.unit_price));
+
+  // Verify order in database
+  const updatedOrder = await getOrder(request, placed.id, adminUser);
+  assert.equal(updatedOrder.total, initialTotal - Number(item1.unit_price));
+  assert.equal(updatedOrder.refund_due, Number(item1.unit_price));
+  assert.equal(updatedOrder.refund_status, "REFUND_PENDING");
+  const unavItem = updatedOrder.items.find(i => i.id === item1.id);
+  assert.equal(unavItem.is_unavailable, 1);
+  assert.equal(unavItem.unavailable_reason, "Machine fault, paper unavailable");
+
+  // Verify vendor pending checklist: UNAV101 is NO LONGER listed
+  const updatedPending = await getVendorPendingBooks(vendorUser, vendorId);
+  assert.ok(!updatedPending.pendingBooks.some(b => b.code === "UNAV101"));
+  assert.ok(updatedPending.pendingBooks.some(b => b.code === "UNAV102"));
+
+  // Verify vendor ledger: cost for UNAV101 (100 pages, 1 book) is DEDUCTED from vendor earnings
+  const updatedLedger = await getVendorLedger(vendorUser, vendorId);
+  assert.ok(updatedLedger.summary.total_printing_cost < initialPrintingCost);
+  assert.equal(updatedLedger.summary.total_books, 1);
+  assert.equal(updatedLedger.summary.total_pages, 80);
+
+  // 5. Admin restores UNAV101 as available
+  const restoreRes = await toggleItemUnavailable(
+    request,
+    adminUser,
+    placed.id,
+    item1.id,
+    false,
+  );
+  assert.equal(restoreRes.ok, true);
+  assert.equal(restoreRes.is_unavailable, 0);
+  assert.equal(restoreRes.total, initialTotal);
+  assert.equal(restoreRes.refund_due, 0);
+
+  const restoredOrder = await getOrder(request, placed.id, adminUser);
+  assert.equal(restoredOrder.total, initialTotal);
+  assert.equal(restoredOrder.refund_due, 0);
 });

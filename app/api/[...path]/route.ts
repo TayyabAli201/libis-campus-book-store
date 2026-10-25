@@ -58,6 +58,7 @@ import {
   updateDueNote,
   toggleOrderItemReceived,
   setAllOrderItemsReceived,
+  toggleItemUnavailable,
   recordStudentRefund,
   changeDeliveryType,
 } from "@/lib/server/orders";
@@ -750,11 +751,13 @@ async function handle(req: Request) {
               "update_due_note",
               "toggle_item_received",
               "set_all_items_received",
+              "toggle_item_unavailable",
               "record_refund",
               "change_delivery_type",
             ]),
             item_id: z.string().trim().optional(),
             received: z.boolean().optional(),
+            unavailable: z.boolean().optional(),
             method: z.string().trim().max(100).optional(),
             reference: z.string().trim().max(200).optional(),
             status: z.string().optional(),
@@ -876,6 +879,10 @@ async function handle(req: Request) {
         }
         if (b.action === "set_all_items_received") {
           return ok(await setAllOrderItemsReceived(req, u, id, b.received !== false));
+        }
+        if (b.action === "toggle_item_unavailable") {
+          if (!b.item_id) throw new AppError(400, "Item ID is required.");
+          return ok(await toggleItemUnavailable(req, u, id, b.item_id, b.unavailable !== false, b.reason));
         }
         if (b.action === "record_refund") {
           if (!b.amount || b.amount <= 0) throw new AppError(400, "Valid refund amount is required.");

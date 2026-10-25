@@ -75,7 +75,7 @@ export function orderSheet(
   let grandTotalBooks = 0;
 
   orders.forEach((o, orderIdx) => {
-    const items =
+    const sourceItems =
       o.items && o.items.length > 0
         ? o.items
         : [
@@ -85,6 +85,8 @@ export function orderSheet(
               quantity: 1,
             },
           ];
+    const rawItems = sourceItems.filter((it: any) => !it.is_unavailable);
+    const items = rawItems.filter((it: any) => !it.is_unavailable);
 
     const hasAnyReceivedOrDispatched =
       items.some((it: any) => Boolean(it.received_from_vendor)) ||

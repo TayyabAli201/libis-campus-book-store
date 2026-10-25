@@ -322,7 +322,7 @@ export async function getOrder(
   if (digits.length >= 7) {
     const phoneWildcard = `%${digits.slice(-10)}%`;
     o = await one<any>(
-      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=? OR o.phone=? OR o.phone LIKE ? ORDER BY o.created_at DESC LIMIT 1",
+      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0)) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=? OR o.phone=? OR o.phone LIKE ? ORDER BY o.created_at DESC LIMIT 1",
       identifier.toLowerCase(),
       identifier.toUpperCase(),
       identifier,
@@ -330,7 +330,7 @@ export async function getOrder(
     );
   } else {
     o = await one<any>(
-      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
+      "SELECT o.*,p.status AS payment_status,p.slip_id,p.note AS payment_note,s.ocr_status,s.detected_amount,s.ocr_message,s.mime,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0)) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE o.id=? OR o.reference=?",
       identifier.toLowerCase(),
       identifier.toUpperCase(),
     );
@@ -445,11 +445,12 @@ export async function getOrder(
     const perPageRate = Number(v?.per_page_rate ?? 1.60);
     const bindingRate = Number(v?.binding_rate ?? 30.00);
 
-    const orderPages = items.reduce(
+    const availableItems = items.filter((it: any) => !it.is_unavailable);
+    const orderPages = availableItems.reduce(
       (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
       0,
     );
-    const orderBooks = items.reduce(
+    const orderBooks = availableItems.reduce(
       (sum: number, it: any) => sum + (it.quantity || 1),
       0,
     );
@@ -622,7 +623,7 @@ export async function listOrders(
   const limitClause = isAll ? "LIMIT 10000" : `LIMIT ${pageSize} OFFSET ?`;
   const queryArgs = isAll ? [...args] : [...args, (page - 1) * pageSize];
   const rows = await all(
-    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
+    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0)) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
     ...queryArgs,
   );
   rows.forEach((o: any) => {
@@ -661,7 +662,7 @@ export async function listOrders(
       const slice = orderIds.slice(i, i + 100);
       const placeholders = slice.map(() => "?").join(",");
       const batchItems = await all(
-        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor FROM order_items WHERE order_id IN (${placeholders})`,
+        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at FROM order_items WHERE order_id IN (${placeholders})`,
         ...slice,
       );
       allItems.push(...batchItems);
@@ -752,11 +753,12 @@ export async function listOrders(
 
     for (const r of rows) {
       const items = (r as any).items || [];
-      const orderPages = items.reduce(
+      const availableItems = items.filter((it: any) => !it.is_unavailable);
+    const orderPages = availableItems.reduce(
         (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
         0,
       );
-      const orderBooks = items.reduce(
+      const orderBooks = availableItems.reduce(
         (sum: number, it: any) => sum + (it.quantity || 1),
         0,
       );
@@ -2371,6 +2373,121 @@ export async function setAllOrderItemsReceived(
   ];
   await batch(statements);
   return { ok: true, received_from_vendor: recVal };
+}
+
+export async function toggleItemUnavailable(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+  isUnavailable: boolean,
+  reason = "",
+) {
+  const isSuperAdmin = u.role === "SUPER_ADMIN" || Boolean(u.permissions?.includes("orders.update"));
+  const isVendor = u.role === "VENDOR";
+
+  if (!isSuperAdmin && !isVendor) {
+    throw new AppError(403, "Permission denied to update book availability.");
+  }
+
+  const o = await one<any>("SELECT * FROM orders WHERE id=?", orderId);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  if (isVendor) {
+    const vendorId = u.vendor_id || u.id;
+    if (o.vendor_id !== vendorId) {
+      throw new AppError(403, "You can only update books for orders assigned to you.");
+    }
+    if (["DELIVERED", "CANCELLED", "REJECTED"].includes(o.status)) {
+      throw new AppError(400, "Cannot change book availability for delivered or terminal orders.");
+    }
+  }
+
+  const it = await one<any>("SELECT * FROM order_items WHERE id=? AND order_id=?", itemId, orderId);
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  const unavVal = isUnavailable ? 1 : 0;
+  if (Number(it.is_unavailable || 0) === unavVal) {
+    return { ok: true, itemId, is_unavailable: unavVal };
+  }
+
+  const allItems = await all<any>("SELECT * FROM order_items WHERE order_id=?", orderId);
+  const activeItems = allItems
+    .map((item: any) => (item.id === itemId ? { ...item, is_unavailable: unavVal } : item))
+    .filter((item: any) => !item.is_unavailable);
+
+  const newSubtotal = activeItems.reduce(
+    (sum: number, item: any) => sum + (Number(item.unit_price) * (Number(item.quantity) || 1)),
+    0,
+  );
+  const delivery = Number(o.delivery || 0);
+  const newTotal = newSubtotal + delivery;
+
+  const newAmountPaid = Number(o.amount_paid || 0);
+  const newDueAmount = newAmountPaid > 0 ? Math.max(0, newTotal - newAmountPaid) : 0;
+  const newDueStatus = newAmountPaid > 0 ? (newDueAmount > 0 ? "DUE_PENDING" : "PAID") : (o.due_status || "NONE");
+
+  const excessPaid = Math.max(0, newAmountPaid - newTotal);
+  const existingRefundPaid = Number(o.refund_amount || 0);
+  const newRefundDue = Math.max(0, excessPaid - existingRefundPaid);
+  const newRefundStatus = excessPaid > 0 ? (newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+
+  const at = now();
+  const cleanReason = (reason || (isVendor ? "Vendor reported unavailable / out of print" : "Marked unavailable by admin")).trim();
+  const histNote = isUnavailable
+    ? `Book marked as unavailable/shortage: ${it.code} (${it.title}). Reason: ${cleanReason}. Total: Rs. ${Number(o.total).toLocaleString()} → Rs. ${Number(newTotal).toLocaleString()}${newRefundDue > 0 ? `. Student Refund Due: Rs. ${newRefundDue.toLocaleString()}` : ""}`
+    : `Book restored as available: ${it.code} (${it.title}). Total: Rs. ${Number(o.total).toLocaleString()} → Rs. ${Number(newTotal).toLocaleString()}`;
+
+  const statements: any[] = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", o.id, o.version),
+    stmt(
+      "UPDATE order_items SET is_unavailable=?, unavailable_reason=?, unavailable_at=? WHERE id=? AND order_id=?",
+      unavVal,
+      isUnavailable ? cleanReason : null,
+      isUnavailable ? at : null,
+      itemId,
+      orderId,
+    ),
+    stmt(
+      "UPDATE orders SET subtotal=?, total=?, due_amount=?, due_status=?, refund_due=?, refund_status=?, version=version+1, updated_at=? WHERE id=?",
+      newSubtotal,
+      newTotal,
+      newDueAmount,
+      newDueStatus,
+      newRefundDue,
+      newRefundStatus,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      o.status,
+      histNote,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_UNAVAILABLE_TOGGLE",
+      itemId,
+      { is_unavailable: it.is_unavailable },
+      { is_unavailable: unavVal, order_id: orderId, code: it.code, total: newTotal, refund_due: newRefundDue },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return {
+    ok: true,
+    itemId,
+    is_unavailable: unavVal,
+    subtotal: newSubtotal,
+    total: newTotal,
+    refund_due: newRefundDue,
+    refund_status: newRefundStatus,
+  };
 }
 
 export async function recordStudentRefund(

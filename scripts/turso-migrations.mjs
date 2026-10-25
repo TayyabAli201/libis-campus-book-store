@@ -15,6 +15,7 @@ export const migrations = [
   "0010_due_payments.sql",
   "0011_actual_courier_charges.sql",
   "0012_item_received_and_refunds.sql",
+  "0013_item_unavailable_workflow.sql",
 ];
 export async function migrateTurso(client, log = console.log) {
   await client.execute(

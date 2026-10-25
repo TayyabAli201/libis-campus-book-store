@@ -2249,16 +2249,26 @@ export function printOrderReceiptSlip(order: any) {
 
   const itemsHtml = (order.items || [])
     .map(
-      (b: any) => `
-        <tr>
+      (b: any) => {
+        const isUnav = Boolean(b.is_unavailable);
+        return `
+        <tr style="${isUnav ? "background: #fef2f2; color: #991b1b;" : ""}">
           <td>
-            <strong>${escapeHtml(formatReceiptBookTitle(b.code, b.title))}</strong>
+            <strong style="${isUnav ? "text-decoration: line-through; color: #991b1b;" : ""}">
+              ${escapeHtml(formatReceiptBookTitle(b.code, b.title))}
+            </strong>
+            ${isUnav ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 700; background: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">❌ NOT AVAILABLE (REFUNDED)</span>` : ""}
           </td>
-          <td>${b.quantity}</td>
-          <td>${escapeHtml(money(b.unit_price, order.currency))}</td>
-          <td>${escapeHtml(money(b.unit_price * b.quantity, order.currency))}</td>
+          <td style="${isUnav ? "text-decoration: line-through;" : ""}">${b.quantity}</td>
+          <td style="${isUnav ? "text-decoration: line-through;" : ""}">${escapeHtml(money(b.unit_price, order.currency))}</td>
+          <td>
+            ${isUnav 
+              ? `<span style="text-decoration: line-through; color: #991b1b; display: block; font-size: 0.78rem;">${escapeHtml(money(b.unit_price * b.quantity, order.currency))}</span><strong style="color: #b91c1c; font-size: 0.85rem;">Rs. 0 (Refunded)</strong>` 
+              : escapeHtml(money(b.unit_price * b.quantity, order.currency))}
+          </td>
         </tr>
-      `
+      `;
+      }
     )
     .join("");
 
@@ -2821,16 +2831,48 @@ export function OrderReceipt({ o }: { o: any }) {
           </tr>
         </thead>
         <tbody>
-          {o.items.map((b: any) => (
-            <tr key={b.id || b.code}>
-              <td>
-                <strong>{formatReceiptBookTitle(b.code, b.title)}</strong>
-              </td>
-              <td>{b.quantity}</td>
-              <td>{money(b.unit_price, o.currency)}</td>
-              <td>{money(b.unit_price * b.quantity, o.currency)}</td>
-            </tr>
-          ))}
+          {o.items.map((b: any) => {
+            const isUnav = Boolean(b.is_unavailable);
+            return (
+              <tr key={b.id || b.code} style={isUnav ? { background: "#fef2f2" } : undefined}>
+                <td>
+                  <strong style={isUnav ? { textDecoration: "line-through", color: "#991b1b" } : undefined}>
+                    {formatReceiptBookTitle(b.code, b.title)}
+                  </strong>
+                  {isUnav && (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        border: "1px solid #ef4444",
+                        marginTop: 2,
+                        display: "inline-block",
+                      }}
+                    >
+                      ❌ NOT AVAILABLE (REFUNDED)
+                    </span>
+                  )}
+                </td>
+                <td style={isUnav ? { textDecoration: "line-through" } : undefined}>{b.quantity}</td>
+                <td style={isUnav ? { textDecoration: "line-through" } : undefined}>{money(b.unit_price, o.currency)}</td>
+                <td>
+                  {isUnav ? (
+                    <div>
+                      <span style={{ textDecoration: "line-through", color: "#991b1b", fontSize: "0.78rem", display: "block" }}>
+                        {money(b.unit_price * b.quantity, o.currency)}
+                      </span>
+                      <strong style={{ color: "#b91c1c" }}>Rs. 0 (Refunded)</strong>
+                    </div>
+                  ) : (
+                    money(b.unit_price * b.quantity, o.currency)
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <div className="receipt-bottom">

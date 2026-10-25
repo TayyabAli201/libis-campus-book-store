@@ -39,8 +39,8 @@ export async function listVendors(u: User): Promise<Vendor[]> {
   const orderAggs = await all<any>(
     `SELECT 
       o.vendor_id,
-      COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
-      COALESCE(SUM(oi.quantity), 0) AS total_books
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 THEN 0 ELSE oi.pages * oi.quantity END), 0) AS total_pages,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 THEN 0 ELSE oi.quantity END), 0) AS total_books
      FROM orders o
      JOIN order_items oi ON oi.order_id = o.id
      WHERE o.vendor_id IS NOT NULL
@@ -341,8 +341,8 @@ export async function getVendorLedger(
       COUNT(DISTINCT o.id) AS total_orders,
       COUNT(DISTINCT CASE WHEN o.status = 'PROCESSING' AND o.vendor_printed_at IS NULL THEN o.id END) AS printing_orders,
       COUNT(DISTINCT CASE WHEN o.vendor_printed_at IS NOT NULL THEN o.id END) AS printed_orders,
-      COALESCE(SUM(oi.pages * oi.quantity), 0) AS total_pages,
-      COALESCE(SUM(oi.quantity), 0) AS total_books
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 THEN 0 ELSE oi.pages * oi.quantity END), 0) AS total_pages,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 THEN 0 ELSE oi.quantity END), 0) AS total_books
      FROM orders o
      LEFT JOIN order_items oi ON oi.order_id = o.id
      WHERE o.vendor_id = ?`,
@@ -857,6 +857,7 @@ export async function getVendorPendingBooks(
       AND (o.delivery_type != 'other' OR o.delivery_type IS NULL)
       AND o.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED')
       AND oi.received_from_vendor = 0
+      AND (oi.is_unavailable IS NULL OR oi.is_unavailable = 0)
     GROUP BY oi.code, oi.title
     ORDER BY shortage_qty DESC, oi.code ASC`,
     targetVendorId,

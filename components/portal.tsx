@@ -2796,12 +2796,20 @@ function BulkAssignVendorModal({
   );
 }
 
-function VendorOrderBooksPanel({ o }: { o: any }) {
+function VendorOrderBooksPanel({
+  o,
+  onUpdated,
+}: {
+  o: any;
+  onUpdated?: () => Promise<void> | void;
+}) {
+  const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
   const items: any[] = o?.items || [];
+  const activeItems = items.filter((it: any) => !it.is_unavailable);
   const totalBooks =
     o?.total_books ??
-    items.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
-  const totalPages = items.reduce(
+    activeItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+  const totalPages = activeItems.reduce(
     (s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1),
     0,
   );
@@ -2813,6 +2821,28 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
   const isOther =
     o?.delivery_type === "other" ||
     (!isCampus && o?.city && !o.city.toLowerCase().includes("lahore"));
+
+  const handleToggleUnavailable = async (itemId: string, unavailable: boolean) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "toggle_item_unavailable",
+        item_id: itemId,
+        unavailable,
+      });
+      toast.success(
+        unavailable
+          ? "Book marked as out of stock / cannot print"
+          : "Book restored as available",
+      );
+      notifyOrdersUpdated();
+      await onUpdated?.();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
 
   return (
     <div className="panel stack" style={{ gap: 14 }}>
@@ -2892,7 +2922,7 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
               border: "1px solid var(--status-info-border)",
             }}
           >
-            {totalBooks} {totalBooks === 1 ? "book" : "books"}
+            {totalBooks} {totalBooks === 1 ? "book" : "books"} to print
           </span>
         </div>
 
@@ -2910,56 +2940,119 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
                   <th style={{ padding: "8px 10px", fontWeight: 600 }}>Book Title</th>
                   <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "right" }}>Pages</th>
                   <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "center", width: "60px" }}>Qty</th>
+                  <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "center", width: "130px" }}>Print Status</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((it: any, idx: number) => (
-                  <tr
-                    key={it.id || it.code || idx}
-                    style={{
-                      borderBottom: idx < items.length - 1 ? "1px solid var(--border)" : "none",
-                      background: idx % 2 === 0 ? "transparent" : "var(--muted)",
-                    }}
-                  >
-                    <td style={{ padding: "9px 10px", color: "var(--muted-foreground)", fontSize: "0.8rem" }}>
-                      {idx + 1}
-                    </td>
-                    <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
-                      <span
-                        className="mono-pill"
-                        style={{
-                          fontWeight: 700,
-                          fontSize: "0.78rem",
-                          background: "var(--card)",
-                          border: "1px solid var(--border)",
-                        }}
-                      >
-                        {it.code}
-                      </span>
-                    </td>
-                    <td style={{ padding: "9px 10px", fontWeight: 500, color: "var(--foreground)" }}>
-                      {it.title}
-                    </td>
-                    <td style={{ padding: "9px 10px", textAlign: "right", color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
-                      {it.pages ? `${it.pages} p.` : "—"}
-                    </td>
-                    <td style={{ padding: "9px 10px", textAlign: "center" }}>
-                      <span
-                        className="mono-pill"
-                        style={{
-                          fontWeight: 700,
-                          fontSize: "0.8rem",
-                          background: "var(--status-info-bg)",
-                          color: "var(--status-info-text)",
-                          border: "1px solid var(--status-info-border)",
-                          padding: "2px 7px",
-                        }}
-                      >
-                        ×{it.quantity || 1}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {items.map((it: any, idx: number) => {
+                  const isUnav = Boolean(it.is_unavailable);
+                  return (
+                    <tr
+                      key={it.id || it.code || idx}
+                      style={{
+                        borderBottom: idx < items.length - 1 ? "1px solid var(--border)" : "none",
+                        background: isUnav ? "#fef2f2" : idx % 2 === 0 ? "transparent" : "var(--muted)",
+                      }}
+                    >
+                      <td style={{ padding: "9px 10px", color: "var(--muted-foreground)", fontSize: "0.8rem" }}>
+                        {idx + 1}
+                      </td>
+                      <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "0.78rem",
+                            background: isUnav ? "#fee2e2" : "var(--card)",
+                            color: isUnav ? "#991b1b" : undefined,
+                            border: isUnav ? "1px solid #f87171" : "1px solid var(--border)",
+                            textDecoration: isUnav ? "line-through" : undefined,
+                          }}
+                        >
+                          {it.code}
+                        </span>
+                      </td>
+                      <td style={{ padding: "9px 10px", fontWeight: 500, color: isUnav ? "#991b1b" : "var(--foreground)" }}>
+                        <div style={{ textDecoration: isUnav ? "line-through" : undefined }}>{it.title}</div>
+                        {isUnav && (
+                          <span
+                            className="mono-pill"
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              border: "1px solid #ef4444",
+                              marginTop: 2,
+                              display: "inline-block",
+                            }}
+                          >
+                            ❌ Cannot Print / Out of Stock
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "9px 10px", textAlign: "right", color: "var(--muted-foreground)", whiteSpace: "nowrap", textDecoration: isUnav ? "line-through" : undefined }}>
+                        {it.pages ? `${it.pages} p.` : "—"}
+                      </td>
+                      <td style={{ padding: "9px 10px", textAlign: "center" }}>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "0.8rem",
+                            background: isUnav ? "#fee2e2" : "var(--status-info-bg)",
+                            color: isUnav ? "#991b1b" : "var(--status-info-text)",
+                            border: isUnav ? "1px solid #f87171" : "1px solid var(--status-info-border)",
+                            padding: "2px 7px",
+                            textDecoration: isUnav ? "line-through" : undefined,
+                          }}
+                        >
+                          ×{it.quantity || 1}
+                        </span>
+                      </td>
+                      <td style={{ padding: "9px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                        {isUnav ? (
+                          <button
+                            type="button"
+                            className="btn compact"
+                            disabled={togglingItemId === it.id}
+                            onClick={async () => {
+                              if (!window.confirm(`Undo and restore "${it.code} - ${it.title}" for printing?\n\nThis will re-add this book to your printing queue and bill.`)) return;
+                              await handleToggleUnavailable(it.id, false);
+                            }}
+                            style={{ fontSize: "0.72rem", padding: "2px 7px", display: "inline-flex", alignItems: "center", gap: 3 }}
+                            title="Restore book for printing"
+                          >
+                            <RotateCcw size={11} /> Undo
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn outline compact"
+                            disabled={togglingItemId === it.id}
+                            onClick={async () => {
+                              if (!window.confirm(`Cannot print "${it.code} - ${it.title}"?\n\nThis will remove the book from your printing queue, deduct its cost from your earnings, and update the student refund.`)) return;
+                              await handleToggleUnavailable(it.id, true);
+                            }}
+                            style={{
+                              fontSize: "0.72rem",
+                              padding: "2px 7px",
+                              color: "#b91c1c",
+                              borderColor: "#fca5a5",
+                              background: "#fff",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                            }}
+                            title="Mark book as unavailable / cannot print"
+                          >
+                            <XCircle size={12} /> Cannot Print
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr style={{ background: "var(--muted)", borderTop: "1px solid var(--border)", fontWeight: 600, fontSize: "0.82rem" }}>
@@ -2971,6 +3064,9 @@ function VendorOrderBooksPanel({ o }: { o: any }) {
                   </td>
                   <td style={{ padding: "8px 10px", textAlign: "center", color: "var(--status-info-text)", fontWeight: 700 }}>
                     {totalBooks}
+                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
+                    {items.length !== activeItems.length ? `${items.length - activeItems.length} out of stock` : "—"}
                   </td>
                 </tr>
               </tfoot>
@@ -3230,6 +3326,28 @@ function AdminOrderBooksPanel({
   const isOther =
     o?.delivery_type === "other" ||
     (!isCampus && o?.city && !o.city.toLowerCase().includes("lahore"));
+
+  const toggleItemUnavailable = async (itemId: string, unavailable: boolean) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "toggle_item_unavailable",
+        item_id: itemId,
+        unavailable,
+      });
+      toast.success(
+        unavailable
+          ? "Book marked as out of stock / unavailable. Bill updated & student refund generated."
+          : "Book restored as available. Total bill updated."
+      );
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
 
   const toggleItemReceived = async (itemId: string, received: boolean) => {
     setTogglingItemId(itemId);
@@ -3779,6 +3897,7 @@ function AdminOrderBooksPanel({
                 const unitPrice = Number(it.unit_price) || 0;
                 const qty = Number(it.quantity) || 1;
                 const lineTotal = unitPrice * qty;
+                const isUnav = Boolean(it.is_unavailable);
 
                 return (
                   <tr
@@ -3788,7 +3907,7 @@ function AdminOrderBooksPanel({
                         idx < (isEditing ? itemsDraft : rawItems).length - 1
                           ? "1px solid var(--border)"
                           : "none",
-                      background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                      background: isUnav ? "#fef2f2" : idx % 2 === 0 ? "transparent" : "var(--muted)",
                     }}
                   >
                     <td
@@ -3813,9 +3932,24 @@ function AdminOrderBooksPanel({
                         {it.code}
                       </span>
                     </td>
-                    <td style={{ padding: "8px 10px", fontWeight: 500 }}>
-                      <div>{it.title}</div>
-                      {it.pages ? (
+                    <td style={{ padding: "8px 10px", fontWeight: 500, color: isUnav ? "#991b1b" : undefined }}>
+                      <div style={{ textDecoration: isUnav ? "line-through" : undefined }}>{it.title}</div>
+                      {isUnav ? (
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            background: "#fee2e2",
+                            color: "#b91c1c",
+                            border: "1px solid #ef4444",
+                            marginTop: 2,
+                            display: "inline-block",
+                          }}
+                        >
+                          ❌ Out of Stock / Refunded
+                        </span>
+                      ) : it.pages ? (
                         <span
                           style={{
                             fontSize: "0.74rem",
@@ -3915,46 +4049,114 @@ function AdminOrderBooksPanel({
                     </td>
                     {!isEditing && (
                       <td style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
-                        <button
-                          type="button"
-                          disabled={togglingItemId === it.id || !canUpdate}
-                          onClick={() => toggleItemReceived(it.id, !it.received_from_vendor)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: "0.72rem",
-                            fontWeight: 600,
-                            padding: "2px 8px",
-                            borderRadius: 9999,
-                            cursor: canUpdate ? "pointer" : "default",
-                            background: it.received_from_vendor
-                              ? "rgba(22, 163, 74, 0.15)"
-                              : "rgba(245, 158, 11, 0.15)",
-                            color: it.received_from_vendor ? "#15803d" : "#b45309",
-                            border: it.received_from_vendor
-                              ? "1px solid #86efac"
-                              : "1px solid #fde68a",
-                            transition: "all 0.15s ease",
-                          }}
-                          title={
-                            it.received_from_vendor
-                              ? "Received in Campus. Click if this book was missing or misprinted."
-                              : "Missing / Pending from vendor. Click to mark as received in Campus."
-                          }
-                        >
-                          {togglingItemId === it.id ? (
-                            "Saving…"
-                          ) : it.received_from_vendor ? (
-                            <>
-                              <CheckCircle2 size={11} /> Received in Campus ✓
-                            </>
-                          ) : (
-                            <>
-                              <Clock size={11} /> Missing / Shortage ⏳
-                            </>
-                          )}
-                        </button>
+                        {isUnav ? (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                            <span
+                              className="mono-pill"
+                              style={{
+                                background: "#fee2e2",
+                                color: "#b91c1c",
+                                border: "1px solid #ef4444",
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                              }}
+                            >
+                              ❌ OUT OF STOCK
+                            </span>
+                            {canUpdate && (
+                              <button
+                                type="button"
+                                disabled={togglingItemId === it.id}
+                                onClick={async () => {
+                                  if (!window.confirm(`Restore "${it.code} - ${it.title}" as available in order?\n\nThis will re-add its price to the student total bill.`)) return;
+                                  await toggleItemUnavailable(it.id, false);
+                                }}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  fontSize: "0.68rem",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  background: "#fff",
+                                  border: "1px solid var(--border)",
+                                  cursor: "pointer",
+                                }}
+                                title="Restore book as available"
+                              >
+                                <RotateCcw size={10} /> Restore
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <button
+                              type="button"
+                              disabled={togglingItemId === it.id || !canUpdate}
+                              onClick={() => toggleItemReceived(it.id, !it.received_from_vendor)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: "0.72rem",
+                                fontWeight: 600,
+                                padding: "2px 8px",
+                                borderRadius: 9999,
+                                cursor: canUpdate ? "pointer" : "default",
+                                background: it.received_from_vendor
+                                  ? "rgba(22, 163, 74, 0.15)"
+                                  : "rgba(245, 158, 11, 0.15)",
+                                color: it.received_from_vendor ? "#15803d" : "#b45309",
+                                border: it.received_from_vendor
+                                  ? "1px solid #86efac"
+                                  : "1px solid #fde68a",
+                                transition: "all 0.15s ease",
+                              }}
+                              title={
+                                it.received_from_vendor
+                                  ? "Received in Campus. Click if this book was missing or misprinted."
+                                  : "Missing / Pending from vendor. Click to mark as received in Campus."
+                              }
+                            >
+                              {togglingItemId === it.id ? (
+                                "Saving…"
+                              ) : it.received_from_vendor ? (
+                                <>
+                                  <CheckCircle2 size={11} /> Received in Campus ✓
+                                </>
+                              ) : (
+                                <>
+                                  <Clock size={11} /> Missing / Shortage ⏳
+                                </>
+                              )}
+                            </button>
+                            {canUpdate && (
+                              <button
+                                type="button"
+                                disabled={togglingItemId === it.id}
+                                onClick={async () => {
+                                  if (!window.confirm(`Mark "${it.code} - ${it.title}" as out of stock / unavailable?\n\nThis will remove it from the bill, generate a student refund, and deduct its printing cost from vendor billing.`)) return;
+                                  await toggleItemUnavailable(it.id, true);
+                                }}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  fontSize: "0.68rem",
+                                  padding: "2px 5px",
+                                  borderRadius: 4,
+                                  background: "#fff",
+                                  color: "#b91c1c",
+                                  border: "1px solid #fca5a5",
+                                  cursor: "pointer",
+                                }}
+                                title="Mark book as out of stock / unavailable"
+                              >
+                                <XCircle size={10} /> Out of Stock
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                     )}
                     {isEditing && (
@@ -5643,7 +5845,7 @@ function OrderModalPopup({
               <div className="checkout-grid order-modal-grid">
                 <div className="stack">
                   {isVendor ? (
-                    <VendorOrderBooksPanel o={o} />
+                    <VendorOrderBooksPanel o={o} onUpdated={reload} />
                   ) : (
                     <>
                       {/* Direct Online Payment Slip View */}
@@ -9629,7 +9831,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
           <div className="checkout-grid">
             {isVendor ? (
               <div className="stack no-print">
-                <VendorOrderBooksPanel o={o} />
+                <VendorOrderBooksPanel o={o} onUpdated={reload} />
               </div>
             ) : (
               <>
