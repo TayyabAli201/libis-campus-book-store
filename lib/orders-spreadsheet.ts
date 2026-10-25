@@ -85,8 +85,8 @@ export function orderSheet(
               quantity: 1,
             },
           ];
-    const rawItems = sourceItems.filter((it: any) => !it.is_unavailable);
-    const items = rawItems.filter((it: any) => !it.is_unavailable);
+    const rawItems = sourceItems.filter((it: any) => !it.is_unavailable && !it.in_office_stock);
+    const items = rawItems;
 
     const hasAnyReceivedOrDispatched =
       items.some((it: any) => Boolean(it.received_from_vendor)) ||
@@ -367,10 +367,11 @@ export function bookSummarySheet(orders: any[]) {
       hasAnyReceivedOrDispatched &&
       rawItems.some((it: any) => !it.received_from_vendor);
 
-    // Only summarize missing books for shortage orders
+    // Only summarize missing books for shortage orders; exclude office stock and unavailable books
+    const eligibleItems = rawItems.filter((it: any) => !it.is_unavailable && !it.in_office_stock);
     const items = hasShortage
-      ? rawItems.filter((it: any) => !it.received_from_vendor)
-      : rawItems;
+      ? eligibleItems.filter((it: any) => !it.received_from_vendor)
+      : eligibleItems;
 
     items.forEach((item: any) => {
       const rawCode = String(item.code || "").trim();

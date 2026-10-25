@@ -354,7 +354,7 @@ export async function getOrder(
   const privateAccess = staffAccess || owned;
   if (!privateAccess && access === "private")
     throw new AppError(404, "Order not found.");
-  const items = await all("SELECT * FROM order_items WHERE order_id=?", o.id);
+  let items = await all("SELECT * FROM order_items WHERE order_id=?", o.id);
   const history = await all(
     `SELECT status,note,created_at,actor,internal FROM order_history WHERE order_id=? ${u?.role === "SUPER_ADMIN" ? "" : "AND internal=0"} ORDER BY created_at`,
     o.id,
@@ -445,7 +445,7 @@ export async function getOrder(
     const perPageRate = Number(v?.per_page_rate ?? 1.60);
     const bindingRate = Number(v?.binding_rate ?? 30.00);
 
-    const availableItems = items.filter((it: any) => !it.is_unavailable);
+    const availableItems = items.filter((it: any) => !it.is_unavailable && !it.in_office_stock);
     const orderPages = availableItems.reduce(
       (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
       0,
@@ -459,6 +459,7 @@ export async function getOrder(
     );
 
     const courierCharge = Number(o.actual_courier_charges || 0);
+    o.total_books = orderBooks;
     o.vendor_price = vendorPrice;
     o.actual_courier_charges = courierCharge;
     o.vendor_total_credit = vendorPrice + courierCharge;
@@ -485,6 +486,7 @@ export async function getOrder(
     delete o.slip_id;
     delete o.detected_amount;
     delete o.ocr_status;
+    items = items.filter((it: any) => !it.in_office_stock);
     for (const it of items) {
       delete (it as any).unit_price;
     }
@@ -623,7 +625,7 @@ export async function listOrders(
   const limitClause = isAll ? "LIMIT 10000" : `LIMIT ${pageSize} OFFSET ?`;
   const queryArgs = isAll ? [...args] : [...args, (page - 1) * pageSize];
   const rows = await all(
-    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0)) AS total_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
+    `SELECT o.*,p.status AS payment_status,s.detected_amount,s.ocr_status,p.slip_id,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0)) AS total_books,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0) AND (oi.in_office_stock IS NULL OR oi.in_office_stock=0)) AS print_books,(SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND oi.in_office_stock=1) AS office_stock_books,(SELECT name FROM vendors v WHERE v.id=o.vendor_id) AS vendor_name,(SELECT phone FROM vendors v WHERE v.id=o.vendor_id) AS vendor_phone FROM orders o JOIN payments p ON p.order_id=o.id JOIN payment_slips s ON s.id=p.slip_id WHERE ${where} ORDER BY o.created_at DESC ${limitClause}`,
     ...queryArgs,
   );
   rows.forEach((o: any) => {
@@ -653,6 +655,11 @@ export async function listOrders(
       delete o.actual_courier_charges;
     } else {
       o.actual_courier_charges = Number(o.actual_courier_charges || 0);
+      o.print_books = Number(o.print_books ?? o.total_books ?? 0);
+      o.office_stock_books = Number(o.office_stock_books ?? 0);
+      if (u.role === "VENDOR") {
+        o.total_books = o.print_books;
+      }
     }
   });
   if (rows.length > 0) {
@@ -662,7 +669,7 @@ export async function listOrders(
       const slice = orderIds.slice(i, i + 100);
       const placeholders = slice.map(() => "?").join(",");
       const batchItems = await all(
-        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at FROM order_items WHERE order_id IN (${placeholders})`,
+        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at,in_office_stock,office_stock_at FROM order_items WHERE order_id IN (${placeholders})`,
         ...slice,
       );
       allItems.push(...batchItems);
@@ -674,7 +681,10 @@ export async function listOrders(
       itemsByOrder.set(it.order_id, list);
     }
     for (const r of rows) {
-      (r as any).items = itemsByOrder.get(r.id) || [];
+      const orderItems = itemsByOrder.get(r.id) || [];
+      (r as any).items = u.role === "VENDOR"
+        ? orderItems.filter((it: any) => !it.in_office_stock)
+        : orderItems;
     }
   }
 
@@ -753,7 +763,7 @@ export async function listOrders(
 
     for (const r of rows) {
       const items = (r as any).items || [];
-      const availableItems = items.filter((it: any) => !it.is_unavailable);
+      const availableItems = items.filter((it: any) => !it.is_unavailable && !it.in_office_stock);
     const orderPages = availableItems.reduce(
         (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
         0,
@@ -2487,6 +2497,96 @@ export async function toggleItemUnavailable(
     total: newTotal,
     refund_due: newRefundDue,
     refund_status: newRefundStatus,
+  };
+}
+
+export async function toggleItemOfficeStock(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+  inOfficeStock: boolean,
+) {
+  const isSuperAdmin =
+    u.role === "SUPER_ADMIN" || Boolean(u.permissions?.includes("orders.update"));
+
+  if (!isSuperAdmin) {
+    throw new AppError(403, "Only Super Admin can mark items as In Office Stock.");
+  }
+
+  const o = await one<any>("SELECT * FROM orders WHERE id=?", orderId);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  if (["DELIVERED", "CANCELLED", "REJECTED"].includes(o.status)) {
+    throw new AppError(400, "Cannot change office stock status for delivered or cancelled orders.");
+  }
+
+  const it = await one<any>(
+    "SELECT * FROM order_items WHERE id=? AND order_id=?",
+    itemId,
+    orderId,
+  );
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  if (Boolean(it.is_unavailable) && inOfficeStock) {
+    throw new AppError(
+      400,
+      "This book is currently marked as out of stock / unavailable. Restore it first before marking as in office stock.",
+    );
+  }
+
+  const stockVal = inOfficeStock ? 1 : 0;
+  if (Number(it.in_office_stock || 0) === stockVal) {
+    return { ok: true, itemId, in_office_stock: stockVal };
+  }
+
+  const at = now();
+  const histNote = inOfficeStock
+    ? `Admin marked book as Available in Office Stock: ${it.code} (${it.title}). Fulfill from shelf (vendor printing skipped, bill unchanged).`
+    : `Admin reverted book from Office Stock to Vendor Printing: ${it.code} (${it.title}).`;
+
+  const newReceived = inOfficeStock ? 1 : (Number(it.received_from_vendor) || 0);
+
+  const statements: any[] = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", o.id, o.version),
+    stmt(
+      "UPDATE order_items SET in_office_stock=?, office_stock_at=?, received_from_vendor=? WHERE id=? AND order_id=?",
+      stockVal,
+      inOfficeStock ? at : null,
+      newReceived,
+      itemId,
+      orderId,
+    ),
+    stmt(
+      "UPDATE orders SET version=version+1, updated_at=? WHERE id=?",
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      o.status,
+      histNote,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_OFFICE_STOCK_TOGGLE",
+      itemId,
+      { in_office_stock: it.in_office_stock },
+      { in_office_stock: stockVal, order_id: orderId, code: it.code },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return {
+    ok: true,
+    itemId,
+    in_office_stock: stockVal,
+    received_from_vendor: newReceived,
   };
 }
 

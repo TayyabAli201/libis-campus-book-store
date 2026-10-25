@@ -2257,7 +2257,7 @@ export function printOrderReceiptSlip(order: any) {
             <strong style="${isUnav ? "text-decoration: line-through; color: #991b1b;" : ""}">
               ${escapeHtml(formatReceiptBookTitle(b.code, b.title))}
             </strong>
-            ${isUnav ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 700; background: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">❌ NOT AVAILABLE (REFUNDED)</span>` : ""}
+            ${isUnav ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 700; background: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">❌ NOT AVAILABLE (REFUNDED)</span>` : b.in_office_stock ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 600; background: #f0fdf4; color: #166534; border: 1px solid #86efac; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">📦 In Stock (Office Shelf)</span>` : ""}
           </td>
           <td style="${isUnav ? "text-decoration: line-through;" : ""}">${b.quantity}</td>
           <td style="${isUnav ? "text-decoration: line-through;" : ""}">${escapeHtml(money(b.unit_price, order.currency))}</td>
@@ -2839,7 +2839,7 @@ export function OrderReceipt({ o }: { o: any }) {
                   <strong style={isUnav ? { textDecoration: "line-through", color: "#991b1b" } : undefined}>
                     {formatReceiptBookTitle(b.code, b.title)}
                   </strong>
-                  {isUnav && (
+                  {isUnav ? (
                     <span
                       className="mono-pill"
                       style={{
@@ -2854,7 +2854,22 @@ export function OrderReceipt({ o }: { o: any }) {
                     >
                       ❌ NOT AVAILABLE (REFUNDED)
                     </span>
-                  )}
+                  ) : b.in_office_stock ? (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 600,
+                        background: "#f0fdf4",
+                        color: "#166534",
+                        border: "1px solid #86efac",
+                        marginTop: 2,
+                        display: "inline-block",
+                      }}
+                    >
+                      📦 In Stock (Office Shelf)
+                    </span>
+                  ) : null}
                 </td>
                 <td style={isUnav ? { textDecoration: "line-through" } : undefined}>{b.quantity}</td>
                 <td style={isUnav ? { textDecoration: "line-through" } : undefined}>{money(b.unit_price, o.currency)}</td>

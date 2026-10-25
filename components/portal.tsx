@@ -2804,12 +2804,11 @@ function VendorOrderBooksPanel({
   onUpdated?: () => Promise<void> | void;
 }) {
   const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
-  const items: any[] = o?.items || [];
-  const activeItems = items.filter((it: any) => !it.is_unavailable);
-  const totalBooks =
-    o?.total_books ??
-    activeItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
-  const totalPages = activeItems.reduce(
+  const items: any[] = (o?.items || []).filter((it: any) => !it.in_office_stock);
+  const printItems = items.filter((it: any) => !it.is_unavailable);
+  const unavailableItems = items.filter((it: any) => Boolean(it.is_unavailable));
+  const totalBooks = printItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+  const totalPages = printItems.reduce(
     (s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1),
     0,
   );
@@ -2926,9 +2925,11 @@ function VendorOrderBooksPanel({
           </span>
         </div>
 
-        {items.length === 0 ? (
-          <div className="empty-state" style={{ padding: "16px", textAlign: "center", fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
-            No books found for this order.
+        {printItems.length === 0 ? (
+          <div className="empty-state" style={{ padding: "20px 16px", textAlign: "center", fontSize: "0.85rem", color: "var(--muted-foreground)", background: "var(--muted)", borderRadius: 8, border: "1px dashed var(--border)" }}>
+            {unavailableItems.length > 0
+              ? "All books in this order are marked out of stock / cannot print."
+              : "No books to print for this order."}
           </div>
         ) : (
           <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
@@ -2944,14 +2945,13 @@ function VendorOrderBooksPanel({
                 </tr>
               </thead>
               <tbody>
-                {items.map((it: any, idx: number) => {
-                  const isUnav = Boolean(it.is_unavailable);
+                {printItems.map((it: any, idx: number) => {
                   return (
                     <tr
                       key={it.id || it.code || idx}
                       style={{
-                        borderBottom: idx < items.length - 1 ? "1px solid var(--border)" : "none",
-                        background: isUnav ? "#fef2f2" : idx % 2 === 0 ? "transparent" : "var(--muted)",
+                        borderBottom: idx < printItems.length - 1 ? "1px solid var(--border)" : "none",
+                        background: idx % 2 === 0 ? "transparent" : "var(--muted)",
                       }}
                     >
                       <td style={{ padding: "9px 10px", color: "var(--muted-foreground)", fontSize: "0.8rem" }}>
@@ -2963,35 +2963,17 @@ function VendorOrderBooksPanel({
                           style={{
                             fontWeight: 700,
                             fontSize: "0.78rem",
-                            background: isUnav ? "#fee2e2" : "var(--card)",
-                            color: isUnav ? "#991b1b" : undefined,
-                            border: isUnav ? "1px solid #f87171" : "1px solid var(--border)",
-                            textDecoration: isUnav ? "line-through" : undefined,
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
                           }}
                         >
                           {it.code}
                         </span>
                       </td>
-                      <td style={{ padding: "9px 10px", fontWeight: 500, color: isUnav ? "#991b1b" : "var(--foreground)" }}>
-                        <div style={{ textDecoration: isUnav ? "line-through" : undefined }}>{it.title}</div>
-                        {isUnav && (
-                          <span
-                            className="mono-pill"
-                            style={{
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              background: "#fee2e2",
-                              color: "#b91c1c",
-                              border: "1px solid #ef4444",
-                              marginTop: 2,
-                              display: "inline-block",
-                            }}
-                          >
-                            ❌ Cannot Print / Out of Stock
-                          </span>
-                        )}
+                      <td style={{ padding: "9px 10px", fontWeight: 500, color: "var(--foreground)" }}>
+                        <div>{it.title}</div>
                       </td>
-                      <td style={{ padding: "9px 10px", textAlign: "right", color: "var(--muted-foreground)", whiteSpace: "nowrap", textDecoration: isUnav ? "line-through" : undefined }}>
+                      <td style={{ padding: "9px 10px", textAlign: "right", color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
                         {it.pages ? `${it.pages} p.` : "—"}
                       </td>
                       <td style={{ padding: "9px 10px", textAlign: "center" }}>
@@ -3000,55 +2982,38 @@ function VendorOrderBooksPanel({
                           style={{
                             fontWeight: 700,
                             fontSize: "0.8rem",
-                            background: isUnav ? "#fee2e2" : "var(--status-info-bg)",
-                            color: isUnav ? "#991b1b" : "var(--status-info-text)",
-                            border: isUnav ? "1px solid #f87171" : "1px solid var(--status-info-border)",
+                            background: "var(--status-info-bg)",
+                            color: "var(--status-info-text)",
+                            border: "1px solid var(--status-info-border)",
                             padding: "2px 7px",
-                            textDecoration: isUnav ? "line-through" : undefined,
                           }}
                         >
                           ×{it.quantity || 1}
                         </span>
                       </td>
                       <td style={{ padding: "9px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
-                        {isUnav ? (
-                          <button
-                            type="button"
-                            className="btn compact"
-                            disabled={togglingItemId === it.id}
-                            onClick={async () => {
-                              if (!window.confirm(`Undo and restore "${it.code} - ${it.title}" for printing?\n\nThis will re-add this book to your printing queue and bill.`)) return;
-                              await handleToggleUnavailable(it.id, false);
-                            }}
-                            style={{ fontSize: "0.72rem", padding: "2px 7px", display: "inline-flex", alignItems: "center", gap: 3 }}
-                            title="Restore book for printing"
-                          >
-                            <RotateCcw size={11} /> Undo
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn outline compact"
-                            disabled={togglingItemId === it.id}
-                            onClick={async () => {
-                              if (!window.confirm(`Cannot print "${it.code} - ${it.title}"?\n\nThis will remove the book from your printing queue, deduct its cost from your earnings, and update the student refund.`)) return;
-                              await handleToggleUnavailable(it.id, true);
-                            }}
-                            style={{
-                              fontSize: "0.72rem",
-                              padding: "2px 7px",
-                              color: "#b91c1c",
-                              borderColor: "#fca5a5",
-                              background: "#fff",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 3,
-                            }}
-                            title="Mark book as unavailable / cannot print"
-                          >
-                            <XCircle size={12} /> Cannot Print
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="btn outline compact"
+                          disabled={togglingItemId === it.id}
+                          onClick={async () => {
+                            if (!window.confirm(`Cannot print "${it.code} - ${it.title}"?\n\nThis will remove the book from your printing queue, deduct its cost from your earnings, and update the student refund.`)) return;
+                            await handleToggleUnavailable(it.id, true);
+                          }}
+                          style={{
+                            fontSize: "0.72rem",
+                            padding: "2px 7px",
+                            color: "#b91c1c",
+                            borderColor: "#fca5a5",
+                            background: "#fff",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                          title="Mark book as unavailable / cannot print"
+                        >
+                          <XCircle size={12} /> Cannot Print
+                        </button>
                       </td>
                     </tr>
                   );
@@ -3066,11 +3031,107 @@ function VendorOrderBooksPanel({
                     {totalBooks}
                   </td>
                   <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
-                    {items.length !== activeItems.length ? `${items.length - activeItems.length} out of stock` : "—"}
+                    —
                   </td>
                 </tr>
               </tfoot>
             </table>
+          </div>
+        )}
+
+        {unavailableItems.length > 0 && (
+          <div
+            style={{
+              marginTop: 14,
+              padding: "12px 14px",
+              borderRadius: 8,
+              background: "rgba(254, 242, 242, 0.5)",
+              border: "1px dashed #fca5a5",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#991b1b" }}>
+                  ❌ Marked Out of Stock / Cannot Print ({unavailableItems.length})
+                </span>
+              </div>
+              <span style={{ fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
+                Excluded from your printing bill
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {unavailableItems.map((it: any, idx: number) => {
+                return (
+                  <div
+                    key={it.id || it.code || idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                      background: "#fff",
+                      border: "1px solid #fecaca",
+                      fontSize: "0.82rem",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 200 }}>
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.74rem",
+                          background: "#fee2e2",
+                          color: "#991b1b",
+                          border: "1px solid #fca5a5",
+                          textDecoration: "line-through",
+                        }}
+                      >
+                        {it.code}
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 500,
+                          color: "#991b1b",
+                          textDecoration: "line-through",
+                        }}
+                      >
+                        {it.title}
+                      </span>
+                      <span style={{ color: "var(--muted-foreground)", fontSize: "0.74rem" }}>
+                        ×{it.quantity || 1}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn compact"
+                        disabled={togglingItemId === it.id}
+                        onClick={async () => {
+                          if (!window.confirm(`Undo and restore "${it.code} - ${it.title}" for printing?\n\nThis will re-add this book to your printing queue and bill.`)) return;
+                          await handleToggleUnavailable(it.id, false);
+                        }}
+                        style={{ fontSize: "0.72rem", padding: "2px 7px", display: "inline-flex", alignItems: "center", gap: 3 }}
+                        title="Restore book for printing"
+                      >
+                        <RotateCcw size={11} /> Undo / Can Print
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -3339,6 +3400,28 @@ function AdminOrderBooksPanel({
         unavailable
           ? "Book marked as out of stock / unavailable. Bill updated & student refund generated."
           : "Book restored as available. Total bill updated."
+      );
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
+  const toggleItemOfficeStock = async (itemId: string, inOfficeStock: boolean) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "toggle_item_office_stock",
+        item_id: itemId,
+        in_office_stock: inOfficeStock,
+      });
+      toast.success(
+        inOfficeStock
+          ? "Book marked as In Office Stock (fulfilled from shelf, vendor print skipped) ✓"
+          : "Book reverted to Vendor Printing ✓"
       );
       notifyOrdersUpdated();
       await onUpdated();
@@ -3949,6 +4032,21 @@ function AdminOrderBooksPanel({
                         >
                           ❌ Out of Stock / Refunded
                         </span>
+                      ) : it.in_office_stock ? (
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            background: "#dcfce7",
+                            color: "#166534",
+                            border: "1px solid #86efac",
+                            marginTop: 2,
+                            display: "inline-block",
+                          }}
+                        >
+                          📦 In Office Stock (Shelf)
+                        </span>
                       ) : it.pages ? (
                         <span
                           style={{
@@ -4088,6 +4186,46 @@ function AdminOrderBooksPanel({
                               </button>
                             )}
                           </div>
+                        ) : it.in_office_stock ? (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                            <span
+                              className="mono-pill"
+                              style={{
+                                background: "#f0fdf4",
+                                color: "#166534",
+                                border: "1px solid #86efac",
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                              }}
+                              title="Available in bookstore shelf. Vendor will NOT print it. Student bill unchanged."
+                            >
+                              📦 IN OFFICE STOCK
+                            </span>
+                            {canUpdate && (
+                              <button
+                                type="button"
+                                disabled={togglingItemId === it.id}
+                                onClick={async () => {
+                                  if (!window.confirm(`Revert "${it.code} - ${it.title}" back to Vendor Printing?\n\nThis will send the book to the vendor to print.`)) return;
+                                  await toggleItemOfficeStock(it.id, false);
+                                }}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  fontSize: "0.68rem",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  background: "#fff",
+                                  border: "1px solid var(--border)",
+                                  cursor: "pointer",
+                                }}
+                                title="Send back to vendor for printing"
+                              >
+                                <RotateCcw size={10} /> Send to Vendor
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                             <button
@@ -4131,29 +4269,55 @@ function AdminOrderBooksPanel({
                               )}
                             </button>
                             {canUpdate && (
-                              <button
-                                type="button"
-                                disabled={togglingItemId === it.id}
-                                onClick={async () => {
-                                  if (!window.confirm(`Mark "${it.code} - ${it.title}" as out of stock / unavailable?\n\nThis will remove it from the bill, generate a student refund, and deduct its printing cost from vendor billing.`)) return;
-                                  await toggleItemUnavailable(it.id, true);
-                                }}
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 3,
-                                  fontSize: "0.68rem",
-                                  padding: "2px 5px",
-                                  borderRadius: 4,
-                                  background: "#fff",
-                                  color: "#b91c1c",
-                                  border: "1px solid #fca5a5",
-                                  cursor: "pointer",
-                                }}
-                                title="Mark book as out of stock / unavailable"
-                              >
-                                <XCircle size={10} /> Out of Stock
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={togglingItemId === it.id}
+                                  onClick={async () => {
+                                    if (!window.confirm(`Mark "${it.code} - ${it.title}" as Available in Office Stock?\n\n• Fulfill from bookstore shelf / stock\n• Vendor will NOT print it (vendor cost deducted)\n• Student bill remains full (NO refund issued)`)) return;
+                                    await toggleItemOfficeStock(it.id, true);
+                                  }}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                    fontSize: "0.68rem",
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    background: "#f0fdf4",
+                                    color: "#166534",
+                                    border: "1px solid #86efac",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                  }}
+                                  title="Book is already available in bookstore shelf. Skip vendor printing without reducing student bill."
+                                >
+                                  📦 Office Stock
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={togglingItemId === it.id}
+                                  onClick={async () => {
+                                    if (!window.confirm(`Mark "${it.code} - ${it.title}" as out of stock / unavailable?\n\nThis will remove it from the bill, generate a student refund, and deduct its printing cost from vendor billing.`)) return;
+                                    await toggleItemUnavailable(it.id, true);
+                                  }}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                    fontSize: "0.68rem",
+                                    padding: "2px 5px",
+                                    borderRadius: 4,
+                                    background: "#fff",
+                                    color: "#b91c1c",
+                                    border: "1px solid #fca5a5",
+                                    cursor: "pointer",
+                                  }}
+                                  title="Book is out of stock / cannot be printed. Deducts price from student bill and vendor billing."
+                                >
+                                  <XCircle size={10} /> Out of Stock
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
@@ -5903,16 +6067,16 @@ function OrderModalPopup({
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books to print:</span>
                           <strong style={{ fontSize: "0.95rem" }}>
-                            {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
-                            {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                            {o.total_books ?? ((o.items || []).filter((it: any) => !it.is_unavailable && !it.in_office_stock).reduce((s: number, it: any) => s + (it.quantity || 1), 0))}{" "}
+                            {Number(o.total_books ?? ((o.items || []).filter((it: any) => !it.is_unavailable && !it.in_office_stock).reduce((s: number, it: any) => s + (it.quantity || 1), 0))) === 1 ? "book" : "books"}
                           </strong>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total pages:</span>
                           <strong style={{ fontSize: "0.95rem" }}>
-                            {Number(o.vendor_pages ?? (o.items?.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0) || 0)).toLocaleString()} pages
+                            {Number(o.vendor_pages ?? ((o.items || []).filter((it: any) => !it.is_unavailable && !it.in_office_stock).reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0))).toLocaleString()} pages
                           </strong>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: "1px dashed var(--border)" }}>
@@ -7159,10 +7323,19 @@ function Orders({
         ];
 
         rows.forEach((o: any, orderIdx: number) => {
-          const items =
+          const rawItems =
             o.items && o.items.length > 0
               ? o.items
               : [{ code: "—", title: "Order Record", quantity: 1 }];
+          const eligibleItems = rawItems.filter(
+            (it: any) => !it.is_unavailable && !it.in_office_stock,
+          );
+          const items =
+            eligibleItems.length > 0
+              ? eligibleItems
+              : rawItems.length > 0 && (rawItems[0].is_unavailable || rawItems[0].in_office_stock)
+                ? []
+                : rawItems;
           const orderTotalBooks = items.reduce(
             (sum: number, it: any) => sum + (Number(it.quantity) || 1),
             0,
@@ -8335,9 +8508,10 @@ function Orders({
             const booksTooltip =
               (o.items || []).length > 0
                 ? (o.items || [])
+                    .filter((it: any) => isVendor ? (!it.is_unavailable && !it.in_office_stock) : !it.is_unavailable)
                     .map(
                       (it: any) =>
-                        `• ${it.code ? `[${it.code}] ` : ""}${it.title || "Book"}${it.quantity > 1 ? ` × ${it.quantity}` : ""}`,
+                        `• ${it.code ? `[${it.code}] ` : ""}${it.title || "Book"}${it.quantity > 1 ? ` × ${it.quantity}` : ""}${it.in_office_stock ? " [In Office Shelf]" : ""}`,
                     )
                     .join("\n")
                 : `${booksCount} book(s) ordered`;
@@ -8497,7 +8671,9 @@ function Orders({
             );
 
             if (isVendor) {
-              const orderItems: any[] = o.items || [];
+              const orderItems: any[] = (o.items || []).filter(
+                (it: any) => !it.is_unavailable && !it.in_office_stock,
+              );
               const totalPages = Number(
                 o.vendor_pages ??
                 orderItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0)
@@ -9860,16 +10036,16 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", borderRadius: 8, background: "var(--muted)", margin: "4px 0" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books ordered:</span>
+                      <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total books to print:</span>
                       <strong style={{ fontSize: "0.95rem" }}>
-                        {o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)}{" "}
-                        {Number(o.total_books ?? (o.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0)) === 1 ? "book" : "books"}
+                        {o.total_books ?? ((o.items || []).filter((it: any) => !it.is_unavailable && !it.in_office_stock).reduce((s: number, it: any) => s + (it.quantity || 1), 0))}{" "}
+                        {Number(o.total_books ?? ((o.items || []).filter((it: any) => !it.is_unavailable && !it.in_office_stock).reduce((s: number, it: any) => s + (it.quantity || 1), 0))) === 1 ? "book" : "books"}
                       </strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Total pages:</span>
                       <strong style={{ fontSize: "0.95rem" }}>
-                        {Number(o.vendor_pages ?? (o.items?.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0) || 0)).toLocaleString()} pages
+                        {Number(o.vendor_pages ?? ((o.items || []).filter((it: any) => !it.is_unavailable && !it.in_office_stock).reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0))).toLocaleString()} pages
                       </strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: "1px dashed var(--border)" }}>
@@ -12456,7 +12632,10 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                 </thead>
                 <tbody>
                   {recentOrders.map((o, idx) => {
-                    const items: any[] = o.items || [];
+                    const rawItems: any[] = o.items || [];
+                    const items = rawItems.filter(
+                      (it: any) => !it.is_unavailable && !it.in_office_stock,
+                    );
                     const booksCount = Number(
                       o.total_books ??
                       items.reduce((s: number, it: any) => s + (it.quantity || 1), 0)

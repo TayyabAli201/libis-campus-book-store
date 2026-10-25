@@ -69,6 +69,7 @@ const {
   recordStudentRefund,
   changeDeliveryType,
   toggleItemUnavailable,
+  toggleItemOfficeStock,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -143,6 +144,7 @@ function database(t) {
     "0011_actual_courier_charges.sql",
     "0012_item_received_and_refunds.sql",
     "0013_item_unavailable_workflow.sql",
+    "0014_item_office_stock.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -3529,4 +3531,136 @@ test("Vendor and Admin can mark book as unavailable / out of stock: auto-recalcu
   const restoredOrder = await getOrder(request, placed.id, adminUser);
   assert.equal(restoredOrder.total, initialTotal);
   assert.equal(restoredOrder.refund_due, 0);
+});
+
+
+test("In Office Stock workflow: admin marks book as in office stock, bill is unchanged (zero refund), vendor printing cost is deducted, and vendor pending checklist skips the book", async (t) => {
+  const sqlite = database(t);
+  const guest = "c".repeat(64);
+  const request = new Request("http://127.0.0.1:5173/api/checkout", {
+    headers: { cookie: "cbs_guest=" + guest },
+  });
+  const adminUser = admin;
+
+  // 1. Save two books
+  const b1Res = await saveBook(
+    bookInput("STOCK101", { title: "Office Stock Book 1", pages: 100, fixed_price: 500 }),
+    adminUser,
+    request,
+  );
+  const b2Res = await saveBook(
+    bookInput("STOCK102", { title: "Office Stock Book 2", pages: 80, fixed_price: 400 }),
+    adminUser,
+    request,
+  );
+
+  // 2. Create vendor
+  const vRes = await createVendor(request, adminUser, {
+    name: "Office Stock Press",
+    phone: "03001234567",
+    email: "officestock@example.com",
+    password: "Password123!",
+    per_page_rate: 2.0,
+    binding_rate: 50,
+  });
+  const vendorId = vRes.vendor.id;
+  const vendorUser = {
+    id: vRes.vendor.user_id,
+    email: "officestock@example.com",
+    role: "VENDOR",
+    vendor_id: vendorId,
+  };
+
+  // 3. Checkout and place order for both books
+  const q = await quote(request, {
+    name: "Student Office Stock",
+    phone: "03009998888",
+    city: "Lahore",
+    address: "Campus Block",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: b1Res.id, quantity: 1 },
+      { id: b2Res.id, quantity: 1 },
+    ],
+  });
+
+  const slip = "slip-stock-" + crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  const placedOrder = await getOrder(request, placed.id, adminUser);
+  const initialTotal = placedOrder.total;
+  await decidePayment(request, adminUser, placed.id, "approve", "Verified", placedOrder.version);
+  await assignOrderToVendor(request, adminUser, placed.id, vendorId);
+
+  const orderBefore = await getOrder(request, placed.id, adminUser);
+  const item1 = orderBefore.items.find((i) => i.code === "STOCK101");
+  const item2 = orderBefore.items.find((i) => i.code === "STOCK102");
+  assert.ok(item1 && item2);
+
+  // Initial vendor ledger
+  const initialLedger = await getVendorLedger(vendorUser, vendorId);
+  assert.equal(initialLedger.summary.total_books, 2);
+  assert.equal(initialLedger.summary.total_pages, 180);
+  const initialCost = initialLedger.summary.total_printing_cost;
+  assert.ok(initialCost > 0);
+
+  // 4. Admin marks STOCK101 as In Office Stock (available on bookstore shelf)
+  const stockRes = await toggleItemOfficeStock(
+    request,
+    adminUser,
+    placed.id,
+    item1.id,
+    true,
+  );
+  assert.equal(stockRes.ok, true);
+  assert.equal(stockRes.in_office_stock, 1);
+  assert.equal(stockRes.received_from_vendor, 1);
+
+  // Verify student order: total bill is 100% UNCHANGED and refund due is 0
+  const orderAfter = await getOrder(request, placed.id, adminUser);
+  assert.equal(orderAfter.total, initialTotal, "Student bill MUST NOT change when book is from office stock");
+  assert.equal(orderAfter.refund_due, 0, "Zero refund due to student for office stock book");
+  assert.equal(orderAfter.refund_status, "NONE");
+  const stockItem = orderAfter.items.find((i) => i.id === item1.id);
+  assert.equal(stockItem.in_office_stock, 1);
+  assert.equal(stockItem.received_from_vendor, 1);
+
+  // Verify vendor ledger: vendor cost excludes STOCK101 (only STOCK102 counted)
+  const updatedLedger = await getVendorLedger(vendorUser, vendorId);
+  assert.equal(updatedLedger.summary.total_books, 1, "Vendor only prints 1 book");
+  assert.equal(updatedLedger.summary.total_pages, 80, "Vendor only prints 80 pages");
+  assert.ok(updatedLedger.summary.total_printing_cost < initialCost);
+
+  // Verify vendor order details: STOCK101 is 100% hidden from vendor view (only STOCK102 visible)
+  const vendorOrder = await getOrder(request, placed.id, vendorUser);
+  assert.equal(vendorOrder.items.length, 1, "Vendor only sees 1 book (office stock is hidden)");
+  assert.equal(vendorOrder.items[0].code, "STOCK102");
+  assert.ok(!vendorOrder.items.some((b) => b.code === "STOCK101"), "Office stock book is completely hidden from vendor");
+
+  // Verify vendor pending checklist: STOCK101 is NOT listed
+  const pendingChecklist = await getVendorPendingBooks(vendorUser, vendorId);
+  assert.ok(!pendingChecklist.pendingBooks.some((b) => b.code === "STOCK101"));
+  assert.ok(pendingChecklist.pendingBooks.some((b) => b.code === "STOCK102"));
+
+  // 5. Admin reverts STOCK101 back to Vendor Printing
+  const revertRes = await toggleItemOfficeStock(
+    request,
+    adminUser,
+    placed.id,
+    item1.id,
+    false,
+  );
+  assert.equal(revertRes.ok, true);
+  assert.equal(revertRes.in_office_stock, 0);
+
+  const revertedLedger = await getVendorLedger(vendorUser, vendorId);
+  assert.equal(revertedLedger.summary.total_books, 2);
+  assert.equal(revertedLedger.summary.total_pages, 180);
+  assert.equal(revertedLedger.summary.total_printing_cost, initialCost);
 });
