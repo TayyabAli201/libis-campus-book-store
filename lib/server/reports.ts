@@ -2,10 +2,14 @@ import { all, one } from "./db";
 import { scope } from "./security";
 import type { User } from "../contracts";
 
-export async function reports(u: User, from: string, to: string) {
+export async function reports(u: User, from: string, to: string, vendorId?: string) {
   const s = scope(u);
-  const filter = `${s.sql} AND o.created_at>=? AND o.created_at<=?`;
+  let filter = `${s.sql} AND o.created_at>=? AND o.created_at<=?`;
   const args = [...s.args, from, to + "T23:59:59.999Z"];
+  if (vendorId && vendorId !== "all") {
+    filter += " AND o.vendor_id = ?";
+    args.push(vendorId);
+  }
 
   const stats = await one<any>(
     `SELECT 

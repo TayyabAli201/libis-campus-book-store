@@ -336,6 +336,12 @@ export interface Vendor {
   binding_rate?: number;
   assigned_orders_count?: number;
   printing_orders_count?: number;
+  queue_orders_count?: number;
+  queue_books?: number;
+  queue_pages?: number;
+  queue_estimated_cost?: number;
+  total_printing_cost?: number;
+  total_courier_charges?: number;
   total_earnings?: number;
   total_paid?: number;
   pending_balance?: number;

@@ -1096,9 +1096,12 @@ function Dashboard({
   ].filter((link) => link.allowed);
   const [range, setRange] = useState("30"),
     [dates, setDates] = useState(dateRange("30"));
-  const { data, error, loading, reload } = useData(
-    "manage/reports?from=" + dates.from + "&to=" + dates.to,
-  );
+  const [selectedVendor, setSelectedVendor] = useState("all");
+  const { data: vendorsData } = useData<any>(isAdmin ? "manage/vendors" : "");
+  const vendorsList: any[] = Array.isArray(vendorsData) ? vendorsData : ((vendorsData as any)?.vendors || []);
+
+  const reportUrl = `manage/reports?from=${dates.from}&to=${dates.to}${selectedVendor !== "all" ? `&vendor_id=${selectedVendor}` : ""}`;
+  const { data, error, loading, reload } = useData(reportUrl);
   return (
     <>
       {!reportsOnly && !!quickLinks.length && (
@@ -1129,6 +1132,20 @@ function Dashboard({
           </div>
         </div>
         <div className="toolbar dashboard-toolbar">
+          {isAdmin && vendorsList.length > 0 && (
+            <Choose
+              label="Vendor Partner"
+              value={selectedVendor}
+              onChange={(v) => setSelectedVendor(v)}
+              options={[
+                { value: "all", label: "🏢 All Vendors (Combined)" },
+                ...vendorsList.map((v: any) => ({
+                  value: String(v.id),
+                  label: `🏭 ${v.name}`,
+                })),
+              ]}
+            />
+          )}
           <Choose
             label="Report period"
             value={range}
@@ -11280,6 +11297,22 @@ function Vendors() {
     (sum, v) => sum + (Number(v.pending_balance) || 0),
     0,
   );
+  const totalQueueCost = vendors.reduce(
+    (sum, v) => sum + (Number(v.queue_estimated_cost) || 0),
+    0,
+  );
+  const totalQueueBooks = vendors.reduce(
+    (sum, v) => sum + (Number(v.queue_books) || 0),
+    0,
+  );
+  const totalQueuePages = vendors.reduce(
+    (sum, v) => sum + (Number(v.queue_pages) || 0),
+    0,
+  );
+  const totalQueueOrders = vendors.reduce(
+    (sum, v) => sum + (Number(v.queue_orders_count || v.printing_orders_count) || 0),
+    0,
+  );
 
   const filtered = vendors.filter((v) => {
     if (!search.trim()) return true;
@@ -11313,15 +11346,15 @@ function Vendors() {
           <small>{activeVendors} active printing partner{activeVendors !== 1 ? "s" : ""}</small>
         </div>
 
-        <div className="metric metric-amber">
+        <div className="metric metric-purple">
           <div className="metric-heading">
-            <span>Currently Printing</span>
+            <span>In Printing Queue</span>
             <span className="metric-icon">
-              <Clock3 size={19} />
+              <Printer size={19} />
             </span>
           </div>
-          <strong>{totalInPrinting}</strong>
-          <small>Orders in active print batches</small>
+          <strong style={{ color: "#7c3aed" }}>Rs. {totalQueueCost.toLocaleString()}</strong>
+          <small>{totalQueueOrders} {totalQueueOrders === 1 ? "Order" : "Orders"} · {totalQueueBooks} Books · {totalQueuePages.toLocaleString()} Pages</small>
         </div>
 
         <div className="metric metric-sky">
@@ -11445,9 +11478,9 @@ function Vendors() {
             "Vendor Partner",
             "Contact & WhatsApp",
             "Pricing Rates",
-            "Ledger & Balance",
-            "Active Workload",
-            "Portal Access",
+            "Shipped Khata (Billed)",
+            "In Printing Queue",
+            "Payable Due",
             "Actions",
           ]}
           rows={filtered.map((v) => {
@@ -11500,33 +11533,61 @@ function Vendors() {
                 </div>
               </div>,
 
-              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 175 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.80rem" }}>
-                  <span className="muted">Printing:</span>
+              <div key={`ledger-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 155 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: "0.80rem" }}>
+                  <span className="muted">Print:</span>
                   <span>Rs. {Number(v.total_printing_cost || 0).toLocaleString()}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.80rem" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: "0.80rem" }}>
                   <span className="muted">Courier:</span>
                   <span style={{ fontWeight: 600, color: "var(--primary)" }}>
                     Rs. {Number(v.total_courier_charges || 0).toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.82rem", borderTop: "1px dashed var(--border)", paddingTop: 2 }}>
-                  <strong style={{ fontSize: "0.84rem" }}>Total Earned:</strong>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: "0.82rem", borderTop: "1px dashed var(--border)", paddingTop: 2 }}>
+                  <strong style={{ fontSize: "0.84rem" }}>Billed:</strong>
                   <strong style={{ fontSize: "0.86rem" }}>Rs. {Number(v.total_earnings || 0).toLocaleString()}</strong>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.78rem" }}>
-                  <span className="muted">Paid:</span>
-                  <span style={{ color: "#15803d", fontWeight: 600 }}>
-                    Rs. {Number(v.total_paid || 0).toLocaleString()}
-                  </span>
+              </div>,
+
+              <div key={`queue-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 175 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <strong style={{ fontSize: "0.92rem", color: "#6b21a8" }}>
+                    Rs. {Number(v.queue_estimated_cost || 0).toLocaleString()}
+                  </strong>
+                  {(v.queue_orders_count || v.printing_orders_count || 0) > 0 ? (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.70rem",
+                        fontWeight: 700,
+                        background: "rgba(124, 58, 237, 0.12)",
+                        color: "#7c3aed",
+                        border: "1px solid rgba(124, 58, 237, 0.25)",
+                      }}
+                    >
+                      {v.queue_orders_count || v.printing_orders_count} {(v.queue_orders_count || v.printing_orders_count) === 1 ? "order" : "orders"}
+                    </span>
+                  ) : (
+                    <span className="small-text muted" style={{ fontSize: "0.72rem" }}>Clear ✓</span>
+                  )}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: "0.78rem" }}>
-                  <span className="muted">Balance:</span>
+                <span className="small-text" style={{ color: "var(--muted-foreground)", fontSize: "0.76rem" }}>
+                  <strong>{v.queue_books || 0} books</strong> · {(v.queue_pages || 0).toLocaleString()} pgs pending
+                </span>
+              </div>,
+
+              <div key={`balance-${v.id}`} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 125 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: "0.76rem" }}>
+                  <span className="muted">Paid:</span>
+                  <span style={{ color: "#15803d", fontWeight: 600 }}>Rs. {Number(v.total_paid || 0).toLocaleString()}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: "0.80rem" }}>
+                  <span className="muted">Due:</span>
                   <span
                     className="mono-pill"
                     style={{
-                      fontSize: "0.72rem",
+                      fontSize: "0.74rem",
                       fontWeight: 700,
                       padding: "2px 6px",
                       background: (v.pending_balance || 0) > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(22, 163, 74, 0.12)",
@@ -11536,41 +11597,25 @@ function Vendors() {
                     Rs. {Number(v.pending_balance || 0).toLocaleString()}
                   </span>
                 </div>
+                <div>
+                  <span
+                    className={v.active ? "badge-success" : "badge-muted"}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "1px 7px",
+                      borderRadius: 999,
+                      fontSize: "0.68rem",
+                      fontWeight: 600,
+                      background: v.active ? "rgba(22, 163, 74, 0.12)" : "var(--muted)",
+                      color: v.active ? "#15803d" : "var(--muted-foreground)",
+                    }}
+                  >
+                    {v.active ? "Active" : "Disabled"}
+                  </span>
+                </div>
               </div>,
-
-              <div key={`workload-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
-                <span
-                  className="mono-pill"
-                  style={{
-                    background: (v.printing_orders_count || 0) > 0 ? "rgba(245, 158, 11, 0.15)" : undefined,
-                    color: (v.printing_orders_count || 0) > 0 ? "#b45309" : undefined,
-                    fontWeight: 600,
-                  }}
-                >
-                  {v.printing_orders_count || 0} in printing
-                </span>
-                <span className="small-text" style={{ color: "var(--muted-foreground)" }}>
-                  ({v.assigned_orders_count || 0} total)
-                </span>
-              </div>,
-
-              <span
-                key={`status-${v.id}`}
-                className={v.active ? "badge-success" : "badge-muted"}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  padding: "3px 9px",
-                  borderRadius: 999,
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  background: v.active ? "rgba(22, 163, 74, 0.12)" : "var(--muted)",
-                  color: v.active ? "#15803d" : "var(--muted-foreground)",
-                }}
-              >
-                {v.active ? "Active" : "Disabled"}
-              </span>,
 
               <div
                 className="row-actions"
@@ -12526,19 +12571,19 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
           </a>
 
-          {/* 2. Orders in Printing Queue */}
+          {/* 2. Detailed In Printing Queue Card */}
           <a
             href="/vendor/orders?status=PROCESSING"
             className="metric metric-amber vendor-metric-card"
             style={{
-              border: (summary.printing_orders || 0) > 0 ? "1px solid #fde68a" : undefined,
-              background: (summary.printing_orders || 0) > 0 ? "rgba(254, 243, 199, 0.35)" : undefined,
+              border: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "1.5px solid #fde68a" : undefined,
+              background: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "rgba(254, 243, 199, 0.45)" : undefined,
             }}
             title="Click to view orders waiting to be printed"
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: (summary.printing_orders || 0) > 0 ? "#92400e" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
-                Printing (Pending)
+              <span style={{ fontSize: "0.86rem", fontWeight: 700, color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#92400e" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                In Printing Queue
               </span>
               <span
                 style={{
@@ -12558,11 +12603,14 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.printing_orders || 0) > 0 ? "var(--status-warn-text)" : "var(--foreground)", marginBottom: 6 }}>
-                {summary.printing_orders || 0}
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#92400e" : "var(--foreground)", marginBottom: 4 }}>
+                Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: (summary.printing_orders || 0) > 0 ? "var(--status-warn-text)" : "var(--muted-foreground)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
-                {(summary.printing_orders || 0) > 0 ? `Active print queue (Est. Rs. ${(summary.queue_estimated_cost || 0).toLocaleString()}) →` : "Print queue clear ✓"}
+              <div style={{ fontSize: "0.84rem", fontWeight: 650, color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#b45309" : "var(--muted-foreground)", marginBottom: 4 }}>
+                {summary.queue_orders || summary.printing_orders || 0} {(summary.queue_orders || summary.printing_orders || 0) === 1 ? "Order" : "Orders"} · {summary.queue_books || 0} Books · {(summary.queue_pages || 0).toLocaleString()} Pages
+              </div>
+              <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                {(summary.queue_orders || summary.printing_orders || 0) > 0 ? "ℹ️ Added to khata bill once shipped →" : "Print queue clear ✓"}
               </div>
             </div>
           </a>

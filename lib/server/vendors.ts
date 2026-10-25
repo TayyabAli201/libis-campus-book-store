@@ -69,6 +69,27 @@ export async function listVendors(u: User): Promise<Vendor[]> {
     courierByVendor.set(ca.vendor_id, Number(ca.total_courier_charges || 0));
   }
 
+  const queueAggs = await all<any>(
+    `SELECT 
+      o.vendor_id,
+      COUNT(DISTINCT o.id) AS queue_orders,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.pages * oi.quantity END), 0) AS queue_pages,
+      COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.quantity END), 0) AS queue_books
+     FROM orders o
+     JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.vendor_id IS NOT NULL AND o.status NOT IN ('SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUND_REQUESTED', 'REFUND_COMPLETED')
+     GROUP BY o.vendor_id`
+  );
+
+  const queueByVendor = new Map<string, { queue_orders: number; queue_pages: number; queue_books: number }>();
+  for (const qa of queueAggs) {
+    queueByVendor.set(qa.vendor_id, {
+      queue_orders: Number(qa.queue_orders || 0),
+      queue_pages: Number(qa.queue_pages || 0),
+      queue_books: Number(qa.queue_books || 0),
+    });
+  }
+
   return rows.map((r) => {
     const perPageRate = Number(r.per_page_rate ?? 1.60);
     const bindingRate = Number(r.binding_rate ?? 30.00);
@@ -78,6 +99,9 @@ export async function listVendors(u: User): Promise<Vendor[]> {
     const totalEarnings = printingEarnings + courierCharges;
     const totalPaid = Number(r.total_paid || 0);
     const pendingBalance = totalEarnings - totalPaid;
+
+    const qAgg = queueByVendor.get(r.id) || { queue_orders: 0, queue_pages: 0, queue_books: 0 };
+    const queueEstCost = Math.round((qAgg.queue_pages * perPageRate) + (qAgg.queue_books * bindingRate));
 
     return {
       id: r.id,
@@ -92,6 +116,10 @@ export async function listVendors(u: User): Promise<Vendor[]> {
       binding_rate: bindingRate,
       assigned_orders_count: Number(r.assigned_orders_count || 0),
       printing_orders_count: Number(r.printing_orders_count || 0),
+      queue_orders_count: qAgg.queue_orders,
+      queue_books: qAgg.queue_books,
+      queue_pages: qAgg.queue_pages,
+      queue_estimated_cost: queueEstCost,
       total_printing_cost: printingEarnings,
       total_courier_charges: courierCharges,
       total_earnings: totalEarnings,

@@ -930,12 +930,14 @@ async function handle(req: Request) {
         .object({
           from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
           to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          vendor_id: z.string().optional(),
         })
         .parse({
           from: url.searchParams.get("from") || "2000-01-01",
           to: url.searchParams.get("to") || now().slice(0, 10),
+          vendor_id: url.searchParams.get("vendor_id") || undefined,
         });
-      return ok(await reports(u, dates.from, dates.to));
+      return ok(await reports(u, dates.from, dates.to, dates.vendor_id));
     }
     if (section === "students") {
       if (method === "GET") {

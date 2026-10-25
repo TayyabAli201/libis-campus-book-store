@@ -938,6 +938,7 @@ export async function listOrders(
       total_paid: totalPaidAll,
       pending_balance: pendingBalanceAll,
       queue_books: queueBooksAll,
+      queue_pages: queuePagesAll,
       queue_estimated_cost: queueEstimatedCostAll,
       per_page_rate: perPageRate,
       binding_rate: bindingRate,
