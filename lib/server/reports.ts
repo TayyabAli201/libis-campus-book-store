@@ -32,6 +32,7 @@ export async function reports(u: User, from: string, to: string) {
       COALESCE(SUM(CASE WHEN i.is_unavailable = 1 OR i.in_office_stock = 1 THEN 0 ELSE (COALESCE(i.pages, 0) * i.quantity) END), 0) AS total_pages_printed,
       COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS vendor_printing_cost,
       COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS vendor_queue_cost,
+      COALESCE(COUNT(DISTINCT CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 0 AND i.in_office_stock = 0) THEN o.id ELSE NULL END), 0) AS queue_orders,
       COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN i.quantity ELSE 0 END), 0) AS queue_books,
       COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity) ELSE 0 END), 0) AS queue_pages,
       COALESCE(SUM(CASE WHEN i.in_office_stock = 1 THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS office_stock_savings
@@ -153,6 +154,7 @@ export async function reports(u: User, from: string, to: string) {
       vendor_courier_cost: vendorCourierCost,
       total_vendor_cost: totalVendorCost,
       vendor_queue_cost: vendorQueueCost,
+      queue_orders: Number(itemStats?.queue_orders || 0),
       queue_books: Number(itemStats?.queue_books || 0),
       queue_pages: Number(itemStats?.queue_pages || 0),
       vendor_total_liability: totalVendorLiability,

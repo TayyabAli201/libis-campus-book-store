@@ -1211,9 +1211,10 @@ function Dashboard({
                       subDisplay = `Paid: ${money(paid)} · Due: ${money(due)}`;
                     } else if (key === "vendor_queue_cost") {
                       mainDisplay = money(Number(data.stats.vendor_queue_cost || 0));
+                      const qOrders = Number(data.stats.queue_orders || 0);
                       const qBks = Number(data.stats.queue_books || 0);
                       const qPgs = Number(data.stats.queue_pages || 0);
-                      subDisplay = `${qBks} ${qBks === 1 ? "Book" : "Books"} · ${qPgs.toLocaleString()} Pages in Queue`;
+                      subDisplay = `${qOrders} ${qOrders === 1 ? "Order" : "Orders"} · ${qBks} ${qBks === 1 ? "Book" : "Books"} · ${qPgs.toLocaleString()} Pages`;
                     } else if (key === "net_profit") {
                       mainDisplay = money(Number(data.stats.net_profit || 0));
                       subDisplay = "Total Sales minus Vendor (Shipped + Queue)";
@@ -11933,6 +11934,7 @@ function VendorLedgerModal({
     per_page_rate: vendor.per_page_rate ?? 1.6,
     binding_rate: vendor.binding_rate ?? 30,
     total_printing_cost: 0,
+    queue_orders: 0,
     queue_pages: 0,
     queue_books: 0,
     queue_estimated_cost: 0,
@@ -12083,7 +12085,7 @@ function VendorLedgerModal({
                 Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}
               </strong>
               <small style={{ color: "var(--muted-foreground)" }}>
-                {summary.queue_books || 0} book{(summary.queue_books || 0) !== 1 ? "s" : ""} · {(summary.queue_pages || 0).toLocaleString()} pgs (Upcoming)
+                {(summary.queue_orders || 0)} {(summary.queue_orders || 0) === 1 ? "order" : "orders"} · {summary.queue_books || 0} book{(summary.queue_books || 0) !== 1 ? "s" : ""} · {(summary.queue_pages || 0).toLocaleString()} pgs (Upcoming)
               </small>
             </div>
           </div>
@@ -13059,6 +13061,7 @@ function VendorLedgerView({ user }: { user: User }) {
     per_page_rate: 1.6,
     binding_rate: 30,
     total_printing_cost: 0,
+    queue_orders: 0,
     total_courier_charges: 0,
     courier_orders_count: 0,
     total_earned: 0,

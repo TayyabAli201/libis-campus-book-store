@@ -340,6 +340,7 @@ export async function getVendorLedger(
     `SELECT 
       COUNT(DISTINCT o.id) AS total_orders,
       COUNT(DISTINCT CASE WHEN o.status = 'PROCESSING' AND o.vendor_printed_at IS NULL THEN o.id END) AS printing_orders,
+      COUNT(DISTINCT CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN o.id END) AS queue_orders,
       COUNT(DISTINCT CASE WHEN o.vendor_printed_at IS NOT NULL THEN o.id END) AS printed_orders,
       COUNT(DISTINCT CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN o.id END) AS shipped_orders,
       COALESCE(SUM(CASE WHEN oi.is_unavailable = 1 OR oi.in_office_stock = 1 THEN 0 ELSE oi.pages * oi.quantity END), 0) AS total_pages,
@@ -449,6 +450,7 @@ export async function getVendorLedger(
     per_page_rate: perPageRate,
     binding_rate: bindingRate,
     total_printing_cost: totalPrintingCost,
+    queue_orders: Number(orderStats?.queue_orders || 0),
     queue_pages: queuePages,
     queue_books: queueBooks,
     queue_estimated_cost: queueEstimatedCost,
