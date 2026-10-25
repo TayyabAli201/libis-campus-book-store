@@ -597,6 +597,7 @@ export async function assignOrderToVendor(
   ok: boolean;
   status: string;
   vendor: Vendor;
+  vendor_name?: string;
   whatsapp_url: string;
   whatsapp_message: string;
   whatsappUrl?: string;
@@ -613,10 +614,10 @@ export async function assignOrderToVendor(
   if (!order) {
     throw new AppError(404, "Order not found.");
   }
-  if (order.payment_status !== "VERIFIED") {
+  if (order.payment_status !== "VERIFIED" && !["DELIVERED", "SHIPPED"].includes(order.status)) {
     throw new AppError(400, "Only orders with verified payment can be sent to a vendor.");
   }
-  if (["DELIVERED", "CANCELLED", "REJECTED", "SHIPPED"].includes(order.status)) {
+  if (["CANCELLED", "REJECTED"].includes(order.status)) {
     throw new AppError(400, `Cannot assign order in ${order.status} status to a vendor.`);
   }
 
@@ -636,26 +637,44 @@ export async function assignOrderToVendor(
   order.items = items;
   order.total_books = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
 
-  // Status transition: When assigning/sending to vendor, default into PROCESSING (Printing Queue).
+  const at = now();
+  const isDeliveredOrShipped = ["DELIVERED", "SHIPPED"].includes(order.status);
+
+  // Status transition:
+  // For DELIVERED / SHIPPED orders, preserve their terminal/active status and stamp printing & dispatch dates
+  // so the vendor's billing ledger immediately records the completed work.
+  // For unfulfilled orders (CONFIRMED / PAYMENT_PENDING / PENDING), transition into PROCESSING (Printing Queue).
   let nextStatus = order.status;
-  if (
-    order.status === "CONFIRMED" ||
-    order.status === "PAYMENT_PENDING" ||
-    order.status === "PENDING"
-  ) {
-    nextStatus = "PROCESSING";
+  let nextVendorPrintedAt: string | null = null;
+  let nextVendorDispatchedAt: string | null = null;
+
+  if (isDeliveredOrShipped) {
+    nextStatus = order.status;
+    nextVendorPrintedAt = order.vendor_printed_at || at;
+    nextVendorDispatchedAt = order.vendor_dispatched_at || at;
+  } else {
+    if (
+      order.status === "CONFIRMED" ||
+      order.status === "PAYMENT_PENDING" ||
+      order.status === "PENDING"
+    ) {
+      nextStatus = "PROCESSING";
+    }
+    nextVendorPrintedAt = null;
+    nextVendorDispatchedAt = null;
   }
 
-  const at = now();
-  const noteText = `Assigned to vendor: ${vendor.name}${notes ? ` - Note: ${notes}` : ""}`;
+  const noteText = `Assigned to vendor: ${vendor.name}${isDeliveredOrShipped ? ` (${order.status} order)` : ""}${notes ? ` - Note: ${notes}` : ""}`;
 
   const statements = [
     stmt(
-      `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, vendor_printed_at = NULL, vendor_dispatched_at = NULL, updated_at = ?, version = version + 1 WHERE id = ?`,
+      `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, vendor_printed_at = ?, vendor_dispatched_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`,
       vendor.id,
       at,
       notes || null,
       nextStatus,
+      nextVendorPrintedAt,
+      nextVendorDispatchedAt,
       at,
       order.id,
     ),
@@ -681,18 +700,20 @@ export async function assignOrderToVendor(
 
   await batch(statements);
 
-  // Trigger email asynchronously
-  try {
-    sendVendorOrderAssignedEmail({
-      vendor,
-      order: { ...order, status: nextStatus },
-      items,
-      origin: new URL(req.url).origin,
-    }).catch((err) => {
-      console.error("Failed to send vendor order email:", err);
-    });
-  } catch (err) {
-    console.error("Failed to trigger vendor email:", err);
+  // Trigger email asynchronously (only for active queue orders, avoid notifying for historical delivered orders)
+  if (!isDeliveredOrShipped) {
+    try {
+      sendVendorOrderAssignedEmail({
+        vendor,
+        order: { ...order, status: nextStatus },
+        items,
+        origin: new URL(req.url).origin,
+      }).catch((err) => {
+        console.error("Failed to send vendor order email:", err);
+      });
+    } catch (err) {
+      console.error("Failed to trigger vendor email:", err);
+    }
   }
 
   const waUrl = getVendorWhatsAppUrl(order, vendor);
@@ -711,6 +732,7 @@ export async function assignOrderToVendor(
       active: true,
       created_at: vendor.created_at,
     },
+    vendor_name: vendor.name,
     whatsapp_url: waUrl,
     whatsapp_message: waMsg,
     whatsappUrl: waUrl,
@@ -728,6 +750,7 @@ export async function batchAssignOrdersToVendor(
   ok: boolean;
   count: number;
   vendor: Vendor;
+  vendor_name?: string;
   message: string;
 }> {
   if (u.role !== "SUPER_ADMIN") {
@@ -756,31 +779,45 @@ export async function batchAssignOrdersToVendor(
     );
     if (!order) continue;
     // Strict requirement: Only orders whose payment is verified can be assigned/sent to vendor
-    if (order.payment_status !== "VERIFIED") {
+    if (order.payment_status !== "VERIFIED" && !["DELIVERED", "SHIPPED"].includes(order.status)) {
       continue;
     }
-    if (["DELIVERED", "CANCELLED", "REJECTED", "SHIPPED"].includes(order.status)) {
+    if (["CANCELLED", "REJECTED"].includes(order.status)) {
       continue;
     }
 
+    const isDeliveredOrShipped = ["DELIVERED", "SHIPPED"].includes(order.status);
     let nextStatus = order.status;
-    if (
-      order.status === "CONFIRMED" ||
-      order.status === "PAYMENT_PENDING" ||
-      order.status === "PENDING"
-    ) {
-      nextStatus = "PROCESSING";
+    let nextVendorPrintedAt: string | null = null;
+    let nextVendorDispatchedAt: string | null = null;
+
+    if (isDeliveredOrShipped) {
+      nextStatus = order.status;
+      nextVendorPrintedAt = order.vendor_printed_at || at;
+      nextVendorDispatchedAt = order.vendor_dispatched_at || at;
+    } else {
+      if (
+        order.status === "CONFIRMED" ||
+        order.status === "PAYMENT_PENDING" ||
+        order.status === "PENDING"
+      ) {
+        nextStatus = "PROCESSING";
+      }
+      nextVendorPrintedAt = null;
+      nextVendorDispatchedAt = null;
     }
 
-    const noteText = `Batch assigned to vendor: ${vendor.name}${notes ? ` - Note: ${notes}` : ""}`;
+    const noteText = `Batch assigned to vendor: ${vendor.name}${isDeliveredOrShipped ? ` (${order.status})` : ""}${notes ? ` - Note: ${notes}` : ""}`;
 
     statements.push(
       stmt(
-        `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, vendor_printed_at = NULL, vendor_dispatched_at = NULL, updated_at = ?, version = version + 1 WHERE id = ?`,
+        `UPDATE orders SET vendor_id = ?, vendor_assigned_at = ?, vendor_notes = ?, status = ?, vendor_printed_at = ?, vendor_dispatched_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`,
         vendor.id,
         at,
         notes || null,
         nextStatus,
+        nextVendorPrintedAt,
+        nextVendorDispatchedAt,
         at,
         order.id,
       ),
@@ -809,17 +846,19 @@ export async function batchAssignOrdersToVendor(
       "SELECT code, title, pages, quantity FROM order_items WHERE order_id = ?",
       order.id,
     );
-    try {
-      sendVendorOrderAssignedEmail({
-        vendor,
-        order: { ...order, status: nextStatus },
-        items,
-        origin: new URL(req.url).origin,
-      }).catch((err) => {
-        console.error("Failed to send vendor order email:", err);
-      });
-    } catch (err) {
-      console.error("Failed to trigger vendor email:", err);
+    if (!isDeliveredOrShipped) {
+      try {
+        sendVendorOrderAssignedEmail({
+          vendor,
+          order: { ...order, status: nextStatus },
+          items,
+          origin: new URL(req.url).origin,
+        }).catch((err) => {
+          console.error("Failed to send vendor order email:", err);
+        });
+      } catch (err) {
+        console.error("Failed to trigger vendor email:", err);
+      }
     }
   }
 

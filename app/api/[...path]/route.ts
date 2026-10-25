@@ -769,6 +769,7 @@ async function handle(req: Request) {
             actual_courier_charges: z.coerce.number().min(0).max(100000).optional(),
             vendor_id: z.string().trim().optional(),
             note: z.string().trim().max(2000).default(""),
+            notes: z.string().trim().max(2000).optional(),
             reason: z.string().trim().max(2000).optional(),
             version: z.number().int().optional(),
             printed: z.boolean().optional(),
@@ -822,7 +823,7 @@ async function handle(req: Request) {
         }
         if (b.action === "assign_vendor") {
           if (!b.vendor_id) throw new AppError(400, "Please select a vendor.");
-          return ok(await assignOrderToVendor(req, u, id, b.vendor_id, b.note));
+          return ok(await assignOrderToVendor(req, u, id, b.vendor_id, b.notes || b.note));
         }
         if (b.action === "note") {
           if (u.role !== "SUPER_ADMIN")

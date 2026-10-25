@@ -2947,7 +2947,7 @@ test("Item Received Tracking and Student Refund Workflow: admin item-level deliv
   );
 });
 
-test("Delivered orders protection: terminal delivered orders cannot be marked as printed or sent to vendor", async (t) => {
+test("Delivered orders protection & retroactive vendor assignment: Super Admin can assign vendor to DELIVERED orders", async (t) => {
   const sqlite = database(t);
   const testReq = new Request("http://127.0.0.1:5173/api/orders");
   const adminUser = { id: "admin", email: "admin@vu.edu.pk", role: "SUPER_ADMIN", permissions: ["orders.update", "orders.manage"] };
@@ -2984,30 +2984,43 @@ test("Delivered orders protection: terminal delivered orders cannot be marked as
   const ord = await getOrder(request, orderId, adminUser);
   await decidePayment(request, adminUser, orderId, "approve", "Approved", ord.version);
 
-  // Move order to DELIVERED status
+  // Move order to DELIVERED status without vendor assigned
   sqlite.prepare("UPDATE orders SET status='DELIVERED', updated_at=datetime('now') WHERE id=?").run(orderId);
 
-  // 1. vendorPrint must reject delivered orders
+  // 1. vendorPrint must reject delivered orders (printing status cannot be manually toggled on delivered orders)
   await assert.rejects(
     () => vendorPrint(testReq, adminUser, orderId, true),
     /Cannot update print status for order in Delivered status/
   );
 
-  // 2. assignOrderToVendor must reject delivered orders
+  // 2. assignOrderToVendor must still reject CANCELLED orders
+  sqlite.prepare("UPDATE orders SET status='CANCELLED', updated_at=datetime('now') WHERE id=?").run(orderId);
   await assert.rejects(
     () => assignOrderToVendor(testReq, adminUser, orderId, vRes.vendor.id),
-    /Cannot assign order in DELIVERED status to a vendor/
+    /Cannot assign order in CANCELLED status to a vendor/
   );
 
-  // 3. batchVendorPrint must safely filter out delivered orders and not touch them
+  // 3. assignOrderToVendor SUCCEEDS for DELIVERED order retroactively, keeping status DELIVERED
+  sqlite.prepare("UPDATE orders SET status='DELIVERED', updated_at=datetime('now') WHERE id=?").run(orderId);
+  const assignRes = await assignOrderToVendor(testReq, adminUser, orderId, vRes.vendor.id);
+  assert.equal(assignRes.ok, true);
+  assert.equal(assignRes.status, "DELIVERED");
+
+  const updatedOrd = await getOrder(request, orderId, adminUser);
+  assert.equal(updatedOrd.vendor_id, vRes.vendor.id);
+  assert.equal(updatedOrd.status, "DELIVERED");
+  assert.ok(updatedOrd.vendor_printed_at);
+  assert.ok(updatedOrd.vendor_dispatched_at);
+
+  // 4. batchVendorPrint must safely filter out delivered orders and not touch them
   const batchPrintRes = await batchVendorPrint(testReq, adminUser, [orderId], true);
   assert.equal(batchPrintRes.ok, true);
   assert.equal(batchPrintRes.count, 0);
 
-  // 4. batchAssignOrdersToVendor must skip delivered orders
+  // 5. batchAssignOrdersToVendor supports assigning delivered orders
   const batchAssignRes = await batchAssignOrdersToVendor(testReq, adminUser, [orderId], vRes.vendor.id);
   assert.equal(batchAssignRes.ok, true);
-  assert.equal(batchAssignRes.count, 0);
+  assert.equal(batchAssignRes.count, 1);
 });
 
 test("Admin Enhancements: student refund WhatsApp notification, vendor pending books summary, and REFUNDS_DUE tab", async (t) => {

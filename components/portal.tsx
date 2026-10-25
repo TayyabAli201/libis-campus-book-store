@@ -2429,7 +2429,11 @@ function AssignVendorModal({
         <DialogHeader>
           <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Factory size={20} style={{ color: "var(--primary)" }} />
-            {order.vendor_id ? "Reassign Vendor" : "Send Order to Vendor"}
+            {order.vendor_id
+              ? "Reassign Vendor"
+              : ["DELIVERED", "SHIPPED"].includes(order.status)
+              ? `Assign Vendor (${order.status} Order)`
+              : "Send Order to Vendor"}
           </DialogTitle>
           <DialogDescription>
             Order <strong>{order.reference}</strong> · {order.name} ({order.city || "Other City"}) · {totalBooks} book{totalBooks === 1 ? "" : "s"}
@@ -2449,9 +2453,13 @@ function AssignVendorModal({
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                <CheckCircle2 size={18} /> Order Pushed to {assignedResult.vendor_name || "Vendor"}!
+                <CheckCircle2 size={18} /> {["DELIVERED", "SHIPPED"].includes(order.status) ? "Vendor Assigned:" : "Order Pushed to"} {assignedResult.vendor_name || "Vendor"}!
               </div>
-              <div>The order has automatically moved to <strong>Printing</strong> status and is now live in the vendor portal.</div>
+              <div>
+                {["DELIVERED", "SHIPPED"].includes(order.status)
+                  ? `Order status remains ${order.status}. Vendor ledger and printing costs have been updated.`
+                  : "The order has automatically moved to Printing status and is now live in the vendor portal."}
+              </div>
             </div>
 
             {assignedResult.whatsapp_url && (
@@ -2483,6 +2491,21 @@ function AssignVendorModal({
           </div>
         ) : (
           <form onSubmit={submit} className="stack" style={{ gap: 14, marginTop: 6 }}>
+            {["DELIVERED", "SHIPPED"].includes(order.status) && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "rgba(16, 185, 129, 0.08)",
+                  border: "1px solid #10b981",
+                  color: "#065f46",
+                  fontSize: "0.83rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>ℹ️ Completed Order Assignment:</strong> This order is already <strong>{order.status}</strong>. Assigning a vendor will immediately credit their ledger with printing costs and courier charges without altering the order status.
+              </div>
+            )}
             <div
               style={{
                 padding: "10px 14px",
@@ -5812,7 +5835,8 @@ function OrderModalPopup({
                   );
                 }
 
-                if (admin && ["CONFIRMED", "PROCESSING"].includes(o.status)) {
+                if (admin && ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"].includes(o.status)) {
+                  const isCompleted = ["SHIPPED", "DELIVERED"].includes(o.status);
                   return (
                     <div
                       style={{
@@ -5822,25 +5846,34 @@ function OrderModalPopup({
                         gap: 12,
                         padding: "10px 16px",
                         borderRadius: 8,
-                        background: "rgba(37, 99, 235, 0.06)",
-                        border: "1px dashed #3b82f6",
+                        background: isCompleted ? "rgba(16, 185, 129, 0.08)" : "rgba(37, 99, 235, 0.06)",
+                        border: isCompleted ? "1px dashed #10b981" : "1px dashed #3b82f6",
                         margin: "2px 0 10px",
                         flexWrap: "wrap",
                       }}
                     >
                       <div>
-                        <strong style={{ fontSize: "0.9rem", color: "#1d4ed8" }}>Ready for Printing Vendor</strong>
+                        <strong style={{ fontSize: "0.9rem", color: isCompleted ? "#047857" : "#1d4ed8" }}>
+                          {isCompleted ? `Assign Vendor (${o.status} Order)` : "Ready for Printing Vendor"}
+                        </strong>
                         <p className="small-text muted" style={{ margin: "2px 0 0" }}>
-                          Push this order directly to a printing vendor to start printing and notify them via WhatsApp/Email.
+                          {isCompleted
+                            ? "Assign the printing vendor who fulfilled this order so printing costs and courier charges are credited to their billing ledger."
+                            : "Push this order directly to a printing vendor to start printing and notify them via WhatsApp/Email."}
                         </p>
                       </div>
                       <button
                         type="button"
                         className="btn primary compact"
                         onClick={() => setAssignVendorOpen(true)}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          ...(isCompleted ? { background: "#059669", borderColor: "#059669" } : {}),
+                        }}
                       >
-                        <Send size={14} /> Send to Vendor
+                        <Send size={14} /> {isCompleted ? "Assign Vendor" : "Send to Vendor"}
                       </button>
                     </div>
                   );
@@ -8284,7 +8317,7 @@ function Orders({
         const selectedRows = (data?.rows || []).filter((r: any) => selectedIds.includes(r.id));
         const printableOrders = selectedRows.filter((r: any) => r.status === "PROCESSING" && !r.vendor_printed_at);
         const unprintableOrders = selectedRows.filter((r: any) => r.status === "PROCESSING" && !!r.vendor_printed_at);
-        const assignableOrders = selectedRows.filter((r: any) => r.status === "CONFIRMED" || (r.status === "PROCESSING" && !r.vendor_id));
+        const assignableOrders = selectedRows.filter((r: any) => !["CANCELLED", "REJECTED"].includes(r.status) && (!r.vendor_id || r.status === "CONFIRMED" || r.status === "PROCESSING"));
 
         return (
           <div
@@ -9890,7 +9923,8 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
               );
             }
 
-            if (admin && ["CONFIRMED", "PROCESSING"].includes(o.status)) {
+            if (admin && ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"].includes(o.status)) {
+              const isCompleted = ["SHIPPED", "DELIVERED"].includes(o.status);
               return (
                 <div
                   className="no-print"
@@ -9901,25 +9935,34 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                     gap: 12,
                     padding: "10px 16px",
                     borderRadius: 8,
-                    background: "rgba(37, 99, 235, 0.06)",
-                    border: "1px dashed #3b82f6",
+                    background: isCompleted ? "rgba(16, 185, 129, 0.08)" : "rgba(37, 99, 235, 0.06)",
+                    border: isCompleted ? "1px dashed #10b981" : "1px dashed #3b82f6",
                     marginBottom: 16,
                     flexWrap: "wrap",
                   }}
                 >
                   <div>
-                    <strong style={{ fontSize: "0.9rem", color: "#1d4ed8" }}>Ready for Printing Vendor</strong>
+                    <strong style={{ fontSize: "0.9rem", color: isCompleted ? "#047857" : "#1d4ed8" }}>
+                      {isCompleted ? `Assign Vendor (${o.status} Order)` : "Ready for Printing Vendor"}
+                    </strong>
                     <p className="small-text muted" style={{ margin: "2px 0 0" }}>
-                      Push this order directly to a printing vendor to start printing and notify them via WhatsApp/Email.
+                      {isCompleted
+                        ? "Assign the printing vendor who fulfilled this order so printing costs and courier charges are credited to their billing ledger."
+                        : "Push this order directly to a printing vendor to start printing and notify them via WhatsApp/Email."}
                     </p>
                   </div>
                   <button
                     type="button"
                     className="btn primary compact"
                     onClick={() => setAssignVendorOpen(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      ...(isCompleted ? { background: "#059669", borderColor: "#059669" } : {}),
+                    }}
                   >
-                    <Send size={14} /> Send to Vendor
+                    <Send size={14} /> {isCompleted ? "Assign Vendor" : "Send to Vendor"}
                   </button>
                 </div>
               );
