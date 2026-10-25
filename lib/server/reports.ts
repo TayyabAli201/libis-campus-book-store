@@ -31,6 +31,9 @@ export async function reports(u: User, from: string, to: string) {
       COALESCE(SUM(CASE WHEN i.in_office_stock = 1 THEN i.quantity ELSE 0 END), 0) AS total_office_stock_books,
       COALESCE(SUM(CASE WHEN i.is_unavailable = 1 OR i.in_office_stock = 1 THEN 0 ELSE (COALESCE(i.pages, 0) * i.quantity) END), 0) AS total_pages_printed,
       COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS vendor_printing_cost,
+      COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS vendor_queue_cost,
+      COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN i.quantity ELSE 0 END), 0) AS queue_books,
+      COALESCE(SUM(CASE WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status NOT IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity) ELSE 0 END), 0) AS queue_pages,
       COALESCE(SUM(CASE WHEN i.in_office_stock = 1 THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS office_stock_savings
      FROM order_items i
      JOIN orders o ON o.id = i.order_id
@@ -52,12 +55,17 @@ export async function reports(u: User, from: string, to: string) {
   const vendorPrintCostRupees = Math.round(Number(itemStats?.vendor_printing_cost || 0));
   const vendorCourierCostRupees = Math.round(Number(courierStats?.vendor_courier_cost || 0));
   const totalVendorCostRupees = vendorPrintCostRupees + vendorCourierCostRupees;
+  const vendorQueueCostRupees = Math.round(Number(itemStats?.vendor_queue_cost || 0));
 
   // Convert to paisas (x 100) to match database currency units and money() formatting
   const vendorPrintCost = vendorPrintCostRupees * 100;
   const vendorCourierCost = vendorCourierCostRupees * 100;
-  const totalVendorCost = totalVendorCostRupees * 100;
-  const netProfit = grossRevenue - totalVendorCost;
+  const totalVendorCost = totalVendorCostRupees * 100; // Shipped / Billed vendor cost
+  const vendorQueueCost = vendorQueueCostRupees * 100; // Committed In-Printing Queue cost
+  const totalVendorLiability = totalVendorCost + vendorQueueCost;
+
+  // Real Net Profit = Total Sales minus (Shipped Vendor Cost + In Printing Queue Cost)
+  const netProfit = grossRevenue - totalVendorLiability;
   const profitMarginPct = grossRevenue > 0 ? Math.round((netProfit / grossRevenue) * 1000) / 10 : 0;
   const officeSavings = Math.round(Number(itemStats?.office_stock_savings || 0)) * 100;
 
@@ -144,6 +152,10 @@ export async function reports(u: User, from: string, to: string) {
       vendor_printing_cost: vendorPrintCost,
       vendor_courier_cost: vendorCourierCost,
       total_vendor_cost: totalVendorCost,
+      vendor_queue_cost: vendorQueueCost,
+      queue_books: Number(itemStats?.queue_books || 0),
+      queue_pages: Number(itemStats?.queue_pages || 0),
+      vendor_total_liability: totalVendorLiability,
       vendor_total_paid: vendorTotalPaid,
       vendor_remaining_balance: vendorRemainingBalance,
       net_profit: netProfit,

@@ -985,9 +985,16 @@ const dashboardMetrics: {
     tone: "amber",
   },
   {
+    key: "vendor_queue_cost",
+    label: "In Printing Queue",
+    hint: "Committed printing cost",
+    icon: Printer,
+    tone: "purple",
+  },
+  {
     key: "net_profit",
     label: "Net Profit",
-    hint: "Total Sales minus Vendor Payment",
+    hint: "Total Sales minus Vendor Production",
     icon: Banknote,
     tone: "green",
   },
@@ -1202,9 +1209,14 @@ function Dashboard({
                       const paid = Number(data.stats.vendor_total_paid || 0);
                       const due = Number(data.stats.vendor_remaining_balance || 0);
                       subDisplay = `Paid: ${money(paid)} · Due: ${money(due)}`;
+                    } else if (key === "vendor_queue_cost") {
+                      mainDisplay = money(Number(data.stats.vendor_queue_cost || 0));
+                      const qBks = Number(data.stats.queue_books || 0);
+                      const qPgs = Number(data.stats.queue_pages || 0);
+                      subDisplay = `${qBks} ${qBks === 1 ? "Book" : "Books"} · ${qPgs.toLocaleString()} Pages in Queue`;
                     } else if (key === "net_profit") {
                       mainDisplay = money(Number(data.stats.net_profit || 0));
-                      subDisplay = "Total Sales minus Vendor Payment";
+                      subDisplay = "Total Sales minus Vendor (Shipped + Queue)";
                     } else if (key === "total_orders") {
                       mainDisplay = `${Number(data.stats.total_orders || 0)} Orders`;
                       const bks = Number(data.stats.total_books_ordered || 0);
@@ -11921,6 +11933,9 @@ function VendorLedgerModal({
     per_page_rate: vendor.per_page_rate ?? 1.6,
     binding_rate: vendor.binding_rate ?? 30,
     total_printing_cost: 0,
+    queue_pages: 0,
+    queue_books: 0,
+    queue_estimated_cost: 0,
     total_courier_charges: 0,
     courier_orders_count: 0,
     total_earned: vendor.total_earnings ?? 0,
@@ -12057,6 +12072,18 @@ function VendorLedgerModal({
               </strong>
               <small style={{ color: "var(--muted-foreground)" }}>
                 {summary.pending_balance > 0 ? "Outstanding balance payable" : "All accounts fully settled ✓"}
+              </small>
+            </div>
+
+            <div className="metric metric-purple">
+              <span style={{ fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                In Printing Queue
+              </span>
+              <strong style={{ fontSize: "1.35rem", margin: "4px 0", color: "#7c3aed" }}>
+                Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}
+              </strong>
+              <small style={{ color: "var(--muted-foreground)" }}>
+                {summary.queue_books || 0} book{(summary.queue_books || 0) !== 1 ? "s" : ""} · {(summary.queue_pages || 0).toLocaleString()} pgs (Upcoming)
               </small>
             </div>
           </div>
@@ -12533,7 +12560,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                 {summary.printing_orders || 0}
               </strong>
               <div style={{ fontSize: "0.82rem", color: (summary.printing_orders || 0) > 0 ? "var(--status-warn-text)" : "var(--muted-foreground)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
-                {(summary.printing_orders || 0) > 0 ? "Active print queue →" : "Print queue clear ✓"}
+                {(summary.printing_orders || 0) > 0 ? `Active print queue (Est. Rs. ${(summary.queue_estimated_cost || 0).toLocaleString()}) →` : "Print queue clear ✓"}
               </div>
             </div>
           </a>
