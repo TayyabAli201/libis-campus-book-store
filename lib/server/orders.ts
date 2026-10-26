@@ -742,10 +742,24 @@ export async function listOrders(
     for (let i = 0; i < orderIds.length; i += 100) {
       const slice = orderIds.slice(i, i + 100);
       const placeholders = slice.map(() => "?").join(",");
-      const batchItems = await all(
-        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at,in_office_stock,office_stock_at,delivered_to_student,delivered_to_student_at FROM order_items WHERE order_id IN (${placeholders})`,
-        ...slice,
-      );
+      let batchItems: any[];
+      try {
+        batchItems = await all(
+          `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at,in_office_stock,office_stock_at,delivered_to_student,delivered_to_student_at FROM order_items WHERE order_id IN (${placeholders})`,
+          ...slice,
+        );
+      } catch {
+        batchItems = (
+          await all(
+            `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at,in_office_stock,office_stock_at FROM order_items WHERE order_id IN (${placeholders})`,
+            ...slice,
+          )
+        ).map((it: any) => ({
+          ...it,
+          delivered_to_student: 0,
+          delivered_to_student_at: null,
+        }));
+      }
       allItems.push(...batchItems);
     }
     const itemsByOrder = new Map<string, any[]>();
