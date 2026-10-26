@@ -60,6 +60,8 @@ import {
   setAllOrderItemsReceived,
   toggleItemUnavailable,
   toggleItemOfficeStock,
+  toggleOrderItemStudentDelivered,
+  handoverAvailableItemsToStudent,
   recordStudentRefund,
   changeDeliveryType,
 } from "@/lib/server/orders";
@@ -754,11 +756,14 @@ async function handle(req: Request) {
               "set_all_items_received",
               "toggle_item_unavailable",
               "toggle_item_office_stock",
+              "toggle_item_student_delivered",
+              "handover_available_items_to_student",
               "record_refund",
               "change_delivery_type",
             ]),
             item_id: z.string().trim().optional(),
             received: z.boolean().optional(),
+            delivered: z.boolean().optional(),
             unavailable: z.boolean().optional(),
             in_office_stock: z.boolean().optional(),
             method: z.string().trim().max(100).optional(),
@@ -891,6 +896,13 @@ async function handle(req: Request) {
         if (b.action === "toggle_item_office_stock") {
           if (!b.item_id) throw new AppError(400, "Item ID is required.");
           return ok(await toggleItemOfficeStock(req, u, id, b.item_id, b.in_office_stock !== false));
+        }
+        if (b.action === "toggle_item_student_delivered") {
+          if (!b.item_id) throw new AppError(400, "Item ID is required.");
+          return ok(await toggleOrderItemStudentDelivered(req, u, id, b.item_id, b.delivered !== false));
+        }
+        if (b.action === "handover_available_items_to_student") {
+          return ok(await handoverAvailableItemsToStudent(req, u, id));
         }
         if (b.action === "record_refund") {
           if (!b.amount || b.amount <= 0) throw new AppError(400, "Valid refund amount is required.");

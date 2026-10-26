@@ -3516,6 +3516,41 @@ function AdminOrderBooksPanel({
     }
   };
 
+  const toggleItemStudentDelivered = async (itemId: string, delivered: boolean) => {
+    setTogglingItemId(itemId);
+    try {
+      const res = await api(`manage/orders/${o.id}`, {
+        action: "toggle_item_student_delivered",
+        item_id: itemId,
+        delivered,
+      });
+      toast.success(delivered ? "Book marked handed over to student ✓" : "Book student handover unmarked");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
+  const handleHandoverAvailable = async () => {
+    if (!window.confirm(`Hand over ${availableUnhanded.length} available book(s) to student at campus counter now?`)) return;
+    setTogglingItemId("HANDOVER_ALL");
+    try {
+      const res = await api(`manage/orders/${o.id}`, {
+        action: "handover_available_items_to_student",
+      });
+      toast.success(res.all_completed ? "All books handed over! Order marked DELIVERED ✓" : `Handed over ${res.handed_count} book(s) to student ✓`);
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
   const setAllItemsReceived = async (received: boolean) => {
     setTogglingItemId("ALL");
     try {
@@ -3542,6 +3577,17 @@ function AdminOrderBooksPanel({
     (sum: number, it: any) => sum + (Number(it.pages) || 0) * (it.quantity || 1),
     0,
   );
+  const activeItems = rawItems.filter((it: any) => !it.is_unavailable);
+  const activeTotalCount = activeItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+  const availableUnhanded = activeItems.filter(
+    (it: any) => (Number(it.received_from_vendor) === 1 || Number(it.in_office_stock) === 1) && !it.delivered_to_student,
+  );
+  const handedCount = activeItems
+    .filter((it: any) => it.delivered_to_student)
+    .reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+  const rcvCount = activeItems
+    .filter((it: any) => it.received_from_vendor || it.in_office_stock)
+    .reduce((s: number, it: any) => s + (it.quantity || 1), 0);
 
   const startEditing = () => {
     setItemsDraft(
@@ -3792,39 +3838,71 @@ function AdminOrderBooksPanel({
                 {(isEditing ? draftBooksCount : totalBooks) === 1 ? "book" : "books"}
               </span>
               {!isEditing && totalBooks > 0 && (() => {
-                const rcvCount = rawItems.filter((it: any) => it.received_from_vendor).reduce((s: number, it: any) => s + (it.quantity || 1), 0);
-                const isAllRcvd = rcvCount === totalBooks;
-                const isPartRcvd = rcvCount > 0 && rcvCount < totalBooks;
+                const isAllRcvd = rcvCount === activeTotalCount;
+                const isPartRcvd = rcvCount > 0 && rcvCount < activeTotalCount;
                 return (
-                  <span
-                    className="mono-pill"
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      background: isAllRcvd
-                        ? "rgba(22, 163, 74, 0.15)"
+                  <>
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        background: isAllRcvd
+                          ? "rgba(22, 163, 74, 0.15)"
+                          : isPartRcvd
+                            ? "rgba(245, 158, 11, 0.15)"
+                            : "rgba(100, 116, 139, 0.12)",
+                        color: isAllRcvd
+                          ? "#15803d"
+                          : isPartRcvd
+                            ? "#b45309"
+                            : "var(--muted-foreground)",
+                        border: isAllRcvd
+                          ? "1px solid #86efac"
+                          : isPartRcvd
+                            ? "1px solid #fde68a"
+                            : "1px solid var(--border)",
+                      }}
+                      title={`${rcvCount} of ${activeTotalCount} books received in campus`}
+                    >
+                      {isAllRcvd
+                        ? `All ${activeTotalCount} Books in Campus ✓`
                         : isPartRcvd
-                          ? "rgba(245, 158, 11, 0.15)"
-                          : "rgba(100, 116, 139, 0.12)",
-                      color: isAllRcvd
-                        ? "#15803d"
-                        : isPartRcvd
-                          ? "#b45309"
-                          : "var(--muted-foreground)",
-                      border: isAllRcvd
-                        ? "1px solid #86efac"
-                        : isPartRcvd
-                          ? "1px solid #fde68a"
-                          : "1px solid var(--border)",
-                    }}
-                    title={`${rcvCount} of ${totalBooks} books delivered by vendor`}
-                  >
-                    {isAllRcvd
-                      ? `All ${totalBooks} Books Received ✓`
-                      : isPartRcvd
-                        ? `Partially Received (${rcvCount}/${totalBooks} Books · ${totalBooks - rcvCount} Pending from Vendor)`
-                        : `0/${totalBooks} Received (Pending from Vendor)`}
-                  </span>
+                          ? `Partially Received (${rcvCount}/${activeTotalCount} in Campus · ${activeTotalCount - rcvCount} Pending Vendor)`
+                          : `0/${activeTotalCount} Received (Pending from Vendor)`}
+                    </span>
+
+                    {handedCount > 0 && handedCount < activeTotalCount && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          background: "rgba(124, 58, 237, 0.12)",
+                          color: "#7c3aed",
+                          border: "1px solid rgba(124, 58, 237, 0.3)",
+                        }}
+                        title={`${handedCount} of ${activeTotalCount} books handed over to student`}
+                      >
+                        🚚 ${handedCount}/${activeTotalCount} Handed Over to Student
+                      </span>
+                    )}
+
+                    {handedCount === activeTotalCount && activeTotalCount > 0 && (
+                      <span
+                        className="mono-pill"
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          background: "rgba(22, 163, 74, 0.15)",
+                          color: "#15803d",
+                          border: "1px solid #86efac",
+                        }}
+                      >
+                        ✅ All ${activeTotalCount} Handed Over
+                      </span>
+                    )}
+                  </>
                 );
               })()}
             </div>
@@ -3859,6 +3937,30 @@ function AdminOrderBooksPanel({
             </div>
           ) : canEdit ? (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {canUpdate && availableUnhanded.length > 0 && (
+                <button
+                  type="button"
+                  className="btn compact"
+                  style={{
+                    fontSize: "0.76rem",
+                    padding: "4px 11px",
+                    background: "#16a34a",
+                    color: "#ffffff",
+                    borderColor: "#15803d",
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    boxShadow: "0 1px 3px rgba(22, 163, 74, 0.25)",
+                    cursor: "pointer",
+                  }}
+                  disabled={!!togglingItemId}
+                  onClick={handleHandoverAvailable}
+                  title={`Hand over ${availableUnhanded.length} available book(s) to student at campus counter`}
+                >
+                  🤝 Hand Over Available Books (${availableUnhanded.length})
+                </button>
+              )}
               {canUpdate && totalBooks > 1 && (
                 <>
                   <button
@@ -4420,32 +4522,24 @@ function AdminOrderBooksPanel({
                   fontSize: "0.82rem",
                 }}
               >
-                <td colSpan={3} style={{ padding: "8px 10px" }}>
-                  Subtotal:
+                <td colSpan={2} style={{ padding: "8px 10px" }}>
+                  <strong>Subtotal:</strong>
                 </td>
-                <td
-                  colSpan={2}
-                  style={{
-                    padding: "8px 10px",
-                    textAlign: "center",
-                    color: "#1d4ed8",
-                    fontWeight: 700,
-                  }}
-                >
-                  {isEditing ? draftBooksCount : totalBooks} books
+                <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                  <strong style={{ color: "var(--foreground)" }}>{money(isEditing ? draftSubtotal : (o.subtotal || 0))}</strong>
                 </td>
-                <td
-                  style={{
-                    padding: "8px 10px",
-                    textAlign: "right",
-                    color: "var(--foreground)",
-                    fontWeight: 700,
-                  }}
-                >
-                  {money(isEditing ? draftSubtotal : (o.subtotal || 0))}
-                </td>
-                {!isEditing && <td />}
-                {isEditing && <td />}
+                {!isEditing && (
+                  <td colSpan={3} style={{ padding: "8px 10px", fontSize: "0.76rem", color: "var(--muted-foreground)" }}>
+                    <span>
+                      <strong>{handedCount} of {activeTotalCount}</strong> books handed over to student · <strong>{rcvCount} of {activeTotalCount}</strong> in campus
+                    </span>
+                  </td>
+                )}
+                {isEditing && (
+                  <td colSpan={3} style={{ padding: "8px 10px", textAlign: "center", color: "#1d4ed8", fontWeight: 700 }}>
+                    {draftBooksCount} books
+                  </td>
+                )}
               </tr>
             </tfoot>
           </table>
@@ -9246,6 +9340,40 @@ function Orders({
                     )}
                   </div>
                 )}
+                {(() => {
+                  const studentHanded = (o.items || [])
+                    .filter((it: any) => !it.is_unavailable && it.delivered_to_student)
+                    .reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+                  const activeBks = (o.items || [])
+                    .filter((it: any) => !it.is_unavailable)
+                    .reduce((s: number, it: any) => s + (it.quantity || 1), 0);
+                  if (studentHanded > 0 && studentHanded < activeBks) {
+                    return (
+                      <div style={{ marginTop: 3 }}>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: "0.70rem",
+                            fontWeight: 700,
+                            padding: "2px 7px",
+                            borderRadius: 9999,
+                            background: "rgba(124, 58, 237, 0.15)",
+                            color: "#6b21a8",
+                            border: "1px solid rgba(124, 58, 237, 0.3)",
+                            width: "fit-content",
+                          }}
+                          title={`${studentHanded} of ${activeBks} books handed over to student`}
+                        >
+                          🚚 ${studentHanded}/${activeBks} Books Handed Over
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {o.vendor_dispatched_at && (
                   <div style={{ marginTop: 4 }}>
                     {isPartiallyDelivered ? (

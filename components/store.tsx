@@ -1299,7 +1299,7 @@ function ProofUploader({
         <>
           <Progress value={progress} />
           <p role="status">
-            {progress < 100 ? `Uploading ${progress}%` : "Reading the slip…"}
+            {progress < 100 ? `Uploading ${progress}%` : "Processing…"}
           </p>
         </>
       )}
@@ -1309,8 +1309,7 @@ function ProofUploader({
         </p>
       )}
       <p className="small-text">
-        Automatic extraction checks the amount only. An administrator must
-        verify the actual payment.
+        Payment proof will be verified manually by our team upon order submission.
       </p>
     </div>
   );
@@ -2029,15 +2028,26 @@ function Checkout({ data }: { data: Catalog }) {
                 onUploaded={setSlip}
               />
               {slip && (
-                <div className="notice">
-                  <Status value={slip.status} />
-                  <p>{slip.message}</p>
-                  {slip.detected_amount !== null && (
-                    <p>
-                      Detected payment: {money(slip.detected_amount)} ·
-                      Required: {money(quote!.total)}
-                    </p>
-                  )}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 16px",
+                    background: "rgba(16, 185, 129, 0.08)",
+                    border: "1.5px solid rgba(16, 185, 129, 0.35)",
+                    borderRadius: "10px",
+                  }}
+                >
+                  <CheckCircle2 size={20} style={{ color: "#10b981", flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ display: "block", color: "#065f46", fontSize: "0.9rem", marginBottom: 2 }}>
+                      Payment Proof Uploaded Successfully
+                    </strong>
+                    <span style={{ fontSize: "0.82rem", color: "var(--foreground)", opacity: 0.85 }}>
+                      Our team will verify your transfer manually upon submission.
+                    </span>
+                  </div>
                 </div>
               )}
               <button
@@ -3477,7 +3487,7 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
         },
         {
           title: "How information is used",
-          text: "Order details are available to authorized staff and, for a selected campus, its authorized administrators. Payment slips are restricted to Super Admin. If a document extraction provider is configured, payment proof is sent securely to that provider for amount extraction.",
+          text: "Order details are available to authorized staff and, for a selected campus, its authorized administrators. Payment slips are strictly restricted to Super Admin for manual verification.",
           icon: Layers,
           badge: "DATA USAGE",
           accent: "amber",

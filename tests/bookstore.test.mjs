@@ -70,6 +70,8 @@ const {
   changeDeliveryType,
   toggleItemUnavailable,
   toggleItemOfficeStock,
+  toggleOrderItemStudentDelivered,
+  handoverAvailableItemsToStudent,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -145,6 +147,7 @@ function database(t) {
     "0012_item_received_and_refunds.sql",
     "0013_item_unavailable_workflow.sql",
     "0014_item_office_stock.sql",
+    "0015_student_partial_handover.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -3683,4 +3686,102 @@ test("In Office Stock workflow: admin marks book as in office stock, bill is unc
   assert.equal(revertedLedger.summary.total_books, 2);
   assert.equal(revertedLedger.summary.total_pages, 180);
   assert.equal(revertedLedger.summary.total_printing_cost, initialCost);
+});
+
+test("Student partial handover workflow: campus order hands over available books while pending remains unhanded", async (t) => {
+  const sqlite = database(t);
+  const guest = "c".repeat(64);
+  const request = new Request("http://127.0.0.1:5173/api/checkout", {
+    headers: { cookie: "cbs_guest=" + guest },
+  });
+  const adminUser = admin;
+
+  // 1. Save two books
+  const b1Res = await saveBook(
+    bookInput("PART101", { title: "Partial Computing 1", pages: 100, fixed_price: 500 }),
+    adminUser,
+    request,
+  );
+  const b2Res = await saveBook(
+    bookInput("PART102", { title: "Partial Computing 2", pages: 120, fixed_price: 400 }),
+    adminUser,
+    request,
+  );
+
+  // 2. Place order
+  const q = await quote(request, {
+    name: "Ayesha Parveen",
+    phone: "03001234567",
+    city: "Lahore",
+    address: "Qanchi Campus Pickup",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [
+      { id: b1Res.id, quantity: 1 },
+      { id: b2Res.id, quantity: 1 },
+    ],
+  });
+
+  const slip = "slip-part-" + crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  const placedOrder = await getOrder(request, placed.id, adminUser);
+  await decidePayment(request, adminUser, placed.id, "approve", "Verified", placedOrder.version);
+
+  const item1 = placedOrder.items.find((i) => i.code === "PART101");
+  const item2 = placedOrder.items.find((i) => i.code === "PART102");
+  assert.ok(item1 && item2);
+
+  // 3. Vendor delivers PART101, but PART102 is still pending from vendor
+  await toggleOrderItemReceived(request, adminUser, placed.id, item1.id, true);
+  await toggleOrderItemReceived(request, adminUser, placed.id, item2.id, false);
+
+  const orderMid = await getOrder(request, placed.id, adminUser);
+  const it1Mid = orderMid.items.find((i) => i.id === item1.id);
+  const it2Mid = orderMid.items.find((i) => i.id === item2.id);
+  assert.equal(it1Mid.received_from_vendor, 1);
+  assert.equal(it2Mid.received_from_vendor, 0);
+
+  // 4. Student arrives at counter: Admin hands over available books (PART101)
+  const handoverRes = await handoverAvailableItemsToStudent(request, adminUser, placed.id);
+  assert.equal(handoverRes.ok, true);
+  assert.equal(handoverRes.handed_count, 1, "Only PART101 is handed over");
+  assert.equal(handoverRes.remaining_pending, 1, "PART102 is still pending from vendor");
+  assert.equal(handoverRes.all_completed, false);
+
+  // Verify order details: PART101 is handed over, PART102 is NOT handed over
+  const orderHanded = await getOrder(request, placed.id, adminUser);
+  const it1Handed = orderHanded.items.find((i) => i.id === item1.id);
+  const it2Handed = orderHanded.items.find((i) => i.id === item2.id);
+  assert.equal(it1Handed.delivered_to_student, 1);
+  assert.ok(it1Handed.delivered_to_student_at);
+  assert.equal(it2Handed.delivered_to_student, 0);
+  assert.equal(it2Handed.delivered_to_student_at, null);
+  // Order remains not completed
+  assert.notEqual(orderHanded.status, "DELIVERED");
+
+  // Verify history has record of partial delivery
+  const history = sqlite
+    .prepare("SELECT * FROM order_history WHERE order_id=? ORDER BY created_at DESC")
+    .all(placed.id);
+  const handoverHistory = history.find((h) => h.note && h.note.includes("Handed over 1 available book(s) (PART101)"));
+  assert.ok(handoverHistory, "Order history contains partial handover note");
+
+  // 5. Next day, vendor delivers PART102 to campus
+  await toggleOrderItemReceived(request, adminUser, placed.id, item2.id, true);
+
+  // Student collects PART102: Admin toggles handover for item2
+  const finalHandoverRes = await toggleOrderItemStudentDelivered(request, adminUser, placed.id, item2.id, true);
+  assert.equal(finalHandoverRes.ok, true);
+  assert.equal(finalHandoverRes.all_delivered, true);
+
+  // All books handed over -> order automatically moves to DELIVERED
+  const orderCompleted = await getOrder(request, placed.id, adminUser);
+  assert.equal(orderCompleted.status, "DELIVERED");
+  assert.ok(orderCompleted.items.every((it) => it.delivered_to_student === 1));
 });

@@ -22,7 +22,6 @@ import {
 } from "./db";
 import { getBookSql, getSettings } from "./catalog";
 import { guest, hash, token, scope } from "./security";
-import { compareAmount } from "./ocr";
 export async function pendingOrderCount() {
   const row = await one<{ count: number }>(
     "SELECT COUNT(*) AS count FROM orders WHERE status='PAYMENT_PENDING'",
@@ -200,8 +199,7 @@ export async function submitOrder(
     attempts++;
   }
   const c = data.customer;
-  const result = compareAmount(slip.detected_amount, data.total);
-  const statements = [
+    const statements = [
     guard(
       "EXISTS(SELECT 1 FROM settings WHERE id=1 AND version=?)",
       current.settingsVersion,
@@ -280,8 +278,8 @@ export async function submitOrder(
     stmt(
       "UPDATE payment_slips SET order_id=?,ocr_status=?,ocr_message=? WHERE id=?",
       id,
-      result.status,
-      result.message,
+      "MANUAL_VERIFICATION",
+      "Payment proof uploaded for manual verification.",
       slipId,
     ),
     stmt(
@@ -303,7 +301,7 @@ export async function submitOrder(
     ),
   );
   await batch(statements);
-  return { id, reference, ocr: result };
+  return { id, reference };
 }
 export async function getOrder(
   req: Request,
@@ -745,7 +743,7 @@ export async function listOrders(
       const slice = orderIds.slice(i, i + 100);
       const placeholders = slice.map(() => "?").join(",");
       const batchItems = await all(
-        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at,in_office_stock,office_stock_at FROM order_items WHERE order_id IN (${placeholders})`,
+        `SELECT id,order_id,code,title,pages,unit_price,quantity,received_from_vendor,is_unavailable,unavailable_reason,unavailable_at,in_office_stock,office_stock_at,delivered_to_student,delivered_to_student_at FROM order_items WHERE order_id IN (${placeholders})`,
         ...slice,
       );
       allItems.push(...batchItems);
@@ -1326,6 +1324,15 @@ export async function changeStatus(
   if (["SHIPPED", "DELIVERED"].includes(status)) {
     if (!newVendorPrintedAt) newVendorPrintedAt = at;
     if (!isOtherCityOrder(o) && !newVendorDispatchedAt) newVendorDispatchedAt = at;
+  }
+  if (status === "DELIVERED") {
+    statements.push(
+      stmt(
+        "UPDATE order_items SET delivered_to_student=1, delivered_to_student_at=COALESCE(delivered_to_student_at, ?), received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+        at,
+        o.id,
+      ),
+    );
   }
   statements.push(
     stmt(
@@ -2892,5 +2899,180 @@ export async function changeDeliveryType(
     city: newCity,
     address: newAddress,
     message: `Delivery type changed to ${labelNew} successfully ✓`,
+  };
+}
+
+export async function toggleOrderItemStudentDelivered(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+  delivered: boolean,
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Permission denied to update student delivery status.");
+  }
+  const o = await getOrder(req, orderId, u);
+  const it = await one<any>("SELECT * FROM order_items WHERE id=? AND order_id=?", itemId, orderId);
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  if (delivered && it.is_unavailable) {
+    throw new AppError(400, "Cannot hand over an out of stock / unavailable book.");
+  }
+
+  const at = now();
+  const delVal = delivered ? 1 : 0;
+  const delAt = delivered ? at : null;
+
+  const statements: any[] = [
+    stmt(
+      "UPDATE order_items SET delivered_to_student=?, delivered_to_student_at=? WHERE id=? AND order_id=?",
+      delVal,
+      delAt,
+      itemId,
+      orderId,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,1,?)",
+      uid(),
+      orderId,
+      o.status,
+      delivered
+        ? `Book handed over to student: ${it.code} (${it.title})`
+        : `Book student handover unmarked: ${it.code} (${it.title})`,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_STUDENT_DELIVERED_TOGGLE",
+      itemId,
+      { delivered_to_student: it.delivered_to_student },
+      { delivered_to_student: delVal, order_id: orderId, code: it.code },
+      req,
+    ),
+  ];
+
+  // Check if all active items are now delivered to student
+  const allItems = await all<any>("SELECT * FROM order_items WHERE order_id=?", orderId);
+  const activeItems = allItems.filter((i: any) => !i.is_unavailable);
+  const updatedItems = activeItems.map((i: any) => (i.id === itemId ? { ...i, delivered_to_student: delVal } : i));
+  const allDelivered = updatedItems.length > 0 && updatedItems.every((i: any) => Boolean(i.delivered_to_student));
+
+  if (allDelivered && o.status !== "DELIVERED") {
+    statements.push(
+      stmt(
+        "UPDATE orders SET status='DELIVERED', updated_at=?, version=version+1 WHERE id=?",
+        at,
+        orderId,
+      ),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        orderId,
+        "DELIVERED",
+        "All books handed over to student. Order marked as DELIVERED.",
+        u.email,
+        at,
+      ),
+    );
+  }
+
+  await batch(statements);
+  return { ok: true, itemId, delivered_to_student: delVal, all_delivered: allDelivered };
+}
+
+export async function handoverAvailableItemsToStudent(
+  req: Request,
+  u: User,
+  orderId: string,
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Permission denied to update student delivery status.");
+  }
+  const o = await getOrder(req, orderId, u);
+  const allItems = await all<any>("SELECT * FROM order_items WHERE order_id=?", orderId);
+  const activeItems = allItems.filter((i: any) => !i.is_unavailable);
+
+  const availableUnhanded = activeItems.filter(
+    (i: any) => (Number(i.received_from_vendor) === 1 || Number(i.in_office_stock) === 1) && !i.delivered_to_student,
+  );
+
+  if (availableUnhanded.length === 0) {
+    throw new AppError(400, "No unhanded available books found to hand over to student.");
+  }
+
+  const at = now();
+  const statements: any[] = [];
+
+  for (const it of availableUnhanded) {
+    statements.push(
+      stmt(
+        "UPDATE order_items SET delivered_to_student=1, delivered_to_student_at=? WHERE id=? AND order_id=?",
+        at,
+        it.id,
+        orderId,
+      ),
+    );
+  }
+
+  const remainingPending = activeItems.filter(
+    (i: any) => !i.delivered_to_student && !availableUnhanded.some((h: any) => h.id === i.id),
+  );
+
+  const allCompleted = remainingPending.length === 0;
+
+  if (allCompleted) {
+    statements.push(
+      stmt(
+        "UPDATE orders SET status='DELIVERED', updated_at=?, version=version+1 WHERE id=?",
+        at,
+        orderId,
+      ),
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+        uid(),
+        orderId,
+        "DELIVERED",
+        `Handed over ${availableUnhanded.length} book(s) (${availableUnhanded.map((i: any) => i.code).join(", ")}). All books delivered to student!`,
+        u.email,
+        at,
+      ),
+    );
+  } else {
+    statements.push(
+      stmt(
+        "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,1,?)",
+        uid(),
+        orderId,
+        o.status,
+        `Handed over ${availableUnhanded.length} available book(s) (${availableUnhanded.map((i: any) => i.code).join(", ")}) to student. ${remainingPending.length} book(s) pending from vendor.`,
+        u.email,
+        at,
+      ),
+    );
+  }
+
+  statements.push(
+    auditStmt(
+      u.email,
+      "ORDER_HANDOVER_AVAILABLE_ITEMS",
+      orderId,
+      null,
+      {
+        handed_count: availableUnhanded.length,
+        remaining_pending: remainingPending.length,
+        all_completed: allCompleted,
+      },
+      req,
+    ),
+  );
+
+  await batch(statements);
+  return {
+    ok: true,
+    handed_count: availableUnhanded.length,
+    remaining_pending: remainingPending.length,
+    all_completed: allCompleted,
   };
 }

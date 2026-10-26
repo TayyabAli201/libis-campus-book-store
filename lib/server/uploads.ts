@@ -12,7 +12,6 @@ import {
 } from "./db";
 import { guest, hash, admin, rate } from "./security";
 import { getSettings } from "./catalog";
-import { extractAmount, compareAmount } from "./ocr";
 import { getOrder } from "./orders";
 export function detectMime(b: Uint8Array) {
   if (
@@ -193,8 +192,6 @@ export async function upload(req: Request, cover = false) {
     return { url: "/api/covers/" + id };
   }
   try {
-    const extraction = await extractAmount(bytes, mime);
-    const result = compareAmount(extraction.amount, total!);
     const statements = [
       stmt(
         "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at,order_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
@@ -204,9 +201,9 @@ export async function upload(req: Request, cover = false) {
         mime,
         bytes.length,
         digest,
-        result.status,
-        extraction.amount,
-        result.message,
+        "MANUAL_VERIFICATION",
+        null,
+        "Payment proof uploaded for manual verification.",
         now(),
         order?.id || null,
       ),
@@ -246,7 +243,12 @@ export async function upload(req: Request, cover = false) {
       );
     }
     await batch(statements);
-    return { id, detected_amount: extraction.amount, ...result };
+    return {
+      id,
+      detected_amount: null,
+      status: "MANUAL_VERIFICATION",
+      message: "Payment proof uploaded for manual verification.",
+    };
   } catch (e) {
     await bucket().delete(key);
     throw e;
