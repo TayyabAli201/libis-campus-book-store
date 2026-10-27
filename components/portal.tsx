@@ -111,6 +111,8 @@ import {
   getVendorPendingBooksWhatsAppUrl,
   isCampusOrder,
   isLahoreOrder,
+  extractOrderCoordinates,
+  getYangoRouteUrl,
   type User,
   type Vendor,
   type VendorPayment,
@@ -2085,6 +2087,38 @@ function getMapLocation(o: any) {
   return getMapDirectionsUrl(o);
 }
 
+function handleOpenYango(o: any, e?: React.MouseEvent) {
+  if (e) e.stopPropagation();
+  if (!o) return;
+  const coords = extractOrderCoordinates(o);
+  const yangoUrl = getYangoRouteUrl(o);
+
+  const cleanAddress = (o.address || "")
+    .replace(/📍 Pin Location:.*$/i, "")
+    .trim();
+  const info = [
+    `Student: ${o.name || "Student"}`,
+    `Phone: ${o.phone || ""}`,
+    `Drop-off Address: ${cleanAddress || "Lahore"}${o.city ? `, ${o.city}` : ""}`,
+    coords ? `Drop-off GPS: ${coords.lat}, ${coords.lng}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
+    navigator.clipboard.writeText(info).catch(() => {});
+  }
+
+  if (coords) {
+    toast.success("Opening Yango App with drop-off destination! 📋 Address & phone copied to clipboard.");
+  } else {
+    toast.success("Opening Yango App! 📋 Student delivery address & phone copied to clipboard.");
+  }
+
+  window.open(yangoUrl, "_blank");
+}
+
+
 function CourierTrackingModal({
   order,
   onClose,
@@ -2886,6 +2920,7 @@ function VendorOrderBooksPanel({
   const isOther =
     o?.delivery_type === "other" ||
     (!isCampus && o?.city && !o.city.toLowerCase().includes("lahore"));
+  const isLahore = !isCampus && !isOther;
 
   const handleToggleUnavailable = async (itemId: string, unavailable: boolean) => {
     setTogglingItemId(itemId);
@@ -3453,6 +3488,7 @@ function AdminOrderBooksPanel({
   const isOther =
     o?.delivery_type === "other" ||
     (!isCampus && o?.city && !o.city.toLowerCase().includes("lahore"));
+  const isLahore = !isCampus && !isOther;
 
   const toggleItemUnavailable = async (itemId: string, unavailable: boolean) => {
     setTogglingItemId(itemId);
@@ -3743,27 +3779,37 @@ function AdminOrderBooksPanel({
               💸 RETURN TO STUDENT: {money(o.refund_due)}
             </span>
           )}
-          <span
-            className="mono-pill"
-            style={{
-              fontSize: "0.74rem",
-              fontWeight: 600,
-              padding: "4px 9px",
-              background: isCampus
-                ? "var(--status-info-bg)"
-                : isOther
-                  ? "var(--status-warn-bg)"
-                  : "var(--status-good-bg)",
-              color: isCampus ? "var(--status-info-text)" : isOther ? "var(--status-warn-text)" : "var(--status-good-text)",
-              border: `1px solid ${isCampus ? "var(--status-info-border)" : isOther ? "var(--status-warn-border)" : "var(--status-good-border)"}`,
-            }}
-          >
-            {isCampus
-              ? "🏛️ Qanchi Campus (Pickup)"
-              : isOther
-                ? `📦 ${o?.city || "Parcels"} (Courier)`
-                : "🛵 Lahore Route"}
-          </span>
+          {isLahore ? (
+            <button
+              type="button"
+              className="yango-order-btn"
+              onClick={(e) => handleOpenYango(o, e)}
+              title="🛵 Open Yango App directly with student drop-off destination for delivery"
+              style={{ padding: "4px 10px", fontSize: "0.75rem", marginTop: 0 }}
+            >
+              <Bike size={13} />
+              <span>Open in Yango (Lahore)</span>
+              <span className="yango-badge-arrow">↗</span>
+            </button>
+          ) : (
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.74rem",
+                fontWeight: 600,
+                padding: "4px 9px",
+                background: isCampus
+                  ? "var(--status-info-bg)"
+                  : "var(--status-warn-bg)",
+                color: isCampus ? "var(--status-info-text)" : "var(--status-warn-text)",
+                border: `1px solid ${isCampus ? "var(--status-info-border)" : "var(--status-warn-border)"}`,
+              }}
+            >
+              {isCampus
+                ? "🏛️ Qanchi Campus (Pickup)"
+                : `📦 ${o?.city || "Parcels"} (Courier)`}
+            </span>
+          )}
           {canUpdate && (
             <button
               type="button"
@@ -5779,7 +5825,87 @@ function OrderModalPopup({
                 const isOther =
                   o.delivery_type === "other" ||
                   (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
-                if (!isOther) return null;
+                const isLahore = !isCampus && !isOther;
+                if (isLahore) {
+                  const coords = extractOrderCoordinates(o);
+                  return (
+                    <div
+                      className="courier-modal-banner no-print"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "14px 18px",
+                        margin: "2px 0 16px",
+                        background: "rgba(234, 88, 12, 0.08)",
+                        border: "1px solid rgba(234, 88, 12, 0.3)",
+                        borderRadius: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div
+                          className="courier-badge"
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: 8,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "#ea580c",
+                            color: "#fff",
+                          }}
+                        >
+                          <Bike size={20} />
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: "0.95rem", display: "block" }}>
+                            🛵 Lahore Route (Direct Yango Drop-off Dispatch)
+                          </strong>
+                          <p className="small-text" style={{ margin: "2px 0 0" }}>
+                            {coords
+                              ? `GPS Coordinates Pinned (${coords.lat}, ${coords.lng}). Tap button to launch Yango with drop-off destination.`
+                              : "Deliver via Yango. Tap button to launch Yango app (student drop-off address will be auto-copied)."}
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="yango-order-btn"
+                          onClick={(e) => handleOpenYango(o, e)}
+                          style={{
+                            padding: "6px 14px",
+                            fontSize: "0.82rem",
+                            marginTop: 0,
+                          }}
+                          title="Open Yango App directly with student drop-off location pre-filled"
+                        >
+                          <Bike size={15} strokeWidth={2.4} /> <span>Open in Yango (Drop-off)</span> <span className="yango-badge-arrow">↗</span>
+                        </button>
+                        {getMapLocation(o) && (
+                          <a
+                            href={getMapLocation(o)!}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn compact"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              whiteSpace: "nowrap",
+                            }}
+                            title="Open destination in Google Maps"
+                          >
+                            <Navigation size={13} /> Maps
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
 
                 const isPaymentVerified =
                   o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING";
@@ -8597,6 +8723,8 @@ function Orders({
                 ? `Open ${o.city || "delivery city"} destination on Google Maps`
                 : "Open Bykea / live rider route navigation to student location";
 
+            const isLahore = !isCampus && !isOther;
+
             const badgeContent = isCampus ? (
               <span className="campus-static-pill">
                 <BadgeIcon size={11} /> {badgeLabel}
@@ -8605,21 +8733,26 @@ function Orders({
               <span className="other-static-pill">
                 <BadgeIcon size={11} /> {badgeLabel}
               </span>
-            ) : isAdmin && mapUrl ? (
-              <a
-                href={mapUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={`map-pin-pill ${badgeClass}`}
-                onClick={(e) => e.stopPropagation()}
-                title={badgeTitle}
+            ) : isLahore && !isVendor ? (
+              <button
+                type="button"
+                className="yango-order-btn"
+                onClick={(e) => handleOpenYango(o, e)}
+                title="🛵 Open Yango App directly to dispatch delivery rider to student address"
               >
-                <BadgeIcon size={12} /> {badgeLabel}
-              </a>
+                <Bike size={13} strokeWidth={2.4} />
+                <span>Open in Yango</span>
+                <span className="yango-badge-arrow">↗</span>
+              </button>
             ) : (
               <span
-                className={`map-pin-pill ${badgeClass}`}
-                style={{ cursor: "default" }}
+                className="campus-static-pill"
+                style={{
+                  background: "color-mix(in srgb, #dc2626 12%, transparent)",
+                  color: "#b91c1c",
+                  borderColor: "color-mix(in srgb, #dc2626 32%, transparent)",
+                  cursor: "default",
+                }}
                 title="Lahore Route (Handled by Bookstore Rider)"
               >
                 <BadgeIcon size={12} /> {badgeLabel}
@@ -9906,6 +10039,88 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             const isOther =
               o.delivery_type === "other" ||
               (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
+            const isLahore = !isCampus && !isOther;
+
+            if (isLahore) {
+              const coords = extractOrderCoordinates(o);
+              return (
+                <div
+                  className="courier-modal-banner no-print"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "14px 18px",
+                    marginBottom: 16,
+                    background: "rgba(234, 88, 12, 0.08)",
+                    border: "1px solid rgba(234, 88, 12, 0.3)",
+                    borderRadius: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div
+                      className="courier-badge"
+                      style={{
+                        padding: "6px 8px",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "#ea580c",
+                        color: "#fff",
+                      }}
+                    >
+                      <Bike size={20} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: "0.95rem", display: "block" }}>
+                        🛵 Lahore Route (Direct Yango Drop-off Dispatch)
+                      </strong>
+                      <p className="small-text" style={{ margin: "2px 0 0" }}>
+                        {coords
+                          ? `GPS Coordinates Pinned (${coords.lat}, ${coords.lng}). Tap button to launch Yango with drop-off destination.`
+                          : "Deliver via Yango. Tap button to launch Yango app (student drop-off address will be auto-copied)."}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="yango-order-btn"
+                      onClick={(e) => handleOpenYango(o, e)}
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: "0.82rem",
+                        marginTop: 0,
+                      }}
+                      title="Open Yango App directly with student drop-off location pre-filled"
+                    >
+                      <Bike size={15} strokeWidth={2.4} /> <span>Open in Yango (Drop-off)</span> <span className="yango-badge-arrow">↗</span>
+                    </button>
+                    {getMapLocation(o) && (
+                      <a
+                        href={getMapLocation(o)!}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn compact"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          whiteSpace: "nowrap",
+                        }}
+                        title="Open destination in Google Maps"
+                      >
+                        <Navigation size={13} /> Maps
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             if (!isOther) return null;
 
             const isPaymentVerified =
@@ -13662,6 +13877,9 @@ function SettingsPage() {
         maintenance_message: data.settings.maintenance_message ?? "We are currently conducting scheduled system maintenance. Ordering is temporarily closed. Please check back soon!",
         bank_iban: data.settings.bank_iban ?? "PK29MEZN0011550109645933",
         delivery_campus: data.settings.delivery_campus ?? 10000,
+        delivery_campus_enabled: data.settings.delivery_campus_enabled ?? true,
+        delivery_lahore_enabled: data.settings.delivery_lahore_enabled ?? true,
+        delivery_other_enabled: data.settings.delivery_other_enabled ?? true,
       });
     }
   }, [data]);
@@ -14016,53 +14234,270 @@ function SettingsPage() {
               </Field>
             </div>
 
-            <div className="form-grid three-col" style={{ marginTop: 16 }}>
-              <Field label="VU Qanchi Campus Lahore Pickup Fee (Rs.)">
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  value={Math.round((form.delivery_campus ?? 10000) / 100)}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      delivery_campus: Math.round(Number(e.target.value) * 100),
-                    })
-                  }
-                />
-              </Field>
-              <Field label="Lahore Base Delivery Fee (Rs.) (Min)">
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  value={Math.round((form.delivery_lahore || 0) / 100)}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      delivery_lahore: Math.round(Number(e.target.value) * 100),
-                    })
-                  }
-                />
-              </Field>
-              <Field label="Other City Base Delivery Fee (Rs.) (Min)">
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  value={Math.round((form.delivery_other || 0) / 100)}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      delivery_other: Math.round(Number(e.target.value) * 100),
-                    })
-                  }
-                />
-              </Field>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <div style={{ marginBottom: 14 }}>
+                <strong style={{ fontSize: "0.95rem", display: "block" }}>
+                  Delivery Methods Availability & Base Charges
+                </strong>
+                <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                  Control which delivery methods students can choose at checkout. Any method closed here is completely hidden from the checkout screen.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* 1. VU Qanchi Campus Pickup */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 16,
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    background: form.delivery_campus_enabled !== false ? "color-mix(in srgb, var(--card) 95%, var(--primary))" : "var(--muted)",
+                    border: `1.5px solid ${form.delivery_campus_enabled !== false ? "color-mix(in srgb, var(--border) 70%, var(--primary))" : "var(--border)"}`,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 260 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 8,
+                        background: form.delivery_campus_enabled !== false ? "rgba(37, 99, 235, 0.12)" : "rgba(100, 116, 139, 0.12)",
+                        color: form.delivery_campus_enabled !== false ? "#2563eb" : "#64748b",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Building2 size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <strong style={{ fontSize: "0.92rem" }}>VU Qanchi Campus Lahore Pickup</strong>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.70rem",
+                            fontWeight: 700,
+                            background: form.delivery_campus_enabled !== false ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                            color: form.delivery_campus_enabled !== false ? "#16a34a" : "#dc2626",
+                            border: `1px solid ${form.delivery_campus_enabled !== false ? "rgba(22, 163, 74, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                          }}
+                        >
+                          {form.delivery_campus_enabled !== false ? "● OPEN / ACTIVE" : "○ CLOSED / HIDDEN"}
+                        </span>
+                      </div>
+                      <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                        Student self-pickup from VU Qanchi Campus collection counter.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 140 }}>
+                      <label className="small-text muted" style={{ display: "block", marginBottom: 3, fontWeight: 600 }}>
+                        Pickup Fee (Rs.)
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                        value={Math.round((form.delivery_campus ?? 10000) / 100)}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            delivery_campus: Math.round(Number(e.target.value) * 100),
+                          })
+                        }
+                      />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <label className="small-text muted" style={{ fontSize: "0.72rem", fontWeight: 600 }}>
+                        {form.delivery_campus_enabled !== false ? "Open" : "Closed"}
+                      </label>
+                      <Switch
+                        checked={form.delivery_campus_enabled !== false}
+                        onCheckedChange={(v) => setForm({ ...form, delivery_campus_enabled: v })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Lahore Route (Home Delivery) */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 16,
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    background: form.delivery_lahore_enabled !== false ? "color-mix(in srgb, var(--card) 95%, var(--primary))" : "var(--muted)",
+                    border: `1.5px solid ${form.delivery_lahore_enabled !== false ? "color-mix(in srgb, var(--border) 70%, var(--primary))" : "var(--border)"}`,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 260 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 8,
+                        background: form.delivery_lahore_enabled !== false ? "rgba(234, 88, 12, 0.12)" : "rgba(100, 116, 139, 0.12)",
+                        color: form.delivery_lahore_enabled !== false ? "#ea580c" : "#64748b",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Bike size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <strong style={{ fontSize: "0.92rem" }}>Lahore Route (Home Delivery)</strong>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.70rem",
+                            fontWeight: 700,
+                            background: form.delivery_lahore_enabled !== false ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                            color: form.delivery_lahore_enabled !== false ? "#16a34a" : "#dc2626",
+                            border: `1px solid ${form.delivery_lahore_enabled !== false ? "rgba(22, 163, 74, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                          }}
+                        >
+                          {form.delivery_lahore_enabled !== false ? "● OPEN / ACTIVE" : "○ CLOSED / HIDDEN"}
+                        </span>
+                      </div>
+                      <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                        Rider doorstep parcel delivery in Lahore (dispatched via Yango).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 140 }}>
+                      <label className="small-text muted" style={{ display: "block", marginBottom: 3, fontWeight: 600 }}>
+                        Base Fee Rs. (Min)
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                        value={Math.round((form.delivery_lahore || 0) / 100)}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            delivery_lahore: Math.round(Number(e.target.value) * 100),
+                          })
+                        }
+                      />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <label className="small-text muted" style={{ fontSize: "0.72rem", fontWeight: 600 }}>
+                        {form.delivery_lahore_enabled !== false ? "Open" : "Closed"}
+                      </label>
+                      <Switch
+                        checked={form.delivery_lahore_enabled !== false}
+                        onCheckedChange={(v) => setForm({ ...form, delivery_lahore_enabled: v })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Other City Courier */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 16,
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    background: form.delivery_other_enabled !== false ? "color-mix(in srgb, var(--card) 95%, var(--primary))" : "var(--muted)",
+                    border: `1.5px solid ${form.delivery_other_enabled !== false ? "color-mix(in srgb, var(--border) 70%, var(--primary))" : "var(--border)"}`,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 260 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 8,
+                        background: form.delivery_other_enabled !== false ? "rgba(16, 185, 129, 0.12)" : "rgba(100, 116, 139, 0.12)",
+                        color: form.delivery_other_enabled !== false ? "#059669" : "#64748b",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Truck size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <strong style={{ fontSize: "0.92rem" }}>Other City (Courier Delivery)</strong>
+                        <span
+                          className="mono-pill"
+                          style={{
+                            fontSize: "0.70rem",
+                            fontWeight: 700,
+                            background: form.delivery_other_enabled !== false ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                            color: form.delivery_other_enabled !== false ? "#16a34a" : "#dc2626",
+                            border: `1px solid ${form.delivery_other_enabled !== false ? "rgba(22, 163, 74, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                          }}
+                        >
+                          {form.delivery_other_enabled !== false ? "● OPEN / ACTIVE" : "○ CLOSED / HIDDEN"}
+                        </span>
+                      </div>
+                      <p className="small-text muted" style={{ margin: "2px 0 0" }}>
+                        Nationwide delivery via Leopard / TCS / Trax courier services.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 140 }}>
+                      <label className="small-text muted" style={{ display: "block", marginBottom: 3, fontWeight: 600 }}>
+                        Base Fee Rs. (Min)
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                        value={Math.round((form.delivery_other || 0) / 100)}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            delivery_other: Math.round(Number(e.target.value) * 100),
+                          })
+                        }
+                      />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <label className="small-text muted" style={{ fontSize: "0.72rem", fontWeight: 600 }}>
+                        {form.delivery_other_enabled !== false ? "Open" : "Closed"}
+                      </label>
+                      <Switch
+                        checked={form.delivery_other_enabled !== false}
+                        onCheckedChange={(v) => setForm({ ...form, delivery_other_enabled: v })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="small-text muted" style={{ marginTop: 8 }}>
+                💡 <strong>Delivery Policy Note:</strong> Lahore and Other City fees are base minimum advance charges. Any excess rider fare or courier weight surcharge is paid directly by the student upon delivery.
+              </p>
             </div>
-            <p className="small-text muted" style={{ marginTop: 8 }}>
-              💡 <strong>Delivery Policy Note:</strong> Lahore and Other City fees are base minimum advance charges. Any excess rider fare or courier weight surcharge is paid directly by the student upon delivery.
-            </p>
           </div>
 
           {/* Bottom Save Button */}

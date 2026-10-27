@@ -69,6 +69,43 @@ export function isLahoreOrder(o: any): boolean {
   );
 }
 
+export function extractOrderCoordinates(o: any): { lat: string; lng: string } | null {
+  if (!o) return null;
+  const text = `${o.address || ""} ${o.instructions || ""} ${o.delivery_type || ""}`;
+
+  // 1. Direct coordinates match: e.g. 31.5204, 74.3587 or 31.5204,74.3587
+  const coordMatch = text.match(/([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/);
+  if (coordMatch) {
+    return { lat: coordMatch[1], lng: coordMatch[2] };
+  }
+
+  // 2. Query param (q=lat,lng or query=lat,lng)
+  const qMatch = text.match(/(?:q|query)=([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)/i);
+  if (qMatch) {
+    return { lat: qMatch[1], lng: qMatch[2] };
+  }
+
+  // 3. Full google maps url with coordinates
+  const urlMatch = text.match(/(https?:\/\/(?:www\.)?(?:google\.com\/maps|maps\.google\.com|maps\.app\.goo\.gl|goo\.gl\/maps)\S+)/i);
+  if (urlMatch) {
+    const rawUrl = urlMatch[1];
+    const extractCoords = rawUrl.match(/([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/);
+    if (extractCoords) {
+      return { lat: extractCoords[1], lng: extractCoords[2] };
+    }
+  }
+
+  return null;
+}
+
+export function getYangoRouteUrl(o: any): string {
+  const coords = extractOrderCoordinates(o);
+  if (coords) {
+    return `https://yango.go.link/route?end-lat=${coords.lat}&end-lon=${coords.lng}&lang=en&ref=campusbookstore`;
+  }
+  return `https://yango.go.link/route?lang=en&ref=campusbookstore`;
+}
+
 export function isOtherCityOrder(o: any): boolean {
   if (!o) return false;
   return !isCampusOrder(o) && !isLahoreOrder(o);
@@ -283,8 +320,11 @@ export const settingsInput = z.object({
   bank_iban: z.string().max(60).optional().default("PK29MEZN0011550109645933"),
   account_title: str(150),
   delivery_campus: z.number().int().min(0).max(10000000).optional().default(10000),
+  delivery_campus_enabled: z.boolean().optional().default(true),
   delivery_lahore: z.number().int().min(0).max(10000000),
+  delivery_lahore_enabled: z.boolean().optional().default(true),
   delivery_other: z.number().int().min(0).max(10000000),
+  delivery_other_enabled: z.boolean().optional().default(true),
   currency: z.enum(["PKR"]),
   order_prefix: str(8).regex(/^[A-Z]+$/),
   max_upload_mb: z.number().int().min(1).max(10),

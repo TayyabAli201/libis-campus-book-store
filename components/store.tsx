@@ -1534,13 +1534,24 @@ function LocationPinPicker({
 }
 function Checkout({ data }: { data: Catalog }) {
   const { cart, setCart, ready } = useApp();
+  const campusEnabled = data.settings?.delivery_campus_enabled !== false;
+  const lahoreEnabled = data.settings?.delivery_lahore_enabled !== false;
+  const otherEnabled = data.settings?.delivery_other_enabled !== false;
+
+  const defaultDelivery = lahoreEnabled
+    ? "lahore"
+    : campusEnabled
+      ? "campus"
+      : otherEnabled
+        ? "other"
+        : "lahore";
   const [form, setForm] = useState({
     name: "",
     phone: "",
     city: "Lahore",
     address: "",
     instructions: "",
-    delivery_type: "lahore",
+    delivery_type: defaultDelivery,
     campus_id: "",
   }),
     [quote, setQuote] = useState<Quote | null>(null),
@@ -1548,8 +1559,42 @@ function Checkout({ data }: { data: Catalog }) {
     [slip, setSlip] = useState<any>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const set = (key: string, value: string) =>
-    setForm({ ...form, [key]: value });
+  const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+
+  useEffect(() => {
+    if (form.delivery_type === "campus" && !campusEnabled) {
+      if (lahoreEnabled) {
+        setForm((f) => ({ ...f, delivery_type: "lahore", city: "Lahore", address: "" }));
+      } else if (otherEnabled) {
+        setForm((f) => ({ ...f, delivery_type: "other", city: "", address: "" }));
+      }
+    } else if (form.delivery_type === "lahore" && !lahoreEnabled) {
+      if (campusEnabled) {
+        setForm((f) => ({
+          ...f,
+          delivery_type: "campus",
+          city: "VU Qanchi Campus Lahore",
+          address: "VU Qanchi Campus Lahore",
+        }));
+      } else if (otherEnabled) {
+        setForm((f) => ({ ...f, delivery_type: "other", city: "", address: "" }));
+      }
+    } else if (form.delivery_type === "other" && !otherEnabled) {
+      if (lahoreEnabled) {
+        setForm((f) => ({ ...f, delivery_type: "lahore", city: "Lahore", address: "" }));
+      } else if (campusEnabled) {
+        setForm((f) => ({
+          ...f,
+          delivery_type: "campus",
+          city: "VU Qanchi Campus Lahore",
+          address: "VU Qanchi Campus Lahore",
+        }));
+      }
+    }
+  }, [campusEnabled, lahoreEnabled, otherEnabled, form.delivery_type]);
+
+
   const submit = async () => {
     setBusy(true);
     setError("");
@@ -1643,85 +1688,96 @@ function Checkout({ data }: { data: Catalog }) {
                   Select Delivery Method
                 </label>
                 <div className="delivery-cards-grid">
-                  <button
-                    type="button"
-                    className={`delivery-option-card ${form.delivery_type === "campus" ? "selected" : ""}`}
-                    onClick={() => {
-                      setForm({
-                        ...form,
-                        delivery_type: "campus",
-                        city: "VU Qanchi Campus Lahore",
-                        address: "VU Qanchi Campus Lahore",
-                      });
-                    }}
-                  >
-                    <div className="delivery-option-badge">{money(data.settings.delivery_campus ?? 10000)}</div>
-                    <div className="delivery-option-icon">
-                      <Building2 size={24} />
-                    </div>
-                    <div className="delivery-option-info">
-                      <strong>VU Qanchi Campus Lahore Pickup</strong>
-                      <span>Pickup from VU Qanchi Campus Lahore</span>
-                    </div>
-                  </button>
+                  {campusEnabled && (
+                    <button
+                      type="button"
+                      className={`delivery-option-card ${form.delivery_type === "campus" ? "selected" : ""}`}
+                      onClick={() => {
+                        setForm({
+                          ...form,
+                          delivery_type: "campus",
+                          city: "VU Qanchi Campus Lahore",
+                          address: "VU Qanchi Campus Lahore",
+                        });
+                      }}
+                    >
+                      <div className="delivery-option-badge">{money(data.settings.delivery_campus ?? 10000)}</div>
+                      <div className="delivery-option-icon">
+                        <Building2 size={24} />
+                      </div>
+                      <div className="delivery-option-info">
+                        <strong>VU Qanchi Campus Lahore Pickup</strong>
+                        <span>Pickup from VU Qanchi Campus Lahore</span>
+                      </div>
+                    </button>
+                  )}
 
-                  <button
-                    type="button"
-                    className={`delivery-option-card ${form.delivery_type === "lahore" ? "selected" : ""}`}
-                    onClick={() => {
-                      const isComingFromCampus =
-                        form.delivery_type === "campus" ||
-                        form.address.toLowerCase().includes("campus") ||
-                        form.address.toLowerCase().includes("qanchi") ||
-                        form.address.startsWith("Pickup from");
-                      setForm({
-                        ...form,
-                        delivery_type: "lahore",
-                        city: "Lahore",
-                        address: isComingFromCampus ? "" : form.address,
-                      });
-                    }}
-                  >
-                    <div className="delivery-option-badge">{money(data.settings.delivery_lahore)} (Base)</div>
-                    <div className="delivery-option-icon">
-                      <Navigation size={24} />
-                    </div>
-                    <div className="delivery-option-info">
-                      <strong>Lahore - At Home</strong>
-                      <span>Rider delivery (Base charge)</span>
-                    </div>
-                  </button>
+                  {lahoreEnabled && (
+                    <button
+                      type="button"
+                      className={`delivery-option-card ${form.delivery_type === "lahore" ? "selected" : ""}`}
+                      onClick={() => {
+                        const isComingFromCampus =
+                          form.delivery_type === "campus" ||
+                          form.address.toLowerCase().includes("campus") ||
+                          form.address.toLowerCase().includes("qanchi") ||
+                          form.address.startsWith("Pickup from");
+                        setForm({
+                          ...form,
+                          delivery_type: "lahore",
+                          city: "Lahore",
+                          address: isComingFromCampus ? "" : form.address,
+                        });
+                      }}
+                    >
+                      <div className="delivery-option-badge">{money(data.settings.delivery_lahore)} (Base)</div>
+                      <div className="delivery-option-icon">
+                        <Navigation size={24} />
+                      </div>
+                      <div className="delivery-option-info">
+                        <strong>Lahore - At Home</strong>
+                        <span>Rider delivery (Base charge)</span>
+                      </div>
+                    </button>
+                  )}
 
-                  <button
-                    type="button"
-                    className={`delivery-option-card ${form.delivery_type === "other" ? "selected" : ""}`}
-                    onClick={() => {
-                      const isComingFromCampus =
-                        form.delivery_type === "campus" ||
-                        form.address.toLowerCase().includes("campus") ||
-                        form.address.toLowerCase().includes("qanchi") ||
-                        form.address.startsWith("Pickup from");
-                      const isCityLahoreOrCampus =
-                        form.city === "Lahore" ||
-                        form.city.toLowerCase().includes("campus") ||
-                        form.city.toLowerCase().includes("qanchi");
-                      setForm({
-                        ...form,
-                        delivery_type: "other",
-                        city: isCityLahoreOrCampus ? "" : form.city,
-                        address: isComingFromCampus ? "" : form.address,
-                      });
-                    }}
-                  >
-                    <div className="delivery-option-badge">{money(data.settings.delivery_other)} (Base)</div>
-                    <div className="delivery-option-icon">
-                      <Truck size={24} />
+                  {otherEnabled && (
+                    <button
+                      type="button"
+                      className={`delivery-option-card ${form.delivery_type === "other" ? "selected" : ""}`}
+                      onClick={() => {
+                        const isComingFromCampus =
+                          form.delivery_type === "campus" ||
+                          form.address.toLowerCase().includes("campus") ||
+                          form.address.toLowerCase().includes("qanchi") ||
+                          form.address.startsWith("Pickup from");
+                        const isCityLahoreOrCampus =
+                          form.city === "Lahore" ||
+                          form.city.toLowerCase().includes("campus") ||
+                          form.city.toLowerCase().includes("qanchi");
+                        setForm({
+                          ...form,
+                          delivery_type: "other",
+                          city: isCityLahoreOrCampus ? "" : form.city,
+                          address: isComingFromCampus ? "" : form.address,
+                        });
+                      }}
+                    >
+                      <div className="delivery-option-badge">{money(data.settings.delivery_other)} (Base)</div>
+                      <div className="delivery-option-icon">
+                        <Truck size={24} />
+                      </div>
+                      <div className="delivery-option-info">
+                        <strong>Other City</strong>
+                        <span>Courier delivery (Base charge)</span>
+                      </div>
+                    </button>
+                  )}
+                  {!campusEnabled && !lahoreEnabled && !otherEnabled && (
+                    <div className="notice warning-text" style={{ gridColumn: "1 / -1", padding: "14px 18px", borderRadius: 8, textAlign: "center" }}>
+                      ⚠️ Ordering and delivery is temporarily closed by administration. Please check back later.
                     </div>
-                    <div className="delivery-option-info">
-                      <strong>Other City</strong>
-                      <span>Courier delivery (Base charge)</span>
-                    </div>
-                  </button>
+                  )}
                 </div>
               </div>
 

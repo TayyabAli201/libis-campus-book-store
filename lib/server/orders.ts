@@ -65,6 +65,15 @@ export async function priceCart(input: unknown) {
     });
   }
   const subtotal = items.reduce((sum, b) => sum + b.price * b.quantity, 0);
+  if (c.delivery_type === "campus" && settings.delivery_campus_enabled === false) {
+    throw new AppError(400, "Campus pickup is currently closed.");
+  }
+  if (c.delivery_type === "lahore" && settings.delivery_lahore_enabled === false) {
+    throw new AppError(400, "Lahore home delivery is currently closed.");
+  }
+  if (c.delivery_type === "other" && settings.delivery_other_enabled === false) {
+    throw new AppError(400, "Other city courier delivery is currently closed.");
+  }
   const delivery =
     c.delivery_type === "campus"
       ? settings.delivery_campus ?? 10000

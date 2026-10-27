@@ -95,6 +95,8 @@ const {
   getStudentRefundWhatsAppUrl,
   getVendorPendingBooksWhatsAppMessage,
   getVendorPendingBooksWhatsAppUrl,
+  extractOrderCoordinates,
+  getYangoRouteUrl,
 } = await import("../lib/contracts.ts");
 const { GET, POST, DELETE } = await import("../app/api/[...path]/route.ts");
 const { hash } = await import("../lib/server/security.ts");
@@ -3784,4 +3786,133 @@ test("Student partial handover workflow: campus order hands over available books
   const orderCompleted = await getOrder(request, placed.id, adminUser);
   assert.equal(orderCompleted.status, "DELIVERED");
   assert.ok(orderCompleted.items.every((it) => it.delivered_to_student === 1));
+});
+
+test("Yango drop-off deep link generation correctly extracts coordinates and formats smart-link", () => {
+  // 1. Order with pin location in instructions
+  const orderWithCoords = {
+    name: "Ali Ahmed",
+    phone: "03001234567",
+    address: "House 12, Street 4, Lahore",
+    instructions: "📍 Pin Location: https://maps.google.com/?q=31.4721,74.3156",
+    delivery_type: "lahore",
+  };
+  const coords = extractOrderCoordinates(orderWithCoords);
+  assert.ok(coords);
+  assert.equal(coords.lat, "31.4721");
+  assert.equal(coords.lng, "74.3156");
+
+  const yangoUrl = getYangoRouteUrl(orderWithCoords);
+  assert.equal(
+    yangoUrl,
+    "https://yango.go.link/route?end-lat=31.4721&end-lon=74.3156&lang=en&ref=campusbookstore",
+  );
+
+  // 2. Order without coordinates (text address only)
+  const orderTextOnly = {
+    name: "Usman Khan",
+    phone: "03211234567",
+    address: "Johar Town, Block G, Lahore",
+    delivery_type: "lahore",
+  };
+  const coordsText = extractOrderCoordinates(orderTextOnly);
+  assert.equal(coordsText, null);
+
+  const yangoFallbackUrl = getYangoRouteUrl(orderTextOnly);
+  assert.equal(
+    yangoFallbackUrl,
+    "https://yango.go.link/route?lang=en&ref=campusbookstore",
+  );
+});
+
+test("Delivery options control: closing campus / lahore / other from admin settings prevents quotes and reflects in catalog", async (t) => {
+  const sqlite = database(t);
+  const created = await saveBook(bookInput("DELV101", { fixed_price: 500 }), admin, request);
+
+  // 1. Update settings: Close Campus Pickup (Campus=false, Lahore=true, Other=true)
+  sqlite.prepare("UPDATE settings SET value=? WHERE id=1").run(
+    JSON.stringify({
+      store_name: "QA Bookstore",
+      store_open: true,
+      delivery_campus: 10000,
+      delivery_campus_enabled: false,
+      delivery_lahore: 25000,
+      delivery_lahore_enabled: true,
+      delivery_other: 50000,
+      delivery_other_enabled: true,
+      order_prefix: "QA",
+      currency: "PKR",
+    }),
+  );
+
+  // Check settings returned to student
+  const { settings: currentSettings } = await getSettings();
+  assert.equal(currentSettings.delivery_campus_enabled, false);
+  assert.equal(currentSettings.delivery_lahore_enabled, true);
+  assert.equal(currentSettings.delivery_other_enabled, true);
+
+  // Attempting quote with campus pickup should be rejected
+  const campusCartInput = {
+    name: "Test Student",
+    phone: "03001234567",
+    city: "VU Qanchi Campus Lahore",
+    address: "VU Qanchi Campus Lahore",
+    delivery_type: "campus",
+    campus_id: null,
+    items: [{ id: created.id, quantity: 1 }],
+  };
+  await assert.rejects(
+    async () => quote(request, campusCartInput),
+    /Campus pickup is currently closed/i,
+  );
+
+  // Quoting with Lahore route should succeed
+  const lahoreCartInput = {
+    name: "Test Student",
+    phone: "03001234567",
+    city: "Lahore",
+    address: "Model Town, Lahore",
+    delivery_type: "lahore",
+    campus_id: null,
+    items: [{ id: created.id, quantity: 1 }],
+  };
+  const lahoreQuote = await quote(request, lahoreCartInput);
+  assert.equal(lahoreQuote.delivery, 25000);
+  assert.equal(lahoreQuote.total, 25500);
+
+  // 2. Now close Lahore Route too (leaving only Other City open)
+  sqlite.prepare("UPDATE settings SET value=? WHERE id=1").run(
+    JSON.stringify({
+      store_name: "QA Bookstore",
+      store_open: true,
+      delivery_campus: 10000,
+      delivery_campus_enabled: false,
+      delivery_lahore: 25000,
+      delivery_lahore_enabled: false,
+      delivery_other: 50000,
+      delivery_other_enabled: true,
+      order_prefix: "QA",
+      currency: "PKR",
+    }),
+  );
+
+  // Quoting with Lahore route now rejected
+  await assert.rejects(
+    async () => quote(request, lahoreCartInput),
+    /Lahore home delivery is currently closed/i,
+  );
+
+  // Quoting with Other City succeeds
+  const otherCartInput = {
+    name: "Test Student",
+    phone: "03001234567",
+    city: "Faisalabad",
+    address: "Clock Tower, Faisalabad",
+    delivery_type: "other",
+    campus_id: null,
+    items: [{ id: created.id, quantity: 1 }],
+  };
+  const otherQuote = await quote(request, otherCartInput);
+  assert.equal(otherQuote.delivery, 50000);
+  assert.equal(otherQuote.total, 50500);
 });
