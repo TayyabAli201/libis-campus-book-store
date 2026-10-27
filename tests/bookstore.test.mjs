@@ -97,6 +97,9 @@ const {
   getVendorPendingBooksWhatsAppUrl,
   extractOrderCoordinates,
   getYangoRouteUrl,
+  getYangoWebUrl,
+  getYangoAppUrl,
+  getYangoIntentUrl,
 } = await import("../lib/contracts.ts");
 const { GET, POST, DELETE } = await import("../app/api/[...path]/route.ts");
 const { hash } = await import("../lib/server/security.ts");
@@ -3807,6 +3810,36 @@ test("Yango drop-off deep link generation correctly extracts coordinates and for
     yangoUrl,
     "https://yango.go.link/route?end-lat=31.4721&end-lon=74.3156&lang=en&ref=campusbookstore",
   );
+
+  const yangoWebUrl = getYangoWebUrl(orderWithCoords);
+  assert.equal(
+    yangoWebUrl,
+    "https://yango.com/en_int/order/?gto=74.3156,31.4721",
+  );
+
+  const yangoAppUrl = getYangoAppUrl(orderWithCoords);
+  assert.equal(
+    yangoAppUrl,
+    "yango://route?end-lat=31.4721&end-lon=74.3156",
+  );
+
+  const yangoIntentUrl = getYangoIntentUrl(orderWithCoords);
+  assert.ok(yangoIntentUrl.includes("end-lat=31.4721"));
+  assert.ok(yangoIntentUrl.includes("end-lon=74.3156"));
+  assert.ok(yangoIntentUrl.includes("com.yandex.yango"));
+
+  // 1b. 1st Preference Pin Location: when address has misleading numbers, pin location takes precedence
+  const orderMisleading = {
+    name: "Zainab",
+    phone: "03009876543",
+    address: "House 31.999, Street 74.999, Lahore",
+    instructions: "📍 Pin Location: https://www.google.com/maps?q=31.5204,74.3587",
+    delivery_type: "lahore",
+  };
+  const preferredCoords = extractOrderCoordinates(orderMisleading);
+  assert.ok(preferredCoords);
+  assert.equal(preferredCoords.lat, "31.5204");
+  assert.equal(preferredCoords.lng, "74.3587");
 
   // 2. Order without coordinates (text address only)
   const orderTextOnly = {

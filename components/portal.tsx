@@ -113,6 +113,9 @@ import {
   isLahoreOrder,
   extractOrderCoordinates,
   getYangoRouteUrl,
+  getYangoWebUrl,
+  getYangoAppUrl,
+  getYangoIntentUrl,
   type User,
   type Vendor,
   type VendorPayment,
@@ -2090,8 +2093,9 @@ function getMapLocation(o: any) {
 function handleOpenYango(o: any, e?: React.MouseEvent) {
   if (e) e.stopPropagation();
   if (!o) return;
+
+  // 1st Preference: Pinned GPS drop-off coordinates
   const coords = extractOrderCoordinates(o);
-  const yangoUrl = getYangoRouteUrl(o);
 
   const cleanAddress = (o.address || "")
     .replace(/📍 Pin Location:.*$/i, "")
@@ -2100,7 +2104,7 @@ function handleOpenYango(o: any, e?: React.MouseEvent) {
     `Student: ${o.name || "Student"}`,
     `Phone: ${o.phone || ""}`,
     `Drop-off Address: ${cleanAddress || "Lahore"}${o.city ? `, ${o.city}` : ""}`,
-    coords ? `Drop-off GPS: ${coords.lat}, ${coords.lng}` : "",
+    coords ? `📍 Drop-off Pin Location: ${coords.lat}, ${coords.lng}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -2110,12 +2114,43 @@ function handleOpenYango(o: any, e?: React.MouseEvent) {
   }
 
   if (coords) {
-    toast.success("Opening Yango App with drop-off destination! 📋 Address & phone copied to clipboard.");
+    toast.success(`Opening Yango with Destination Pin (${coords.lat}, ${coords.lng})! 📋 Address copied.`);
   } else {
-    toast.success("Opening Yango App! 📋 Student delivery address & phone copied to clipboard.");
+    toast.success("Opening Yango! 📋 Student delivery address & phone copied to clipboard.");
   }
 
-  window.open(yangoUrl, "_blank");
+  // Device-aware launch to ensure destination pin opens natively in Yango
+  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent || "");
+  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent || "");
+
+  if (coords) {
+    if (isAndroid) {
+      // Android: Native intent into Yango app pre-filling end-lat & end-lon
+      window.location.href = getYangoIntentUrl(o);
+      return;
+    }
+    if (isIOS) {
+      // iOS: Launch via yango:// scheme with fallback
+      window.location.href = getYangoAppUrl(o);
+      setTimeout(() => {
+        window.open(getYangoWebUrl(o), "_blank");
+      }, 1200);
+      return;
+    }
+    // Desktop / Web: Opens Yango with destination pin placed directly
+    window.open(getYangoWebUrl(o), "_blank");
+  } else {
+    if (isAndroid) {
+      window.location.href = getYangoIntentUrl(o);
+    } else if (isIOS) {
+      window.location.href = getYangoAppUrl(o);
+      setTimeout(() => {
+        window.open(getYangoWebUrl(o), "_blank");
+      }, 1200);
+    } else {
+      window.open(getYangoWebUrl(o), "_blank");
+    }
+  }
 }
 
 
@@ -5865,7 +5900,7 @@ function OrderModalPopup({
                           </strong>
                           <p className="small-text" style={{ margin: "2px 0 0" }}>
                             {coords
-                              ? `GPS Coordinates Pinned (${coords.lat}, ${coords.lng}). Tap button to launch Yango with drop-off destination.`
+                              ? `📍 Drop-off Pin: (${coords.lat}, ${coords.lng}) · 1st Preference Pin Location Set ✓. Tap button to launch Yango with pre-filled destination.`
                               : "Deliver via Yango. Tap button to launch Yango app (student drop-off address will be auto-copied)."}
                           </p>
                         </div>
@@ -10080,7 +10115,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       </strong>
                       <p className="small-text" style={{ margin: "2px 0 0" }}>
                         {coords
-                          ? `GPS Coordinates Pinned (${coords.lat}, ${coords.lng}). Tap button to launch Yango with drop-off destination.`
+                          ? `📍 Drop-off Pin: (${coords.lat}, ${coords.lng}) · 1st Preference Pin Location Set ✓. Tap button to launch Yango with pre-filled destination.`
                           : "Deliver via Yango. Tap button to launch Yango app (student drop-off address will be auto-copied)."}
                       </p>
                     </div>

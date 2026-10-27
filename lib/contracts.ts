@@ -71,27 +71,79 @@ export function isLahoreOrder(o: any): boolean {
 
 export function extractOrderCoordinates(o: any): { lat: string; lng: string } | null {
   if (!o) return null;
-  const text = `${o.address || ""} ${o.instructions || ""} ${o.delivery_type || ""}`;
 
-  // 1. Direct coordinates match: e.g. 31.5204, 74.3587 or 31.5204,74.3587
-  const coordMatch = text.match(/([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/);
-  if (coordMatch) {
-    return { lat: coordMatch[1], lng: coordMatch[2] };
+  // Direct properties if already parsed
+  if (o.lat && o.lng) {
+    const lat = parseFloat(o.lat);
+    const lng = parseFloat(o.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat: String(o.lat).trim(), lng: String(o.lng).trim() };
+    }
   }
 
-  // 2. Query param (q=lat,lng or query=lat,lng)
-  const qMatch = text.match(/(?:q|query)=([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)/i);
-  if (qMatch) {
-    return { lat: qMatch[1], lng: qMatch[2] };
+  // Helper to validate and normalize lat/lng (with inverted detection for Pakistan)
+  function parseAndNormalize(rawLat: string | number, rawLng: string | number): { lat: string; lng: string } | null {
+    let lat = typeof rawLat === "number" ? rawLat : parseFloat(rawLat);
+    let lng = typeof rawLng === "number" ? rawLng : parseFloat(rawLng);
+    if (isNaN(lat) || isNaN(lng)) return null;
+
+    let strLat = String(rawLat).trim();
+    let strLng = String(rawLng).trim();
+
+    // Detect inverted coordinates (e.g. 74.3587, 31.5204 -> in Pakistan lat is ~24-37, lng is ~60-78)
+    if (lat > 50 && lat < 90 && lng > 15 && lng < 45) {
+      const tempLat = lat;
+      lat = lng;
+      lng = tempLat;
+      const tempStr = strLat;
+      strLat = strLng;
+      strLng = tempStr;
+    }
+
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat: strLat, lng: strLng };
+    }
+    return null;
   }
 
-  // 3. Full google maps url with coordinates
-  const urlMatch = text.match(/(https?:\/\/(?:www\.)?(?:google\.com\/maps|maps\.google\.com|maps\.app\.goo\.gl|goo\.gl\/maps)\S+)/i);
-  if (urlMatch) {
-    const rawUrl = urlMatch[1];
-    const extractCoords = rawUrl.match(/([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/);
-    if (extractCoords) {
-      return { lat: extractCoords[1], lng: extractCoords[2] };
+  // 1st Preference: Explicit Pin Location / GPS marker in instructions or address
+  const priorityTexts = [o.pin_location, o.instructions, o.address].filter(Boolean).map(String);
+  for (const text of priorityTexts) {
+    const pinMatch = text.match(/(?:📍\s*Pin\s*Location|Pin\s*Location|Pinned|GPS|Drop[- ]?off\s*Location):\s*([^\n\r]+)/i);
+    if (pinMatch) {
+      const pinStr = pinMatch[1].trim();
+
+      // Check query param inside pinned URL (e.g. ?q=31.52,74.35 or @31.52,74.35)
+      const qMatch = pinStr.match(/(?:[?&](?:q|query|ll|daddr|destination)=|@|place\/|dir\/\/?|search\/)([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)/i);
+      if (qMatch) {
+        const res = parseAndNormalize(qMatch[1], qMatch[2]);
+        if (res) return res;
+      }
+
+      // Check direct coordinates in pinned text
+      const direct = pinStr.match(/([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/);
+      if (direct) {
+        const res = parseAndNormalize(direct[1], direct[2]);
+        if (res) return res;
+      }
+    }
+  }
+
+  // 2nd Preference: Any Google Maps / OpenStreetMap URL anywhere in text
+  for (const text of priorityTexts) {
+    const urlCoordMatch = text.match(/(?:[?&](?:q|query|ll|daddr|destination)=|@|place\/|dir\/\/?|search\/)([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/i);
+    if (urlCoordMatch) {
+      const res = parseAndNormalize(urlCoordMatch[1], urlCoordMatch[2]);
+      if (res) return res;
+    }
+  }
+
+  // 3rd Preference: Standard coordinates pair in text (e.g. 31.4721, 74.3156)
+  for (const text of priorityTexts) {
+    const coordMatch = text.match(/([-+]?\d{1,2}\.\d{3,})[,\s]+([-+]?\d{1,3}\.\d{3,})/);
+    if (coordMatch) {
+      const res = parseAndNormalize(coordMatch[1], coordMatch[2]);
+      if (res) return res;
     }
   }
 
@@ -104,6 +156,32 @@ export function getYangoRouteUrl(o: any): string {
     return `https://yango.go.link/route?end-lat=${coords.lat}&end-lon=${coords.lng}&lang=en&ref=campusbookstore`;
   }
   return `https://yango.go.link/route?lang=en&ref=campusbookstore`;
+}
+
+export function getYangoWebUrl(o: any): string {
+  const coords = extractOrderCoordinates(o);
+  if (coords) {
+    return `https://yango.com/en_int/order/?gto=${coords.lng},${coords.lat}`;
+  }
+  return "https://yango.com/en_int/order/";
+}
+
+export function getYangoAppUrl(o: any): string {
+  const coords = extractOrderCoordinates(o);
+  if (coords) {
+    return `yango://route?end-lat=${coords.lat}&end-lon=${coords.lng}`;
+  }
+  return "yango://route";
+}
+
+export function getYangoIntentUrl(o: any): string {
+  const coords = extractOrderCoordinates(o);
+  if (coords) {
+    const webFallback = encodeURIComponent(`https://yango.com/en_int/order/?gto=${coords.lng},${coords.lat}`);
+    return `intent://route?end-lat=${coords.lat}&end-lon=${coords.lng}#Intent;scheme=yango;package=com.yandex.yango;S.browser_fallback_url=${webFallback};end`;
+  }
+  const webFallback = encodeURIComponent("https://yango.com/en_int/order/");
+  return `intent://route#Intent;scheme=yango;package=com.yandex.yango;S.browser_fallback_url=${webFallback};end`;
 }
 
 export function isOtherCityOrder(o: any): boolean {
