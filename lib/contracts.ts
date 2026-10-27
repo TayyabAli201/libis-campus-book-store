@@ -150,40 +150,6 @@ export function extractOrderCoordinates(o: any): { lat: string; lng: string } | 
   return null;
 }
 
-export function getYangoRouteUrl(o: any): string {
-  const coords = extractOrderCoordinates(o);
-  if (coords) {
-    return `https://yango.go.link/route?end-lat=${coords.lat}&end-lon=${coords.lng}&lang=en&ref=campusbookstore`;
-  }
-  return `https://yango.go.link/route?lang=en&ref=campusbookstore`;
-}
-
-export function getYangoWebUrl(o: any): string {
-  const coords = extractOrderCoordinates(o);
-  if (coords) {
-    return `https://yango.com/en_int/order/?gto=${coords.lng},${coords.lat}`;
-  }
-  return "https://yango.com/en_int/order/";
-}
-
-export function getYangoAppUrl(o: any): string {
-  const coords = extractOrderCoordinates(o);
-  if (coords) {
-    return `yango://route?end-lat=${coords.lat}&end-lon=${coords.lng}`;
-  }
-  return "yango://route";
-}
-
-export function getYangoIntentUrl(o: any): string {
-  const coords = extractOrderCoordinates(o);
-  if (coords) {
-    const webFallback = encodeURIComponent(`https://yango.com/en_int/order/?gto=${coords.lng},${coords.lat}`);
-    return `intent://route?end-lat=${coords.lat}&end-lon=${coords.lng}#Intent;scheme=yango;package=com.yandex.yango;S.browser_fallback_url=${webFallback};end`;
-  }
-  const webFallback = encodeURIComponent("https://yango.com/en_int/order/");
-  return `intent://route#Intent;scheme=yango;package=com.yandex.yango;S.browser_fallback_url=${webFallback};end`;
-}
-
 export function isOtherCityOrder(o: any): boolean {
   if (!o) return false;
   return !isCampusOrder(o) && !isLahoreOrder(o);

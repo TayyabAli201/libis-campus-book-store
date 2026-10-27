@@ -112,10 +112,6 @@ import {
   isCampusOrder,
   isLahoreOrder,
   extractOrderCoordinates,
-  getYangoRouteUrl,
-  getYangoWebUrl,
-  getYangoAppUrl,
-  getYangoIntentUrl,
   type User,
   type Vendor,
   type VendorPayment,
@@ -2090,70 +2086,6 @@ function getMapLocation(o: any) {
   return getMapDirectionsUrl(o);
 }
 
-function handleOpenYango(o: any, e?: React.MouseEvent) {
-  if (e) e.stopPropagation();
-  if (!o) return;
-
-  // 1st Preference: Pinned GPS drop-off coordinates
-  const coords = extractOrderCoordinates(o);
-
-  const cleanAddress = (o.address || "")
-    .replace(/📍 Pin Location:.*$/i, "")
-    .trim();
-  const info = [
-    `Student: ${o.name || "Student"}`,
-    `Phone: ${o.phone || ""}`,
-    `Drop-off Address: ${cleanAddress || "Lahore"}${o.city ? `, ${o.city}` : ""}`,
-    coords ? `📍 Drop-off Pin Location: ${coords.lat}, ${coords.lng}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
-    navigator.clipboard.writeText(info).catch(() => {});
-  }
-
-  if (coords) {
-    toast.success(`Opening Yango with Destination Pin (${coords.lat}, ${coords.lng})! 📋 Address copied.`);
-  } else {
-    toast.success("Opening Yango! 📋 Student delivery address & phone copied to clipboard.");
-  }
-
-  // Device-aware launch to ensure destination pin opens natively in Yango
-  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent || "");
-  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent || "");
-
-  if (coords) {
-    if (isAndroid) {
-      // Android: Native intent into Yango app pre-filling end-lat & end-lon
-      window.location.href = getYangoIntentUrl(o);
-      return;
-    }
-    if (isIOS) {
-      // iOS: Launch via yango:// scheme with fallback
-      window.location.href = getYangoAppUrl(o);
-      setTimeout(() => {
-        window.open(getYangoWebUrl(o), "_blank");
-      }, 1200);
-      return;
-    }
-    // Desktop / Web: Opens Yango with destination pin placed directly
-    window.open(getYangoWebUrl(o), "_blank");
-  } else {
-    if (isAndroid) {
-      window.location.href = getYangoIntentUrl(o);
-    } else if (isIOS) {
-      window.location.href = getYangoAppUrl(o);
-      setTimeout(() => {
-        window.open(getYangoWebUrl(o), "_blank");
-      }, 1200);
-    } else {
-      window.open(getYangoWebUrl(o), "_blank");
-    }
-  }
-}
-
-
 function CourierTrackingModal({
   order,
   onClose,
@@ -3814,37 +3746,27 @@ function AdminOrderBooksPanel({
               💸 RETURN TO STUDENT: {money(o.refund_due)}
             </span>
           )}
-          {isLahore ? (
-            <button
-              type="button"
-              className="yango-order-btn"
-              onClick={(e) => handleOpenYango(o, e)}
-              title="🛵 Open Yango App directly with student drop-off destination for delivery"
-              style={{ padding: "4px 10px", fontSize: "0.75rem", marginTop: 0 }}
-            >
-              <Bike size={13} />
-              <span>Open in Yango (Lahore)</span>
-              <span className="yango-badge-arrow">↗</span>
-            </button>
-          ) : (
-            <span
-              className="mono-pill"
-              style={{
-                fontSize: "0.74rem",
-                fontWeight: 600,
-                padding: "4px 9px",
-                background: isCampus
-                  ? "var(--status-info-bg)"
-                  : "var(--status-warn-bg)",
-                color: isCampus ? "var(--status-info-text)" : "var(--status-warn-text)",
-                border: `1px solid ${isCampus ? "var(--status-info-border)" : "var(--status-warn-border)"}`,
-              }}
-            >
-              {isCampus
-                ? "🏛️ Qanchi Campus (Pickup)"
-                : `📦 ${o?.city || "Parcels"} (Courier)`}
-            </span>
-          )}
+          <span
+            className="mono-pill"
+            style={{
+              fontSize: "0.74rem",
+              fontWeight: 600,
+              padding: "4px 9px",
+              background: isCampus
+                ? "var(--status-info-bg)"
+                : isOther
+                  ? "var(--status-warn-bg)"
+                  : "var(--status-good-bg)",
+              color: isCampus ? "var(--status-info-text)" : isOther ? "var(--status-warn-text)" : "var(--status-good-text)",
+              border: `1px solid ${isCampus ? "var(--status-info-border)" : isOther ? "var(--status-warn-border)" : "var(--status-good-border)"}`,
+            }}
+          >
+            {isCampus
+              ? "🏛️ Qanchi Campus (Pickup)"
+              : isOther
+                ? `📦 ${o?.city || "Parcels"} (Courier)`
+                : "🛵 Lahore Route"}
+          </span>
           {canUpdate && (
             <button
               type="button"
@@ -5860,87 +5782,7 @@ function OrderModalPopup({
                 const isOther =
                   o.delivery_type === "other" ||
                   (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
-                const isLahore = !isCampus && !isOther;
-                if (isLahore) {
-                  const coords = extractOrderCoordinates(o);
-                  return (
-                    <div
-                      className="courier-modal-banner no-print"
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 14,
-                        padding: "14px 18px",
-                        margin: "2px 0 16px",
-                        background: "rgba(234, 88, 12, 0.08)",
-                        border: "1px solid rgba(234, 88, 12, 0.3)",
-                        borderRadius: 8,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div
-                          className="courier-badge"
-                          style={{
-                            padding: "6px 8px",
-                            borderRadius: 8,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            background: "#ea580c",
-                            color: "#fff",
-                          }}
-                        >
-                          <Bike size={20} />
-                        </div>
-                        <div>
-                          <strong style={{ fontSize: "0.95rem", display: "block" }}>
-                            🛵 Lahore Route (Direct Yango Drop-off Dispatch)
-                          </strong>
-                          <p className="small-text" style={{ margin: "2px 0 0" }}>
-                            {coords
-                              ? `📍 Drop-off Pin: (${coords.lat}, ${coords.lng}) · 1st Preference Pin Location Set ✓. Tap button to launch Yango with pre-filled destination.`
-                              : "Deliver via Yango. Tap button to launch Yango app (student drop-off address will be auto-copied)."}
-                          </p>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          className="yango-order-btn"
-                          onClick={(e) => handleOpenYango(o, e)}
-                          style={{
-                            padding: "6px 14px",
-                            fontSize: "0.82rem",
-                            marginTop: 0,
-                          }}
-                          title="Open Yango App directly with student drop-off location pre-filled"
-                        >
-                          <Bike size={15} strokeWidth={2.4} /> <span>Open in Yango (Drop-off)</span> <span className="yango-badge-arrow">↗</span>
-                        </button>
-                        {getMapLocation(o) && (
-                          <a
-                            href={getMapLocation(o)!}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn compact"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 5,
-                              whiteSpace: "nowrap",
-                            }}
-                            title="Open destination in Google Maps"
-                          >
-                            <Navigation size={13} /> Maps
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
+                if (!isOther) return null;
 
                 const isPaymentVerified =
                   o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING";
@@ -8758,8 +8600,6 @@ function Orders({
                 ? `Open ${o.city || "delivery city"} destination on Google Maps`
                 : "Open Bykea / live rider route navigation to student location";
 
-            const isLahore = !isCampus && !isOther;
-
             const badgeContent = isCampus ? (
               <span className="campus-static-pill">
                 <BadgeIcon size={11} /> {badgeLabel}
@@ -8768,26 +8608,21 @@ function Orders({
               <span className="other-static-pill">
                 <BadgeIcon size={11} /> {badgeLabel}
               </span>
-            ) : isLahore && !isVendor ? (
-              <button
-                type="button"
-                className="yango-order-btn"
-                onClick={(e) => handleOpenYango(o, e)}
-                title="🛵 Open Yango App directly to dispatch delivery rider to student address"
+            ) : isAdmin && mapUrl ? (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`map-pin-pill ${badgeClass}`}
+                onClick={(e) => e.stopPropagation()}
+                title={badgeTitle}
               >
-                <Bike size={13} strokeWidth={2.4} />
-                <span>Open in Yango</span>
-                <span className="yango-badge-arrow">↗</span>
-              </button>
+                <BadgeIcon size={12} /> {badgeLabel}
+              </a>
             ) : (
               <span
-                className="campus-static-pill"
-                style={{
-                  background: "color-mix(in srgb, #dc2626 12%, transparent)",
-                  color: "#b91c1c",
-                  borderColor: "color-mix(in srgb, #dc2626 32%, transparent)",
-                  cursor: "default",
-                }}
+                className={`map-pin-pill ${badgeClass}`}
+                style={{ cursor: "default" }}
                 title="Lahore Route (Handled by Bookstore Rider)"
               >
                 <BadgeIcon size={12} /> {badgeLabel}
@@ -10074,88 +9909,6 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
             const isOther =
               o.delivery_type === "other" ||
               (!isCampus && o.city && !o.city.toLowerCase().includes("lahore"));
-            const isLahore = !isCampus && !isOther;
-
-            if (isLahore) {
-              const coords = extractOrderCoordinates(o);
-              return (
-                <div
-                  className="courier-modal-banner no-print"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "14px 18px",
-                    marginBottom: 16,
-                    background: "rgba(234, 88, 12, 0.08)",
-                    border: "1px solid rgba(234, 88, 12, 0.3)",
-                    borderRadius: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div
-                      className="courier-badge"
-                      style={{
-                        padding: "6px 8px",
-                        borderRadius: 8,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "#ea580c",
-                        color: "#fff",
-                      }}
-                    >
-                      <Bike size={20} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: "0.95rem", display: "block" }}>
-                        🛵 Lahore Route (Direct Yango Drop-off Dispatch)
-                      </strong>
-                      <p className="small-text" style={{ margin: "2px 0 0" }}>
-                        {coords
-                          ? `📍 Drop-off Pin: (${coords.lat}, ${coords.lng}) · 1st Preference Pin Location Set ✓. Tap button to launch Yango with pre-filled destination.`
-                          : "Deliver via Yango. Tap button to launch Yango app (student drop-off address will be auto-copied)."}
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="yango-order-btn"
-                      onClick={(e) => handleOpenYango(o, e)}
-                      style={{
-                        padding: "6px 14px",
-                        fontSize: "0.82rem",
-                        marginTop: 0,
-                      }}
-                      title="Open Yango App directly with student drop-off location pre-filled"
-                    >
-                      <Bike size={15} strokeWidth={2.4} /> <span>Open in Yango (Drop-off)</span> <span className="yango-badge-arrow">↗</span>
-                    </button>
-                    {getMapLocation(o) && (
-                      <a
-                        href={getMapLocation(o)!}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn compact"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                          whiteSpace: "nowrap",
-                        }}
-                        title="Open destination in Google Maps"
-                      >
-                        <Navigation size={13} /> Maps
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
             if (!isOther) return null;
 
             const isPaymentVerified =
@@ -14410,7 +14163,7 @@ function SettingsPage() {
                         </span>
                       </div>
                       <p className="small-text muted" style={{ margin: "2px 0 0" }}>
-                        Rider doorstep parcel delivery in Lahore (dispatched via Yango).
+                        Rider doorstep parcel delivery in Lahore.
                       </p>
                     </div>
                   </div>
