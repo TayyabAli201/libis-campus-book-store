@@ -3878,3 +3878,99 @@ test("Delivery options control: closing campus / lahore / other from admin setti
   assert.equal(otherQuote.delivery, 50000);
   assert.equal(otherQuote.total, 50500);
 });
+
+test("Overpayment and Student Change Return Workflow: Student overpays (e.g. 5000 on 4500 bill), system tracks change return as pending refund in admin panel, records OVERPAYMENT payment log, and settles on refund recording", async (t) => {
+  const sqlite = database(t);
+  const guest = "c".repeat(64);
+  const request = new Request("http://127.0.0.1:5173/api/checkout", {
+    headers: { cookie: "cbs_guest=" + guest },
+  });
+  const adminUser = admin;
+
+  // 1. Create a book with 500 Rs fixed price
+  const bRes = await saveBook(
+    bookInput("CHG101", { title: "Operating Systems", pages: 200, fixed_price: 500 }),
+    adminUser,
+    request,
+  );
+
+  // 2. Quote for 9 copies -> Subtotal: 4500 Rs (450000 cents), Delivery: 0 (campus)
+  const q = await quote(request, {
+    name: "Student Change Return",
+    phone: "03112223344",
+    city: "Lahore",
+    address: "VU Qanchi Campus",
+    delivery_type: "campus",
+    campus_id: null,
+    items: [{ id: bRes.id, quantity: 9 }],
+  });
+
+  const billTotal = q.total;
+  const changeToReturn = 50000; // Rs. 500 excess change
+  const paidAmount = billTotal + changeToReturn;
+
+  const slip = "slip-chg-" + crypto.randomUUID();
+  sqlite
+    .prepare(
+      "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+    )
+    .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+  const placed = await submitOrder(request, q.id, slip);
+
+  // 3. Super Admin approves with paidAmount received (student paid Rs. 500 extra note)
+  const placedOrder = await getOrder(request, placed.id, adminUser);
+  const decisionRes = await decidePayment(
+    request,
+    adminUser,
+    placed.id,
+    "approve",
+    "Student paid extra note",
+    placedOrder.version,
+    paidAmount,
+    "Return 500 Rs change to student on pickup",
+  );
+
+  assert.equal(decisionRes.status, "CONFIRMED");
+  assert.equal(decisionRes.amount_paid, paidAmount);
+  assert.equal(decisionRes.due_amount, 0);
+  assert.equal(decisionRes.due_status, "PAID");
+  assert.equal(decisionRes.refund_due, changeToReturn); // 500 Rs excess
+  assert.equal(decisionRes.refund_status, "REFUND_PENDING");
+
+  // 4. Verify order in DB
+  const dbOrder = await getOrder(request, placed.id, adminUser);
+  assert.equal(dbOrder.amount_paid, paidAmount);
+  assert.equal(dbOrder.refund_due, changeToReturn);
+  assert.equal(dbOrder.refund_status, "REFUND_PENDING");
+
+  // 5. Verify payment log has OVERPAYMENT
+  const payLogs = sqlite
+    .prepare("SELECT * FROM order_payment_logs WHERE order_id=? ORDER BY created_at ASC")
+    .all(placed.id);
+  assert.ok(payLogs.some(l => l.type === "OVERPAYMENT" && l.amount === paidAmount));
+
+  // 6. Verify order appears in REFUNDS_DUE filter
+  const refundsDueOrders = await listOrders(adminUser, "", "REFUNDS_DUE");
+  assert.ok(refundsDueOrders.rows.some(o => o.id === placed.id));
+  assert.ok(refundsDueOrders.status_counts["REFUNDS_DUE"] >= 1);
+
+  // 7. Super Admin settles refund (hands over Rs. 500 cash change to student)
+  const refundRec = await recordStudentRefund(
+    request,
+    adminUser,
+    placed.id,
+    changeToReturn,
+    "Cash on Campus",
+    "CASH-CHG-001",
+    "Handed 500 change to student",
+  );
+  assert.equal(refundRec.ok, true);
+  assert.equal(refundRec.refund_due, 0);
+  assert.equal(refundRec.refund_status, "REFUNDED");
+
+  // Verify order updated
+  const settledOrder = await getOrder(request, placed.id, adminUser);
+  assert.equal(settledOrder.refund_due, 0);
+  assert.equal(settledOrder.refund_amount, changeToReturn);
+  assert.equal(settledOrder.refund_status, "REFUNDED");
+});

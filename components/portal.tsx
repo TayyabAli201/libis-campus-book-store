@@ -4549,6 +4549,88 @@ function AdminOrderBooksPanel({
         </div>
       )}
 
+      {/* Financial Summary Bar when not editing */}
+      {!isEditing && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "var(--card)",
+            border: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+            marginTop: 4,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <span style={{ fontSize: "0.70rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 700, display: "block" }}>
+                Active Bill
+              </span>
+              <strong style={{ fontSize: "1.05rem", color: "var(--foreground)" }}>{money(o.total || 0)}</strong>
+            </div>
+            {Number(o.amount_paid || 0) > 0 && (
+              <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}>
+                <span style={{ fontSize: "0.70rem", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted-foreground)", fontWeight: 700, display: "block" }}>
+                  Advance Paid
+                </span>
+                <strong style={{ fontSize: "1.05rem", color: "#16a34a" }}>{money(o.amount_paid || 0)}</strong>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {Number(o.refund_due || 0) > 0 && (
+              <div
+                style={{
+                  background: "#fee2e2",
+                  border: "1.5px solid #ef4444",
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#991b1b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    💸 Change / Refund to Student
+                  </div>
+                  <strong style={{ fontSize: "1.1rem", color: "#b91c1c", fontWeight: 900 }}>
+                    {money(o.refund_due)}
+                  </strong>
+                </div>
+              </div>
+            )}
+            {Number(o.due_amount || 0) > 0 && (
+              <div
+                style={{
+                  background: "rgba(245, 158, 11, 0.12)",
+                  border: "1.5px solid #f59e0b",
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    ⚠️ Balance Due on Delivery
+                  </div>
+                  <strong style={{ fontSize: "1.1rem", color: "#b45309", fontWeight: 900 }}>
+                    {money(o.due_amount)}
+                  </strong>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Recalculation Summary Box when in Editing Mode */}
       {isEditing && (
         <div
@@ -6569,6 +6651,7 @@ function OrderModalPopup({
                           {(() => {
                             const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
                             const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                            const returnCents = Math.max(0, enteredCents - (o.total || 0));
                             if (dueCents > 0) {
                               return (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -6593,6 +6676,43 @@ function OrderModalPopup({
                                       value={partialDueNote}
                                       onChange={(e) => setPartialDueNote(e.target.value)}
                                       placeholder="e.g. Rs. 100 pending - will collect on delivery"
+                                      style={{ fontSize: "0.84rem" }}
+                                    />
+                                  </Field>
+                                </div>
+                              );
+                            }
+                            if (returnCents > 0) {
+                              return (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <div
+                                    style={{
+                                      padding: "10px 12px",
+                                      borderRadius: 6,
+                                      background: "#fef2f2",
+                                      border: "1.5px solid #ef4444",
+                                      color: "#991b1b",
+                                      fontSize: "0.85rem",
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span style={{ fontSize: "1.1rem" }}>💸</span>
+                                      <span>CHANGE TO RETURN TO STUDENT:</span>
+                                    </div>
+                                    <strong style={{ fontSize: "1.05rem", color: "#dc2626" }}>{money(returnCents)}</strong>
+                                  </div>
+                                  <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                                    Student paid {money(enteredCents)} on total bill of {money(o.total || 0)}. Rs. {money(returnCents)} change will be recorded in student refund queue.
+                                  </div>
+                                  <Field label="Return Note (Optional)">
+                                    <input
+                                      value={partialDueNote}
+                                      onChange={(e) => setPartialDueNote(e.target.value)}
+                                      placeholder="e.g. Received 5000 note, return 500 change to student"
                                       style={{ fontSize: "0.84rem" }}
                                     />
                                   </Field>
@@ -6634,7 +6754,9 @@ function OrderModalPopup({
                       {admin && o.status === "PAYMENT_PENDING" && (() => {
                         const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
                         const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                        const returnCents = Math.max(0, enteredCents - (o.total || 0));
                         const isPartial = dueCents > 0;
+                        const isOverpaid = returnCents > 0;
                         return (
                           <div className="actions">
                             <button
@@ -6642,16 +6764,20 @@ function OrderModalPopup({
                               style={{
                                 background: isPartial
                                   ? "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
-                                  : undefined,
-                                borderColor: isPartial ? "#b45309" : undefined,
-                                color: isPartial ? "#ffffff" : undefined,
+                                  : isOverpaid
+                                    ? "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)"
+                                    : undefined,
+                                borderColor: isPartial ? "#b45309" : isOverpaid ? "#dc2626" : undefined,
+                                color: isPartial || isOverpaid ? "#ffffff" : undefined,
                               }}
                               onClick={() =>
                                 setDecision({
                                   action: "approve",
                                   label: isPartial
                                     ? `Approve with Partial Payment (${money(dueCents)} Due)`
-                                    : "Approve Payment",
+                                    : isOverpaid
+                                      ? `Approve & Record Return (${money(returnCents)} Change)`
+                                      : "Approve Payment",
                                   amount_paid: enteredCents,
                                   due_amount: dueCents,
                                   due_note: partialDueNote,
@@ -6660,7 +6786,9 @@ function OrderModalPopup({
                             >
                               {isPartial
                                 ? `Approve Partial (${money(dueCents)} Due)`
-                                : "Approve Payment"}
+                                : isOverpaid
+                                  ? `Approve & Return ${money(returnCents)} Change`
+                                  : "Approve Payment"}
                             </button>
                             <button
                               className="btn compact"
@@ -6800,7 +6928,9 @@ function OrderModalPopup({
             decision?.action === "approve"
               ? decision?.due_amount > 0
                 ? `Confirm approving order with partial payment of ${money(decision.amount_paid)}. A remaining balance of ${money(decision.due_amount)} will be recorded as pending due.`
-                : "Confirm only after checking the bank transaction. Approval confirms the order."
+                : decision?.amount_paid > (o.total || 0)
+                  ? `Confirm approving order with received amount of ${money(decision.amount_paid)} (Bill: ${money(o.total || 0)}). Rs. ${money(decision.amount_paid - (o.total || 0))} will be recorded as pending return/refund to student.`
+                  : "Confirm only after checking the bank transaction. Approval confirms the order."
               : "This decision will be recorded in the order history and audit log."
           }
           onConfirm={() =>
@@ -10287,6 +10417,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                 </div>
                 <div className="stack no-print">
                   <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
+                  <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} />
                   <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
                   <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
                     <div>
@@ -10635,6 +10766,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       {(() => {
                         const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
                         const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                        const returnCents = Math.max(0, enteredCents - (o.total || 0));
                         if (dueCents > 0) {
                           return (
                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -10659,6 +10791,43 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                                   value={partialDueNote}
                                   onChange={(e) => setPartialDueNote(e.target.value)}
                                   placeholder="e.g. Rs. 100 pending - will collect on delivery"
+                                  style={{ fontSize: "0.84rem" }}
+                                />
+                              </Field>
+                            </div>
+                          );
+                        }
+                        if (returnCents > 0) {
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              <div
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: 6,
+                                  background: "#fef2f2",
+                                  border: "1.5px solid #ef4444",
+                                  color: "#991b1b",
+                                  fontSize: "0.85rem",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: "1.1rem" }}>💸</span>
+                                  <span>CHANGE TO RETURN TO STUDENT:</span>
+                                </div>
+                                <strong style={{ fontSize: "1.05rem", color: "#dc2626" }}>{money(returnCents)}</strong>
+                              </div>
+                              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                                Student paid {money(enteredCents)} on total bill of {money(o.total || 0)}. Rs. {money(returnCents)} change will be recorded in student refund queue.
+                              </div>
+                              <Field label="Return Note (Optional)">
+                                <input
+                                  value={partialDueNote}
+                                  onChange={(e) => setPartialDueNote(e.target.value)}
+                                  placeholder="e.g. Received 5000 note, return 500 change to student"
                                   style={{ fontSize: "0.84rem" }}
                                 />
                               </Field>
@@ -10700,18 +10869,30 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                   {admin && o.status === "PAYMENT_PENDING" && (() => {
                     const enteredCents = Math.round(Number(partialPaidInput || 0) * 100);
                     const dueCents = Math.max(0, (o.total || 0) - enteredCents);
+                    const returnCents = Math.max(0, enteredCents - (o.total || 0));
                     const isPartial = dueCents > 0;
+                    const isOverpaid = returnCents > 0;
                     return (
                       <div className="actions">
                         <button
                           className="btn compact primary"
-                          style={{ background: isPartial ? "#d97706" : undefined }}
+                          style={{
+                            background: isPartial
+                              ? "#d97706"
+                              : isOverpaid
+                                ? "#dc2626"
+                                : undefined,
+                            borderColor: isPartial ? "#b45309" : isOverpaid ? "#dc2626" : undefined,
+                            color: isPartial || isOverpaid ? "#ffffff" : undefined,
+                          }}
                           onClick={() =>
                             setDecision({
                               action: "approve",
                               label: isPartial
                                 ? `Approve with Partial Payment (${money(dueCents)} Due)`
-                                : "Approve Payment",
+                                : isOverpaid
+                                  ? `Approve & Record Return (${money(returnCents)} Change)`
+                                  : "Approve Payment",
                               amount_paid: enteredCents,
                               due_amount: dueCents,
                               due_note: partialDueNote,
@@ -10720,7 +10901,9 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         >
                           {isPartial
                             ? `Approve Partial (${money(dueCents)} Due)`
-                            : "Approve Payment"}
+                            : isOverpaid
+                              ? `Approve & Return ${money(returnCents)} Change`
+                              : "Approve Payment"}
                         </button>
                         <button
                           className="btn compact"
@@ -10855,7 +11038,9 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
               decision?.action === "approve"
                 ? decision?.due_amount > 0
                   ? `Confirm approving order with partial payment of ${money(decision.amount_paid)}. A remaining balance of ${money(decision.due_amount)} will be recorded as pending due.`
-                  : "Confirm only after checking the bank transaction. Approval confirms the order."
+                  : decision?.amount_paid > (o.total || 0)
+                    ? `Confirm approving order with received amount of ${money(decision.amount_paid)} (Bill: ${money(o.total || 0)}). Rs. ${money(decision.amount_paid - (o.total || 0))} will be recorded as pending return/refund to student.`
+                    : "Confirm only after checking the bank transaction. Approval confirms the order."
                 : "This decision will be recorded in the order history and audit log."
             }
             onConfirm={() =>

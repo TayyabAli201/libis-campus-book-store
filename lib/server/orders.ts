@@ -1055,6 +1055,10 @@ export async function decidePayment(
   let due = 0;
   let dueStatus = "PAID";
   let dueNoteText = "";
+  let excessPaid = 0;
+  let refundDue = Number(o.refund_due || 0);
+  let refundStatus = o.refund_status || "NONE";
+  let refundNote = o.refund_note || null;
 
   if (action === "approve") {
     statements.push(
@@ -1076,6 +1080,12 @@ export async function decidePayment(
     dueStatus = due > 0 ? "DUE_PENDING" : "PAID";
     dueNoteText = typeof dueNote === "string" ? dueNote.trim() : "";
 
+    excessPaid = Math.max(0, paid - o.total);
+    const existingRefundPaid = Number(o.refund_amount || 0);
+    refundDue = Math.max(0, excessPaid - existingRefundPaid);
+    refundStatus = excessPaid > 0 ? (refundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+    refundNote = excessPaid > 0 ? (dueNoteText || "Overpayment / Change to return to student") : (o.refund_note || null);
+
     // Settle reservations only for orders created before stock tracking was removed.
     if (state === "RESERVED") {
       statements.push(...movementStatements(o, items, "RELEASE", u.email));
@@ -1084,13 +1094,16 @@ export async function decidePayment(
 
     statements.push(
       stmt(
-        "UPDATE orders SET status=?,inventory_state=?,amount_paid=?,due_amount=?,due_status=?,due_note=?,version=version+1,updated_at=? WHERE id=?",
+        "UPDATE orders SET status=?,inventory_state=?,amount_paid=?,due_amount=?,due_status=?,due_note=?,refund_due=?,refund_status=?,refund_note=?,version=version+1,updated_at=? WHERE id=?",
         status,
         state,
         paid,
         due,
         dueStatus,
         dueNoteText,
+        refundDue,
+        refundStatus,
+        refundNote,
         at,
         o.id,
       ),
@@ -1099,8 +1112,8 @@ export async function decidePayment(
         uid(),
         o.id,
         paid,
-        due > 0 ? "ADVANCE" : "FULL_PAYMENT",
-        dueNoteText || (due > 0 ? "Initial partial payment approved" : "Payment verified in full"),
+        due > 0 ? "ADVANCE" : (excessPaid > 0 ? "OVERPAYMENT" : "FULL_PAYMENT"),
+        dueNoteText || (due > 0 ? "Initial partial payment approved" : (excessPaid > 0 ? `Overpayment: ${money(excessPaid)} change to return to student` : "Payment verified in full")),
         u.email,
         at,
         at,
@@ -1135,7 +1148,9 @@ export async function decidePayment(
   const historyNote =
     action === "approve" && due > 0
       ? `Payment review: VERIFIED (Partial). Received: ${money(paid)}, Due Balance: ${money(due)}.${dueNoteText ? ` Note: ${dueNoteText}` : ""}`
-      : `Payment review: ${payment}. ${note}`;
+      : action === "approve" && excessPaid > 0
+        ? `Payment review: VERIFIED. Received: ${money(paid)} (Bill: ${money(o.total)}). Change to return to student: ${money(refundDue)}.${dueNoteText ? ` Note: ${dueNoteText}` : ""}`
+        : `Payment review: ${payment}. ${note}`;
 
   statements.push(
     stmt(
@@ -1166,6 +1181,8 @@ export async function decidePayment(
         amount_paid: paid,
         due_amount: due,
         due_status: dueStatus,
+        refund_due: refundDue,
+        refund_status: refundStatus,
       },
       req,
     ),
@@ -1177,6 +1194,8 @@ export async function decidePayment(
     amount_paid: paid,
     due_amount: due,
     due_status: dueStatus,
+    refund_due: refundDue,
+    refund_status: refundStatus,
   };
 }
 
@@ -1207,6 +1226,11 @@ export async function recordDuePayment(
   const newAmountPaid = currentPaid + cleanAmount;
   const newDueAmount = Math.max(0, Number(o.total || 0) - newAmountPaid);
   const newDueStatus = newDueAmount === 0 ? "PAID" : "DUE_PENDING";
+
+  const excess = Math.max(0, newAmountPaid - Number(o.total || 0));
+  const existingRefundPaid = Number(o.refund_amount || 0);
+  const newRefundDue = Math.max(0, excess - existingRefundPaid);
+  const newRefundStatus = excess > 0 ? (newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
   const cleanNote = (note || "").trim();
 
   const statements = [
@@ -1216,10 +1240,12 @@ export async function recordDuePayment(
       o.version,
     ),
     stmt(
-      "UPDATE orders SET amount_paid=?, due_amount=?, due_status=?, version=version+1, updated_at=? WHERE id=?",
+      "UPDATE orders SET amount_paid=?, due_amount=?, due_status=?, refund_due=?, refund_status=?, version=version+1, updated_at=? WHERE id=?",
       newAmountPaid,
       newDueAmount,
       newDueStatus,
+      newRefundDue,
+      newRefundStatus,
       at,
       o.id,
     ),

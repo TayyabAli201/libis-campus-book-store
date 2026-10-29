@@ -2320,16 +2320,16 @@ export function printOrderReceiptSlip(order: any) {
         return `
         <tr style="${isUnav ? "background: #fef2f2; color: #991b1b;" : ""}">
           <td>
-            <strong style="${isUnav ? "text-decoration: line-through; color: #991b1b;" : ""}">
+            <strong style="${isUnav ? "text-decoration: line-through 2px #dc2626; color: #991b1b;" : ""}">
               ${escapeHtml(formatReceiptBookTitle(b.code, b.title))}
             </strong>
-            ${isUnav ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 700; background: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">❌ NOT AVAILABLE (REFUNDED)</span>` : b.in_office_stock ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 600; background: #f0fdf4; color: #166534; border: 1px solid #86efac; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">📦 In Stock (Office Shelf)</span>` : ""}
+            ${isUnav ? `<span style="display: inline-block; font-size: 0.7rem; font-weight: 700; background: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; border-radius: 3px; padding: 2px 6px; margin-top: 3px;">❌ OUT OF STOCK — REFUND TO STUDENT</span>` : b.in_office_stock ? `<span style="display: inline-block; font-size: 0.68rem; font-weight: 600; background: #f0fdf4; color: #166534; border: 1px solid #86efac; border-radius: 3px; padding: 1px 5px; margin-top: 2px;">📦 In Stock (Office Shelf)</span>` : ""}
           </td>
-          <td style="${isUnav ? "text-decoration: line-through;" : ""}">${b.quantity}</td>
-          <td style="${isUnav ? "text-decoration: line-through;" : ""}">${escapeHtml(money(b.unit_price, order.currency))}</td>
+          <td style="${isUnav ? "text-decoration: line-through 1.5px #dc2626; color: #991b1b;" : ""}">${b.quantity}</td>
+          <td style="${isUnav ? "text-decoration: line-through 1.5px #dc2626; color: #991b1b;" : ""}">${escapeHtml(money(b.unit_price, order.currency))}</td>
           <td>
             ${isUnav 
-              ? `<span style="text-decoration: line-through; color: #991b1b; display: block; font-size: 0.78rem;">${escapeHtml(money(b.unit_price * b.quantity, order.currency))}</span><strong style="color: #b91c1c; font-size: 0.85rem;">Rs. 0 (Refunded)</strong>` 
+              ? `<span style="text-decoration: line-through 1.5px #dc2626; color: #991b1b; display: block; font-size: 0.78rem;">${escapeHtml(money(b.unit_price * b.quantity, order.currency))}</span><strong style="color: #dc2626; font-size: 0.85rem; font-weight: 700;">Refund Due: ${escapeHtml(money(b.unit_price * b.quantity, order.currency))}</strong>` 
               : escapeHtml(money(b.unit_price * b.quantity, order.currency))}
           </td>
         </tr>
@@ -2671,7 +2671,7 @@ export function printOrderReceiptSlip(order: any) {
             <dd style="font-size: 0.88rem; color: #16a34a; font-weight: 600;">${escapeHtml(money(order.amount_paid || 0, order.currency))}</dd>
           </div>
           <div style="background: #fee2e2; border: 1.5px solid #dc2626; padding: 6px 10px; border-radius: 4px; margin-top: 6px;">
-            <dt style="color: #991b1b; font-weight: 800; font-size: 0.92rem;">⚠️ CASH REFUND TO STUDENT</dt>
+            <dt style="color: #991b1b; font-weight: 800; font-size: 0.92rem;">💸 CASH REFUND / CHANGE TO STUDENT</dt>
             <dd style="color: #991b1b; font-weight: 900; font-size: 1.15rem;">${escapeHtml(money(order.refund_due, order.currency))}</dd>
           </div>
         ` : ""}
@@ -2902,23 +2902,25 @@ export function OrderReceipt({ o }: { o: any }) {
             return (
               <tr key={b.id || b.code} style={isUnav ? { background: "#fef2f2" } : undefined}>
                 <td>
-                  <strong style={isUnav ? { textDecoration: "line-through", color: "#991b1b" } : undefined}>
+                  <strong style={isUnav ? { textDecoration: "line-through 2px #dc2626", color: "#991b1b" } : undefined}>
                     {formatReceiptBookTitle(b.code, b.title)}
                   </strong>
                   {isUnav ? (
                     <span
                       className="mono-pill"
                       style={{
-                        fontSize: "0.68rem",
+                        fontSize: "0.7rem",
                         fontWeight: 700,
                         background: "#fee2e2",
                         color: "#b91c1c",
                         border: "1px solid #ef4444",
-                        marginTop: 2,
+                        marginTop: 3,
                         display: "inline-block",
+                        borderRadius: 3,
+                        padding: "2px 6px",
                       }}
                     >
-                      ❌ NOT AVAILABLE (REFUNDED)
+                      ❌ OUT OF STOCK — REFUND TO STUDENT
                     </span>
                   ) : b.in_office_stock ? (
                     <span
@@ -2937,15 +2939,17 @@ export function OrderReceipt({ o }: { o: any }) {
                     </span>
                   ) : null}
                 </td>
-                <td style={isUnav ? { textDecoration: "line-through" } : undefined}>{b.quantity}</td>
-                <td style={isUnav ? { textDecoration: "line-through" } : undefined}>{money(b.unit_price, o.currency)}</td>
+                <td style={isUnav ? { textDecoration: "line-through 1.5px #dc2626", color: "#991b1b" } : undefined}>{b.quantity}</td>
+                <td style={isUnav ? { textDecoration: "line-through 1.5px #dc2626", color: "#991b1b" } : undefined}>{money(b.unit_price, o.currency)}</td>
                 <td>
                   {isUnav ? (
                     <div>
-                      <span style={{ textDecoration: "line-through", color: "#991b1b", fontSize: "0.78rem", display: "block" }}>
+                      <span style={{ textDecoration: "line-through 1.5px #dc2626", color: "#991b1b", fontSize: "0.78rem", display: "block" }}>
                         {money(b.unit_price * b.quantity, o.currency)}
                       </span>
-                      <strong style={{ color: "#b91c1c" }}>Rs. 0 (Refunded)</strong>
+                      <strong style={{ color: "#dc2626", fontSize: "0.85rem", fontWeight: 700 }}>
+                        Refund Due: {money(b.unit_price * b.quantity, o.currency)}
+                      </strong>
                     </div>
                   ) : (
                     money(b.unit_price * b.quantity, o.currency)
@@ -2971,10 +2975,32 @@ export function OrderReceipt({ o }: { o: any }) {
             <dd>{money(o.total, o.currency)}</dd>
           </div>
           {Number(o.refund_due || 0) > 0 && (
-            <div style={{ background: "#fee2e2", border: "1.5px solid #dc2626", padding: "6px 10px", borderRadius: 4, marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <dt style={{ color: "#991b1b", fontWeight: 800, fontSize: "0.92rem" }}>⚠️ CASH REFUND TO STUDENT</dt>
-              <dd style={{ color: "#991b1b", fontWeight: 900, fontSize: "1.15rem" }}>{money(o.refund_due, o.currency)}</dd>
-            </div>
+            <>
+              {Number(o.amount_paid || 0) > 0 && (
+                <div style={{ borderTop: "1px dashed #d1d5db", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between" }}>
+                  <dt style={{ fontSize: "0.88rem", color: "#4b5563" }}>Advance Paid</dt>
+                  <dd style={{ fontSize: "0.88rem", color: "#16a34a", fontWeight: 600 }}>{money(o.amount_paid || 0, o.currency)}</dd>
+                </div>
+              )}
+              <div style={{ background: "#fee2e2", border: "1.5px solid #dc2626", padding: "6px 10px", borderRadius: 4, marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <dt style={{ color: "#991b1b", fontWeight: 800, fontSize: "0.92rem" }}>💸 CASH REFUND / CHANGE TO STUDENT</dt>
+                <dd style={{ color: "#991b1b", fontWeight: 900, fontSize: "1.15rem" }}>{money(o.refund_due, o.currency)}</dd>
+              </div>
+            </>
+          )}
+          {Number(o.due_amount || 0) > 0 && (
+            <>
+              {Number(o.amount_paid || 0) > 0 && !Number(o.refund_due || 0) && (
+                <div style={{ borderTop: "1px dashed #d1d5db", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between" }}>
+                  <dt style={{ fontSize: "0.88rem", color: "#4b5563" }}>Advance Paid</dt>
+                  <dd style={{ fontSize: "0.88rem", color: "#16a34a", fontWeight: 600 }}>{money(o.amount_paid || 0, o.currency)}</dd>
+                </div>
+              )}
+              <div style={{ background: "#fffbeb", border: "1px solid #f59e0b", padding: "4px 8px", borderRadius: 4, marginTop: 4, display: "flex", justifyContent: "space-between" }}>
+                <dt style={{ color: "#b45309", fontWeight: 700 }}>Balance Due on Delivery</dt>
+                <dd style={{ color: "#b45309", fontWeight: 800, fontSize: "1rem" }}>{money(o.due_amount, o.currency)}</dd>
+              </div>
+            </>
           )}
         </dl>
       </div>

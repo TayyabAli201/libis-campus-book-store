@@ -226,26 +226,50 @@ export async function receipt(o: any) {
   ensure(95);
   tableHeader();
   for (const item of o.items) {
+    const isUnav = Boolean(item.is_unavailable);
     const displayName = formatReceiptBookTitle(item.code, item.title);
     const titleLines = wrap(displayName, 248, 10, bold);
     const rowHeight = Math.max(
       38,
-      titleLines.length * 14 + 20,
+      titleLines.length * 14 + (isUnav ? 22 : 20),
     );
     if (y - rowHeight < 107) {
       nextPage();
       tableHeader();
     }
     const top = y - 12;
-    lines(titleLines, margin + 10, top, 10, true);
-    right(item.quantity, 352, top, 9);
-    right(money(item.unit_price, o.currency), 446, top, 9);
-    const amount = money(item.quantity * item.unit_price, o.currency);
-    const amountSize = Math.min(
-      9,
-      84 / bold.widthOfTextAtSize(clean(amount), 1),
-    );
-    right(amount, width - margin - 10, top, amountSize, true);
+    if (isUnav) {
+      page.drawRectangle({
+        x: margin,
+        y: y - rowHeight + 3,
+        width: content,
+        height: rowHeight - 3,
+        color: rgb(0.99, 0.95, 0.95),
+      });
+      lines(titleLines, margin + 10, top, 10, true, rgb(0.65, 0.1, 0.1));
+      const firstLineWidth = Math.min(240, bold.widthOfTextAtSize(clean(titleLines[0] || displayName), 10));
+      page.drawLine({
+        start: { x: margin + 10, y: top + 4 },
+        end: { x: margin + 10 + firstLineWidth, y: top + 4 },
+        color: rgb(0.86, 0.15, 0.15),
+        thickness: 1.5,
+      });
+      text("[OUT OF STOCK - REFUNDED]", margin + 10, top - titleLines.length * 13, 7.5, true, rgb(0.86, 0.15, 0.15));
+      right(item.quantity, 352, top, 9, false, rgb(0.65, 0.1, 0.1));
+      right(money(item.unit_price, o.currency), 446, top, 9, false, rgb(0.65, 0.1, 0.1));
+      const amount = money(item.quantity * item.unit_price, o.currency);
+      right("Refund: " + amount, width - margin - 10, top, 8.5, true, rgb(0.86, 0.15, 0.15));
+    } else {
+      lines(titleLines, margin + 10, top, 10, true);
+      right(item.quantity, 352, top, 9);
+      right(money(item.unit_price, o.currency), 446, top, 9);
+      const amount = money(item.quantity * item.unit_price, o.currency);
+      const amountSize = Math.min(
+        9,
+        84 / bold.widthOfTextAtSize(clean(amount), 1),
+      );
+      right(amount, width - margin - 10, top, amountSize, true);
+    }
     y -= rowHeight;
     separator(y);
   }
@@ -279,7 +303,26 @@ export async function receipt(o: any) {
   y -= summaryHeight;
 
   const hasDue = Number(o.due_amount || 0) > 0;
-  if (hasDue) {
+  const hasRefund = Number(o.refund_due || 0) > 0;
+  if (hasRefund) {
+    ensure(55);
+    page.drawRectangle({
+      x: 323,
+      y: y - 48,
+      width: width - margin - 323,
+      height: 44,
+      color: rgb(0.99, 0.95, 0.95),
+      borderColor: rgb(0.9, 0.2, 0.2),
+      borderWidth: 1.5,
+    });
+    if (Number(o.amount_paid || 0) > 0) {
+      text("ADVANCE PAID:", 335, y - 18, 7.5, false, muted);
+      right(money(o.amount_paid || 0, o.currency), width - margin - 10, y - 18, 8.5, true, rgb(0.05, 0.6, 0.2));
+    }
+    text("REFUND / CHANGE TO STUDENT:", 335, y - 38, 7.5, true, rgb(0.86, 0.15, 0.15));
+    right(money(o.refund_due, o.currency), width - margin - 10, y - 38, 11, true, rgb(0.86, 0.15, 0.15));
+    y -= 56;
+  } else if (hasDue) {
     ensure(55);
     page.drawRectangle({
       x: 323,
