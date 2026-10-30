@@ -3936,6 +3936,19 @@ function OrderTracking({ data }: { data: Catalog }) {
                     <strong className="courier-code-inline">{o.courier_tracking_id}</strong> on{" "}
                     <strong>{o.courier_name}</strong> to track your shipment.
                   </p>
+                  {(() => {
+                    const t = String(o.courier_tracking_id || "").trim().toUpperCase();
+                    const name = String(o.courier_name || "").toLowerCase();
+                    const isPakPost = t.startsWith("UMS") || t.startsWith("EP") || t.startsWith("RP") || name.includes("post");
+                    if (isPakPost) {
+                      return (
+                        <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#047857", fontWeight: 600 }}>
+                          ⏱️ Estimated delivery time: 2–4 business days nationwide via Pakistan Post UMS Express.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
             </div>

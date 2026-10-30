@@ -56,10 +56,12 @@ import {
   Tag,
   QrCode,
   Layers,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import { ShippingLabelModal } from "./shipping-label";
 import { BatchPrintManifestModal } from "./batch-print-manifest";
+import { PakPostManifestModal } from "./pak-post-manifest";
 import {
   SidebarProvider,
   Sidebar,
@@ -2251,11 +2253,24 @@ function CourierTrackingModal({
             <input
               type="text"
               className="input full-width"
-              placeholder="e.g. 7849302194"
+              placeholder="e.g. UMS54231890PK or 7849302194"
               value={trackingId}
-              onChange={(e) => setTrackingId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTrackingId(val);
+                const upper = val.trim().toUpperCase();
+                if ((upper.startsWith("UMS") || upper.startsWith("EP") || upper.startsWith("RP")) && (!courierName || courierName === "Courier")) {
+                  setCourierName("Pakistan Post");
+                }
+              }}
               required
             />
+            {trackingId.trim() && (trackingId.toUpperCase().startsWith("UMS") || trackingId.toUpperCase().startsWith("EP") || trackingId.toUpperCase().startsWith("RP") || courierName.toLowerCase().includes("post")) && (
+              <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: "0.76rem", color: "#047857", background: "rgba(16, 185, 129, 0.1)", padding: "4px 8px", borderRadius: 6 }}>
+                <span>🇵🇰</span>
+                <span><strong>Pakistan Post UMS/Express:</strong> Student tracking button will automatically link to ep.gov.pk</span>
+              </div>
+            )}
             <p className="small-text muted" style={{ margin: "5px 0 0", fontSize: "0.78rem" }}>
               Student will see this in their order journey as:
               <br />
@@ -2365,7 +2380,35 @@ function CourierTrackingModal({
                 </button>
               )}
             </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              {order.phone && trackingId.trim() && (
+                <a
+                  href={`https://wa.me/${formatWhatsAppPhone(order.phone)}?text=${encodeURIComponent(
+                    `Salam ${order.name || "Student"}, your order #${order.reference} has been dispatched via ${courierName || "courier"}. Tracking Number: ${trackingId.trim()}.${
+                      (courierName && courierName.toLowerCase().includes("post")) || trackingId.toUpperCase().startsWith("UMS")
+                        ? " Track online at: https://ep.gov.pk/"
+                        : ""
+                    }`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn compact"
+                  style={{
+                    background: "#25D366",
+                    borderColor: "#25D366",
+                    color: "#fff",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
+                    textDecoration: "none",
+                  }}
+                  title="Send tracking details to student on WhatsApp"
+                >
+                  <MessageCircle size={14} /> WhatsApp Student
+                </a>
+              )}
               <button
                 type="button"
                 className="btn compact"
@@ -3892,7 +3935,7 @@ function AdminOrderBooksPanel({
                         }}
                         title={`${handedCount} of ${activeTotalCount} books handed over to student`}
                       >
-                        🚚 ${handedCount}/${activeTotalCount} Handed Over to Student
+                        🚚 {handedCount}/{activeTotalCount} Handed Over to Student
                       </span>
                     )}
 
@@ -3907,7 +3950,7 @@ function AdminOrderBooksPanel({
                           border: "1px solid #86efac",
                         }}
                       >
-                        ✅ All ${activeTotalCount} Handed Over
+                        ✅ All {activeTotalCount} Handed Over
                       </span>
                     )}
                   </>
@@ -3966,7 +4009,7 @@ function AdminOrderBooksPanel({
                   onClick={handleHandoverAvailable}
                   title={`Hand over ${availableUnhanded.length} available book(s) to student at campus counter`}
                 >
-                  🤝 Hand Over Available Books (${availableUnhanded.length})
+                  🤝 Hand Over Available Books ({availableUnhanded.length})
                 </button>
               )}
               {canUpdate && totalBooks > 1 && (
@@ -7398,7 +7441,8 @@ function Orders({
     [dispatchingOffice, setDispatchingOffice] = useState(false),
     [removingQueueOrder, setRemovingQueueOrder] = useState<any | null>(null),
     [selectedIds, setSelectedIds] = useState<string[]>([]),
-    [labelModalOrders, setLabelModalOrders] = useState<any[] | null>(null);
+    [labelModalOrders, setLabelModalOrders] = useState<any[] | null>(null),
+    [gpoManifestOrders, setGpoManifestOrders] = useState<any[] | null>(null);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -8342,6 +8386,40 @@ function Orders({
                 </button>
               );
             })}
+
+        {deliveryTypeList.includes("other") && (
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => {
+              const courierOrders = (data?.rows || []).filter(isOtherCityOrder);
+              if (courierOrders.length === 0) {
+                toast.info("No Other City courier orders found in current view.");
+                return;
+              }
+              setGpoManifestOrders(courierOrders);
+            }}
+            style={{
+              marginLeft: "auto",
+              background: "#059669",
+              borderColor: "#059669",
+              color: "#ffffff",
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              borderRadius: 8,
+              padding: "5px 12px",
+              boxShadow: "0 2px 4px rgba(5, 150, 105, 0.2)",
+              cursor: "pointer",
+            }}
+            title="Generate and print Pakistan Post GPO Daily Booking Manifest for Other City parcels"
+          >
+            <FileText size={14} />
+            <span>📋 Print GPO Booking Sheet</span>
+          </button>
+        )}
         {isPaymentConfirmedTab && deliveryTypeList.length === 0 && (
           <span
             style={{
@@ -8424,6 +8502,59 @@ function Orders({
             <span>{exporting ? "Exporting…" : "Export Orders"}</span>
           </button>
         )}
+        {deliveryTypeList.includes("other") && (
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => {
+              const courierOrders = (data?.rows || []).filter(isOtherCityOrder);
+              if (courierOrders.length === 0) {
+                toast.info("No Other City courier orders found.");
+                return;
+              }
+              setGpoManifestOrders(courierOrders);
+            }}
+            disabled={loading || !(data?.rows && data.rows.length > 0)}
+            title="Print Pakistan Post GPO Daily Booking Manifest Sheet for Other City courier parcels"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.82rem", fontWeight: 600, color: "#059669" }}
+          >
+            <FileText size={13} style={{ color: "#059669" }} />
+            <span>GPO Booking Sheet</span>
+          </button>
+        )}
+        {activeTab === "SHIPPED" && (() => {
+          const shippedOrders = (data?.rows || []).filter((o: any) => o.status === "SHIPPED");
+          const count = shippedOrders.length;
+          return (
+            <button
+              type="button"
+              className="btn compact"
+              onClick={() => {
+                if (count === 0) {
+                  toast.info("No shipped orders available to print labels.");
+                  return;
+                }
+                setLabelModalOrders(shippedOrders);
+              }}
+              disabled={loading || count === 0}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                background: "#7c3aed",
+                borderColor: "#7c3aed",
+                color: "#ffffff",
+                boxShadow: "0 2px 4px rgba(124, 58, 237, 0.25)",
+              }}
+              title="1-Click: Print compact A4/thermal shipping labels for all shipped orders"
+            >
+              <Tag size={14} />
+              <span>Print All Shipped Labels ({count})</span>
+            </button>
+          );
+        })()}
         {isAdmin && !isVendor && activeTab === "CONFIRMED" && (() => {
           const sendToVendorCount =
             verifiedUnassignedOrders.length > 0
@@ -8675,6 +8806,26 @@ function Orders({
               >
                 <Tag size={13} /> Print Shipping Labels ({selectedRows.length})
               </button>
+
+              {selectedRows.some(isOtherCityOrder) && (
+                <button
+                  type="button"
+                  className="btn compact"
+                  onClick={() => setGpoManifestOrders(selectedRows.filter(isOtherCityOrder))}
+                  style={{
+                    background: "#059669",
+                    borderColor: "#059669",
+                    color: "#fff",
+                    fontWeight: 600,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                  title={`Print Pakistan Post GPO Daily Booking Manifest for ${selectedRows.filter(isOtherCityOrder).length} Other City courier order(s)`}
+                >
+                  <FileText size={13} /> GPO Booking Sheet ({selectedRows.filter(isOtherCityOrder).length})
+                </button>
+              )}
 
               <button
                 type="button"
@@ -9524,7 +9675,7 @@ function Orders({
                           }}
                           title={`${studentHanded} of ${activeBks} books handed over to student`}
                         >
-                          🚚 ${studentHanded}/${activeBks} Books Handed Over
+                          🚚 {studentHanded}/{activeBks} Books Handed Over
                         </span>
                       </div>
                     );
@@ -10008,6 +10159,13 @@ function Orders({
           onClose={() => setLabelModalOrders(null)}
         />
       )}
+
+      {gpoManifestOrders && (
+        <PakPostManifestModal
+          orders={gpoManifestOrders}
+          onClose={() => setGpoManifestOrders(null)}
+        />
+      )}
     </>
   );
 }
@@ -10456,7 +10614,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Shipping Documents</strong>
                       <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or parcel shipping label</p>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <button
                         type="button"
                         className="btn"
@@ -10467,6 +10625,28 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                         <Tag size={14} /> Shipping Label
                       </button>
                       <ReceiptButtons order={o} />
+                      {o.phone && (
+                        <a
+                          href={getWhatsAppUrl(o)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn compact"
+                          style={{
+                            background: "#25D366",
+                            borderColor: "#25D366",
+                            color: "#ffffff",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: "0.85rem",
+                            fontWeight: 700,
+                            textDecoration: "none",
+                          }}
+                          title="Open WhatsApp chat with pre-drafted order status message"
+                        >
+                          <MessageCircle size={14} /> WhatsApp Student
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -12838,6 +13018,7 @@ function VendorLedgerModal({
 function VendorDashboard({ user, base }: { user: User; base: string }) {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showBatchManifest, setShowBatchManifest] = useState(false);
+  const [vendorGpoOrders, setVendorGpoOrders] = useState<any[] | null>(null);
   const { data: ledger, error: ledgerError, loading: ledgerLoading, reload: reloadLedger } =
     useData<VendorLedger>("manage/vendor-ledger");
   const { data: ordersData, error: ordersError, loading: ordersLoading, reload: reloadOrders } =
@@ -13264,6 +13445,41 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           >
             <Layers size={16} /> Batch Print Manifest (Job Sheet)
           </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/manage/orders?delivery_type=other&pageSize=100");
+                if (res.ok) {
+                  const d = (await res.json()) as any;
+                  const courierOrders = (d?.rows || []).filter(isOtherCityOrder);
+                  if (courierOrders.length === 0) {
+                    toast.info("No Other City courier orders assigned to you.");
+                    return;
+                  }
+                  setVendorGpoOrders(courierOrders);
+                } else {
+                  toast.error("Failed to load courier orders.");
+                }
+              } catch {
+                toast.error("Failed to load courier orders.");
+              }
+            }}
+            className="btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 18px",
+              background: "#059669",
+              borderColor: "#059669",
+              color: "#fff",
+              fontWeight: 600,
+            }}
+            title="Generate and print Pakistan Post GPO Daily Booking Manifest for assigned Other City parcels"
+          >
+            <FileText size={16} /> GPO Booking Sheet
+          </button>
           <a
             href="/vendor/ledger"
             className="btn"
@@ -13530,6 +13746,12 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           vendorId={user.vendor_id || user.id}
           vendorName={user.name || "Vendor"}
           onClose={() => setShowBatchManifest(false)}
+        />
+      )}
+      {vendorGpoOrders && (
+        <PakPostManifestModal
+          orders={vendorGpoOrders}
+          onClose={() => setVendorGpoOrders(null)}
         />
       )}
     </div>

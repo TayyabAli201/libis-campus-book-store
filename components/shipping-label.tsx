@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Printer, X, Copy, Check, Tag } from "lucide-react";
+import { Printer, X, Tag } from "lucide-react";
 
 interface ShippingLabelProps {
   orders: any[];
@@ -11,10 +11,9 @@ interface ShippingLabelProps {
 }
 
 export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelProps) {
-  const [format, setFormat] = useState<"thermal" | "a4">("thermal");
+  const [format, setFormat] = useState<"a4" | "thermal">("a4");
   const [loadedSettings, setLoadedSettings] = useState<any>(settings || null);
   const [mounted, setMounted] = useState(false);
-  const barcodeRefs = useRef<Record<string, SVGSVGElement | null>>({});
 
   useEffect(() => {
     setMounted(true);
@@ -40,40 +39,6 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
   const dispatchAddress = activeSettings?.distribution_center_address || "Qanchi, Lahore";
   const storePhone = activeSettings?.whatsapp || "03034049973";
 
-  useEffect(() => {
-    let active = true;
-    import("jsbarcode")
-      .then((mod) => {
-        const JsBarcode = mod.default || mod;
-        if (!active) return;
-        orders.forEach((o) => {
-          const ref = o.reference || o.id;
-          const el = barcodeRefs.current[ref];
-          if (el && ref) {
-            try {
-              JsBarcode(el, ref, {
-                format: "CODE128",
-                width: 1.6,
-                height: 38,
-                displayValue: true,
-                fontSize: 12,
-                font: "monospace",
-                margin: 2,
-                lineColor: "#000000",
-              });
-            } catch {
-              // Fallback if barcode fails
-            }
-          }
-        });
-      })
-      .catch(() => {});
-
-    return () => {
-      active = false;
-    };
-  }, [orders, format]);
-
   const handlePrint = () => {
     window.print();
   };
@@ -81,33 +46,24 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
   if (!mounted || !orders || orders.length === 0) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-start overflow-y-auto p-4 md:p-6 no-print-backdrop shipping-label-modal-portal">
+    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-start overflow-y-auto p-3 md:p-6 no-print-backdrop shipping-label-modal-portal">
       {/* Control Bar (hidden during actual paper print) */}
-      <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3 text-white shadow-xl no-print">
+      <div className="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-xl p-3 md:p-4 mb-4 flex flex-wrap items-center justify-between gap-3 text-white shadow-xl no-print">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
             <Tag size={20} />
           </div>
           <div>
-            <h3 className="font-bold text-sm">Print Parcel Shipping Labels</h3>
+            <h3 className="font-bold text-sm md:text-base">Print Parcel Shipping Labels</h3>
             <p className="text-xs text-slate-400">
-              {orders.length} order{orders.length > 1 ? "s" : ""} selected • Details dynamically synced from Store Settings
+              {orders.length} parcel{orders.length > 1 ? "s" : ""} • Clean compact layout (No barcode) • Multiple labels per A4 sheet
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Format Toggle */}
           <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-            <button
-              type="button"
-              onClick={() => setFormat("thermal")}
-              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
-                format === "thermal" ? "bg-purple-600 text-white shadow" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              4x6" Thermal (100x150mm)
-            </button>
             <button
               type="button"
               onClick={() => setFormat("a4")}
@@ -115,7 +71,16 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
                 format === "a4" ? "bg-purple-600 text-white shadow" : "text-slate-400 hover:text-white"
               }`}
             >
-              A4 Sheet (4 per page)
+              A4 Sheet (6-8 per page)
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormat("thermal")}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                format === "thermal" ? "bg-purple-600 text-white shadow" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              4x6" Thermal Sticker
             </button>
           </div>
 
@@ -125,7 +90,7 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow transition-all cursor-pointer"
           >
             <Printer size={16} />
-            <span>Print {orders.length > 1 ? `All (${orders.length})` : "Label"}</span>
+            <span>Print All ({orders.length})</span>
           </button>
 
           {onClose && (
@@ -142,119 +107,128 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
       </div>
 
       {/* Printable Area */}
-      <div className={`shipping-label-printable-area ${format === "a4" ? "grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl w-full" : "flex flex-col gap-6 items-center"}`}>
+      <div
+        className={`shipping-label-printable-area ${
+          format === "a4"
+            ? "grid grid-cols-1 md:grid-cols-2 gap-3 max-w-5xl w-full"
+            : "flex flex-col gap-5 items-center"
+        }`}
+      >
         {orders.map((o) => {
           const activeItems = (o.items || []).filter((i: any) => !i.is_unavailable);
-          const totalPages = activeItems.reduce((acc: number, it: any) => acc + (Number(it.pages || 0) * Number(it.quantity || 1)), 0);
-          const estWeight = Math.round(totalPages * 2.3 + 50);
-          const trackingNo = o.courier_tracking_id || "";
-          const isPakPost = trackingNo.toUpperCase().startsWith("UMS") || trackingNo.toUpperCase().startsWith("EP") || trackingNo.toUpperCase().startsWith("RP");
+          const totalBooks = activeItems.reduce((acc: number, it: any) => acc + Number(it.quantity || 1), 0);
+          const trackingNo = (o.courier_tracking_id || "").trim();
+          const isPakPost =
+            trackingNo.toUpperCase().startsWith("UMS") ||
+            trackingNo.toUpperCase().startsWith("EP") ||
+            trackingNo.toUpperCase().startsWith("RP") ||
+            (o.courier_name && o.courier_name.toLowerCase().includes("post"));
 
           return (
             <div
               key={o.id}
-              className="shipping-label-card bg-white text-black p-4 border-2 border-black rounded shadow-lg select-none font-mono"
+              className="shipping-label-card bg-white text-black p-3 border-2 border-black rounded select-none font-sans"
               style={{
                 width: format === "thermal" ? "380px" : "100%",
-                minHeight: format === "thermal" ? "560px" : "480px",
-                pageBreakAfter: format === "thermal" ? "always" : "auto",
                 boxSizing: "border-box",
                 background: "#ffffff",
                 color: "#000000",
+                pageBreakInside: "avoid",
+                breakInside: "avoid",
               }}
             >
-              {/* Header */}
-              <div className="flex justify-between items-center border-b-2 border-black pb-2">
+              {/* Header: Sender & Courier Type */}
+              <div className="flex justify-between items-start border-b-2 border-black pb-1.5 mb-1.5">
                 <div>
-                  <div className="text-base font-extrabold tracking-tight leading-none">{storeName}</div>
-                  <div className="text-[10px] text-gray-700 mt-1">From: {dispatchAddress} • Ph: {storePhone}</div>
+                  <div className="text-xs font-bold uppercase text-gray-700">FROM (SENDER):</div>
+                  <div className="text-sm font-black tracking-tight leading-tight">{storeName}</div>
+                  <div className="text-[10px] text-gray-800 font-medium">
+                    Origin: {dispatchAddress} • Helpline: {storePhone}
+                  </div>
                 </div>
                 <div className="text-right">
-                  <span className="border-2 border-black px-1.5 py-0.5 font-black text-[11px] uppercase">
-                    {isPakPost ? "PAK POST" : o.delivery_type === "campus" ? "CAMPUS" : "PARCEL"}
+                  <span className="border-2 border-black px-1.5 py-0.5 font-black text-[10px] uppercase bg-black text-white">
+                    {isPakPost ? "PAK POST" : o.delivery_type === "campus" ? "CAMPUS" : "COURIER"}
                   </span>
-                  <div className="text-[9px] font-bold mt-0.5 uppercase">
-                    {isPakPost ? "UMS EXPRESS" : o.delivery_type === "campus" ? (o.campus_name || "BOOTH PICKUP") : "COURIER"}
+                  <div className="text-[9px] font-bold mt-0.5 uppercase text-gray-800">
+                    {isPakPost ? "UMS EXPRESS" : o.delivery_type === "campus" ? (o.campus_name || "BOOTH PICKUP") : "PARCEL"}
                   </div>
                 </div>
               </div>
 
-              {/* Courier Tracking Box (if assigned) */}
-              {trackingNo ? (
-                <div className="my-2 py-1.5 px-2 bg-gray-100 border border-black text-center rounded">
-                  <div className="text-[9px] font-bold text-gray-700 uppercase">
-                    {isPakPost ? "Pakistan Post Article Number" : "Courier Consignment No"}:
-                  </div>
-                  <div className="text-sm font-black tracking-widest text-black mt-0.5">{trackingNo}</div>
+              {/* Consignee (Student Delivery Details) */}
+              <div className="border-b-2 border-black pb-1.5 mb-1.5 space-y-0.5">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-700">DELIVER TO:</span>
+                  <span className="text-xs font-black uppercase text-black bg-gray-100 px-1 rounded border border-gray-400">
+                    CITY: {String(o.city || "OTHER CITY").toUpperCase()}
+                  </span>
                 </div>
-              ) : (
-                <div className="my-2 py-1 px-2 border border-dashed border-gray-400 text-center text-[10px] text-gray-500">
-                  [ GPO / Courier Booking Sticker Space ]
-                </div>
-              )}
-
-              {/* Consignee (Student) Details */}
-              <div className="border-b-2 border-black pb-2 mb-2 space-y-1">
-                <div className="text-[9px] font-bold uppercase text-gray-600">DELIVER TO (STUDENT):</div>
-                <div className="text-sm font-black leading-tight text-black">
+                <div className="text-base font-black leading-tight text-black">
                   {o.name || "Student"}
                 </div>
-                <div className="text-xs font-bold text-black">
+                <div className="text-xs font-bold text-black font-mono">
                   Phone: {o.phone || "—"} {o.alternate_phone ? `| Alt: ${o.alternate_phone}` : ""}
                 </div>
-                <div className="text-xs font-medium leading-tight text-gray-900 mt-1">
-                  {o.address || "No street address provided"}
-                </div>
-                <div className="flex justify-between items-center pt-1 font-extrabold text-xs">
-                  <span>CITY: {String(o.city || "—").toUpperCase()}</span>
-                  <span>DEST: {o.delivery_type === "campus" ? "CAMPUS PICKUP" : "HOME DELIVERY"}</span>
+                <div className="text-xs font-medium leading-tight text-gray-900 pt-0.5">
+                  <strong>Address:</strong> {o.address || "Address not provided"}
                 </div>
                 {o.instructions && (
-                  <div className="text-[10px] italic text-gray-700 bg-gray-50 p-1 border-t border-gray-200 mt-1">
+                  <div className="text-[9.5px] italic text-gray-800 bg-gray-100 p-1 border border-gray-300 rounded mt-0.5">
                     Note: {o.instructions}
                   </div>
                 )}
               </div>
 
-              {/* Order Reference Barcode */}
-              <div className="text-center border-b-2 border-black pb-2 mb-2">
-                <div className="text-[9px] font-bold text-gray-600">ORDER IDENTIFIER:</div>
-                <div className="flex justify-center my-0.5">
-                  <svg
-                    ref={(el) => {
-                      barcodeRefs.current[o.reference || o.id] = el;
-                    }}
-                    className="max-h-12 w-auto"
-                  ></svg>
+              {/* Order Reference & Date Box */}
+              <div className="flex justify-between items-center border-b-2 border-black pb-1 mb-1.5 text-xs font-mono">
+                <div>
+                  <span className="text-[9px] font-bold text-gray-600 block uppercase font-sans">ORDER REFERENCE:</span>
+                  <strong className="text-sm font-black text-black">{o.reference || o.id}</strong>
                 </div>
-                <div className="flex justify-between text-[10px] text-gray-700 font-bold px-1">
-                  <span>Date: {new Date(o.created_at || Date.now()).toLocaleDateString("en-GB")}</span>
-                  <span>Est. Weight: ~{estWeight}g</span>
+                <div className="text-right">
+                  <span className="text-[9px] font-bold text-gray-600 block uppercase font-sans">ORDER DATE:</span>
+                  <strong className="text-[11px] text-gray-900">
+                    {new Date(o.created_at || Date.now()).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </strong>
                 </div>
+                {trackingNo && (
+                  <div className="text-right pl-2 border-l border-gray-300">
+                    <span className="text-[8px] font-bold text-gray-600 block uppercase font-sans">TRACKING #:</span>
+                    <strong className="text-[10px] text-black font-mono bg-gray-100 px-1 py-0.5 rounded border border-gray-300">
+                      {trackingNo}
+                    </strong>
+                  </div>
+                )}
               </div>
 
               {/* Package Contents */}
-              <div className="border-b-2 border-black pb-2 mb-2">
-                <div className="text-[9px] font-bold text-gray-600 mb-1">PARCEL CONTENTS (SYLLABUS BOOKS):</div>
-                <div className="space-y-0.5 max-h-28 overflow-hidden text-[10px]">
-                  {activeItems.map((it: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-baseline font-bold leading-tight">
-                      <span className="truncate max-w-[280px]">
-                        {idx + 1}. {it.code || it.course_code} - {it.title}
-                      </span>
-                      <span className="whitespace-nowrap ml-2">Qty: {it.quantity}</span>
-                    </div>
-                  ))}
-                  {activeItems.length === 0 && <div className="text-gray-500 italic">No items</div>}
+              <div className="border-b border-black pb-1 mb-1">
+                <div className="flex justify-between items-baseline mb-0.5">
+                  <span className="text-[9px] font-bold text-gray-700 uppercase font-sans">
+                    CONTENTS (EDUCATIONAL TEXTBOOKS):
+                  </span>
+                  <span className="text-[9.5px] font-black text-black">
+                    Total: {totalBooks} {totalBooks === 1 ? "Book" : "Books"}
+                  </span>
                 </div>
-                <div className="text-[9px] text-gray-600 mt-1 font-bold">
-                  Total Books: {activeItems.reduce((sum: number, it: any) => sum + Number(it.quantity || 1), 0)} | Total Pages: {totalPages}
+                <div className="text-[9.5px] leading-tight text-gray-900 truncate max-w-[360px]" title={activeItems.map((it: any) => `${it.code || it.course_code} (x${it.quantity || 1})`).join(", ")}>
+                  {activeItems.map((it: any, idx: number) => (
+                    <span key={idx} className="font-semibold">
+                      {idx > 0 ? " • " : ""}{it.code || it.course_code || it.title} {Number(it.quantity || 1) > 1 ? `(x${it.quantity})` : ""}
+                    </span>
+                  ))}
+                  {activeItems.length === 0 && <span className="text-gray-500 italic">No items</span>}
                 </div>
               </div>
 
-              {/* Footer Stamp */}
-              <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider pt-0.5">
-                <span className="border border-black px-1.5 py-0.5">EDUCATIONAL MATERIAL</span>
+              {/* Footer Notice */}
+              <div className="flex justify-between items-center text-[8.5px] font-black uppercase tracking-wider text-gray-800 pt-0.5">
+                <span>EDUCATIONAL SYLLABUS MATERIAL</span>
                 <span>HANDLE WITH CARE / DO NOT BEND</span>
               </div>
             </div>
@@ -262,7 +236,7 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
         })}
       </div>
 
-      {/* Embedded Print CSS for exact 4x6" and A4 Output */}
+      {/* Embedded Print CSS for Multiple Labels per A4 Page */}
       <style>{`
         @media print {
           html, body {
@@ -273,7 +247,6 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
             width: 100% !important;
             height: auto !important;
           }
-          /* Hide background website */
           body.shipping-modal-open > *:not(.shipping-label-modal-portal) {
             display: none !important;
           }
@@ -296,20 +269,22 @@ export function ShippingLabelModal({ orders, settings, onClose }: ShippingLabelP
             overflow: visible !important;
           }
           .shipping-label-printable-area {
-            display: block !important;
+            display: grid !important;
+            grid-template-columns: ${format === "a4" ? "repeat(2, 1fr)" : "1fr"} !important;
+            gap: 6mm !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
           }
           .shipping-label-card {
             box-shadow: none !important;
-            margin: 0 auto 20px auto !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            margin: 0 !important;
           }
           @page {
-            size: auto;
-            margin: 4mm;
+            size: ${format === "a4" ? "A4 portrait" : "100mm 150mm"};
+            margin: 8mm 6mm;
           }
         }
       `}</style>

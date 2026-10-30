@@ -190,6 +190,20 @@ export function getOrderWhatsAppMessage(o: any): string {
       return `Salam ${studentName}, your books have reached us and will be delivered to you within 1 day.`;
     }
     // Other Cities Order
+    if (o?.courier_tracking_id) {
+      const tracking = String(o.courier_tracking_id).trim();
+      const isPakPost =
+        tracking.toUpperCase().startsWith("UMS") ||
+        tracking.toUpperCase().startsWith("EP") ||
+        tracking.toUpperCase().startsWith("RP") ||
+        (o.courier_name && String(o.courier_name).toLowerCase().includes("post"));
+      const courierName = o?.courier_name || (isPakPost ? "Pakistan Post (UMS)" : "courier");
+      let msg = `Salam ${studentName}, your order has been shipped via ${courierName}. Tracking #: ${tracking}.`;
+      if (isPakPost) {
+        msg += " Track online at: https://ep.gov.pk/";
+      }
+      return msg;
+    }
     return `Salam ${studentName}, your order has been shipped via courier.`;
   }
 
