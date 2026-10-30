@@ -2789,6 +2789,7 @@ export function ReceiptButtons({ order }: { order: any }) {
     </div>
   );
 }
+
 export function OrderReceipt({ o }: { o: any }) {
   const storeName = o.store?.store_name || "Campus Bookstore";
   const contact = [o.store?.support_email, o.store?.whatsapp]
@@ -2826,14 +2827,16 @@ export function OrderReceipt({ o }: { o: any }) {
           {o.tracking_only ? "ORDER SUMMARY" : "ORDER RECEIPT"}
         </span>
       </header>
-      <div className="receipt-meta">
-        <div>
-          <span className="receipt-label">Order ID</span>
-          <h2>{o.reference}</h2>
-        </div>
-        <div>
-          <span className="receipt-label">Issued on</span>
-          <p>{receiptDate(o.created_at)}</p>
+      <div className="receipt-meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <span className="receipt-label">Order ID</span>
+            <h2>{o.reference}</h2>
+          </div>
+          <div>
+            <span className="receipt-label">Issued on</span>
+            <p>{receiptDate(o.created_at)}</p>
+          </div>
         </div>
       </div>
       {!o.tracking_only && (
@@ -3409,8 +3412,35 @@ function OrderTracking({ data }: { data: Catalog }) {
                     <span className="courier-tracking-label">Tracking Number:</span>
                     <span className="courier-tracking-code">{o.courier_tracking_id}</span>
                   </div>
-                  <div className="courier-actions-wrap">
+                  <div className="courier-actions-wrap" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <CopyTrackingButton code={o.courier_tracking_id} />
+                    {(() => {
+                      const t = String(o.courier_tracking_id || "").trim().toUpperCase();
+                      const name = String(o.courier_name || "").toLowerCase();
+                      const isPakPost = t.startsWith("UMS") || t.startsWith("EP") || t.startsWith("RP") || name.includes("post");
+                      if (isPakPost) {
+                        return (
+                          <a
+                            href="https://ep.gov.pk/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn primary compact"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              textDecoration: "none",
+                              fontSize: "0.82rem",
+                              padding: "6px 12px",
+                              fontWeight: 700,
+                            }}
+                          >
+                            <span>Track on Pakistan Post ↗</span>
+                          </a>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
 

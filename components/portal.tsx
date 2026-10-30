@@ -53,8 +53,13 @@ import {
   Receipt,
   Banknote,
   ClipboardList,
+  Tag,
+  QrCode,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
+import { ShippingLabelModal } from "./shipping-label";
+import { BatchPrintManifestModal } from "./batch-print-manifest";
 import {
   SidebarProvider,
   Sidebar,
@@ -7392,7 +7397,8 @@ function Orders({
     [dispatchOfficeOrder, setDispatchOfficeOrder] = useState<any | null>(null),
     [dispatchingOffice, setDispatchingOffice] = useState(false),
     [removingQueueOrder, setRemovingQueueOrder] = useState<any | null>(null),
-    [selectedIds, setSelectedIds] = useState<string[]>([]);
+    [selectedIds, setSelectedIds] = useState<string[]>([]),
+    [labelModalOrders, setLabelModalOrders] = useState<any[] | null>(null);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -8655,6 +8661,24 @@ function Orders({
               <button
                 type="button"
                 className="btn compact"
+                onClick={() => setLabelModalOrders(selectedRows)}
+                style={{
+                  background: "#7c3aed",
+                  borderColor: "#7c3aed",
+                  color: "#fff",
+                  fontWeight: 600,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+                title={`Print shipping labels for selected ${selectedRows.length} order(s)`}
+              >
+                <Tag size={13} /> Print Shipping Labels ({selectedRows.length})
+              </button>
+
+              <button
+                type="button"
+                className="btn compact"
                 onClick={() => setSelectedIds([])}
                 style={{
                   fontSize: "0.76rem",
@@ -9577,7 +9601,7 @@ function Orders({
                         "—"
                       )}
                     </p>
-                    {isAdmin && (Number(o.refund_due || 0) > 0 || o.refund_status === "REFUND_PENDING") && (
+                    {isAdmin && Number(o.refund_due || 0) > 0 && o.refund_status === "REFUND_PENDING" && (
                       <span
                         className="mono-pill"
                         style={{
@@ -9604,7 +9628,7 @@ function Orders({
                   formatDateDMY(o.created_at),
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <strong>{money(o.total)}</strong>
-                    {isAdmin && Number(o.due_amount || 0) > 0 && (
+                    {isAdmin && Number(o.due_amount || 0) > 0 && o.due_status !== "PAID" && (
                       <span
                         className="mono-pill"
                         style={{
@@ -9670,7 +9694,7 @@ function Orders({
                   formatDateDMY(o.created_at),
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <strong>{money(o.total)}</strong>
-                    {isAdmin && Number(o.due_amount || 0) > 0 && (
+                    {isAdmin && Number(o.due_amount || 0) > 0 && o.due_status !== "PAID" && (
                       <span
                         className="mono-pill"
                         style={{
@@ -9687,7 +9711,7 @@ function Orders({
                         Due: {money(o.due_amount)}
                       </span>
                     )}
-                    {isAdmin && (Number(o.refund_due || 0) > 0 || o.refund_status === "REFUND_PENDING") && (
+                    {isAdmin && Number(o.refund_due || 0) > 0 && o.refund_status === "REFUND_PENDING" && (
                       <span
                         className="mono-pill"
                         style={{
@@ -9977,6 +10001,13 @@ function Orders({
           onSuccess={reload}
         />
       )}
+
+      {labelModalOrders && (
+        <ShippingLabelModal
+          orders={labelModalOrders}
+          onClose={() => setLabelModalOrders(null)}
+        />
+      )}
     </>
   );
 }
@@ -9987,6 +10018,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
     [decision, setDecision] = useState<any>(null),
     [courierModalOpen, setCourierModalOpen] = useState(false),
     [assignVendorOpen, setAssignVendorOpen] = useState(false),
+    [showShippingLabel, setShowShippingLabel] = useState(false),
     [busy, setBusy] = useState(false),
     [partialPaidInput, setPartialPaidInput] = useState<string>(""),
     [partialDueNote, setPartialDueNote] = useState<string>(""),
@@ -10419,12 +10451,23 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                   <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
                   <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} />
                   <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
-                  <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
+                  <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px", flexWrap: "wrap" }}>
                     <div>
-                      <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Documents</strong>
-                      <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or download PDF</p>
+                      <strong style={{ fontSize: "0.95rem" }}>Order Receipt & Shipping Documents</strong>
+                      <p className="small-text" style={{ margin: "2px 0 0" }}>Print official order receipt or parcel shipping label</p>
                     </div>
-                    <ReceiptButtons order={o} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setShowShippingLabel(true)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.85rem", fontWeight: 600 }}
+                        title="Print 4x6 thermal or A4 parcel shipping sticker"
+                      >
+                        <Tag size={14} /> Shipping Label
+                      </button>
+                      <ReceiptButtons order={o} />
+                    </div>
                   </div>
                 </div>
               </>
@@ -11075,6 +11118,12 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
               onSuccess={reload}
             />
           )}
+          {showShippingLabel && (
+            <ShippingLabelModal
+              orders={[o]}
+              onClose={() => setShowShippingLabel(false)}
+            />
+          )}
         </>
       )}
     </Result>
@@ -11578,6 +11627,7 @@ function Vendors() {
   const [remove, setRemove] = useState<any>(null);
   const [ledgerVendor, setLedgerVendor] = useState<any>(null);
   const [pendingBooksVendor, setPendingBooksVendor] = useState<any>(null);
+  const [batchManifestVendor, setBatchManifestVendor] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -11990,6 +12040,27 @@ function Vendors() {
                   <span>Pending</span>
                 </button>
                 <button
+                  type="button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: "0.75rem",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    background: "rgba(79, 70, 229, 0.08)",
+                    color: "#4f46e5",
+                    border: "1px solid rgba(79, 70, 229, 0.3)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setBatchManifestVendor(v)}
+                  title={`View / Print Batch Job Manifest for ${v.name}`}
+                >
+                  <Layers size={13} />
+                  <span>Job Sheet</span>
+                </button>
+                <button
                   onClick={() =>
                     setEdit({
                       id: v.id,
@@ -12246,6 +12317,13 @@ function Vendors() {
         <VendorPendingBooksModal
           vendor={pendingBooksVendor}
           onClose={() => setPendingBooksVendor(null)}
+        />
+      )}
+      {batchManifestVendor && (
+        <BatchPrintManifestModal
+          vendorId={batchManifestVendor.id}
+          vendorName={batchManifestVendor.name}
+          onClose={() => setBatchManifestVendor(null)}
         />
       )}
 
@@ -12759,6 +12837,7 @@ function VendorLedgerModal({
 
 function VendorDashboard({ user, base }: { user: User; base: string }) {
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showBatchManifest, setShowBatchManifest] = useState(false);
   const { data: ledger, error: ledgerError, loading: ledgerLoading, reload: reloadLedger } =
     useData<VendorLedger>("manage/vendor-ledger");
   const { data: ordersData, error: ordersError, loading: ordersLoading, reload: reloadOrders } =
@@ -12830,6 +12909,24 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           >
             <ClipboardList size={14} />
             Pending Books Checklist
+          </button>
+          <button
+            type="button"
+            className="btn compact"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontWeight: 600,
+              background: "rgba(79, 70, 229, 0.12)",
+              color: "#4f46e5",
+              borderColor: "rgba(79, 70, 229, 0.35)",
+            }}
+            onClick={() => setShowBatchManifest(true)}
+            title="Generate consolidated batch job manifest for machine operators"
+          >
+            <Layers size={14} />
+            Batch Print Manifest
           </button>
           <button
             type="button"
@@ -13150,6 +13247,23 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           >
             <Printer size={16} /> Open Printing Queue ({summary.printing_orders || 0})
           </a>
+          <button
+            type="button"
+            onClick={() => setShowBatchManifest(true)}
+            className="btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 18px",
+              background: "#4f46e5",
+              borderColor: "#4f46e5",
+              color: "#fff",
+              fontWeight: 600,
+            }}
+          >
+            <Layers size={16} /> Batch Print Manifest (Job Sheet)
+          </button>
           <a
             href="/vendor/ledger"
             className="btn"
@@ -13409,6 +13523,13 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
         <VendorPendingBooksModal
           vendor={{ id: user.vendor_id || user.id, name: user.name || "Vendor" }}
           onClose={() => setShowPendingModal(false)}
+        />
+      )}
+      {showBatchManifest && (
+        <BatchPrintManifestModal
+          vendorId={user.vendor_id || user.id}
+          vendorName={user.name || "Vendor"}
+          onClose={() => setShowBatchManifest(false)}
         />
       )}
     </div>

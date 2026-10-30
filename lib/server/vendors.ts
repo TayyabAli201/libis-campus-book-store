@@ -928,10 +928,15 @@ export async function getVendorPendingBooks(
     throw new AppError(400, "Vendor ID is required.");
   }
 
-  const vendor = await one<any>("SELECT * FROM vendors WHERE id = ?", targetVendorId);
+  const vendor = await one<any>(
+    "SELECT * FROM vendors WHERE id = ? OR user_id = ?",
+    targetVendorId,
+    targetVendorId,
+  );
   if (!vendor) {
     throw new AppError(404, "Vendor not found.");
   }
+  targetVendorId = vendor.id;
 
   const rows = await all<any>(
     `SELECT 
@@ -984,5 +989,164 @@ export async function getVendorPendingBooks(
     totalPendingTitles,
     whatsappMessage,
     whatsappUrl,
+  };
+}
+
+export async function getVendorBatchPrintManifest(
+  u: User,
+  vendorId?: string,
+) {
+  let targetVendorId = vendorId;
+  if (u.role === "VENDOR") {
+    targetVendorId = u.vendor_id || u.id;
+  } else if (u.role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Access denied.");
+  }
+
+  if (!targetVendorId) {
+    throw new AppError(400, "Vendor ID is required.");
+  }
+
+  const vendor = await one<any>(
+    "SELECT * FROM vendors WHERE id = ? OR user_id = ?",
+    targetVendorId,
+    targetVendorId,
+  );
+  if (!vendor) {
+    throw new AppError(404, "Vendor not found.");
+  }
+  targetVendorId = vendor.id;
+
+  const perPageRate = Number(vendor.per_page_rate ?? 1.60);
+  const bindingRate = Number(vendor.binding_rate ?? 30.00);
+
+  // 1. Consolidated books matrix across all active pending orders for this vendor
+  const bookRows = await all<any>(
+    `SELECT 
+      oi.code,
+      oi.title,
+      MAX(oi.pages) AS pages,
+      SUM(oi.quantity) AS total_qty,
+      SUM(oi.pages * oi.quantity) AS total_pages
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.vendor_id = ?
+      AND o.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED')
+      AND oi.received_from_vendor = 0
+      AND (oi.is_unavailable IS NULL OR oi.is_unavailable = 0)
+      AND (oi.in_office_stock IS NULL OR oi.in_office_stock = 0)
+    GROUP BY oi.code, oi.title
+    ORDER BY total_qty DESC, oi.code ASC`,
+    targetVendorId,
+  );
+
+  const manifestBooks = bookRows.map((r: any) => {
+    const pages = Number(r.pages || 0);
+    const qty = Number(r.total_qty || 0);
+    const totalPages = Number(r.total_pages || (pages * qty));
+    const printingCost = Math.round(totalPages * perPageRate);
+    const bindingCost = Math.round(qty * bindingRate);
+    const totalCost = printingCost + bindingCost;
+    return {
+      code: r.code,
+      title: r.title || "",
+      pages,
+      totalQty: qty,
+      totalPages,
+      printingCost,
+      bindingCost,
+      totalCost,
+      bindingType: pages > 250 ? "Spiral Binding" : pages > 100 ? "Tape Binding" : "Staple Pin",
+    };
+  });
+
+  // 2. Active orders with these pending items
+  const orderRows = await all<any>(
+    `SELECT DISTINCT
+      o.id,
+      o.reference,
+      o.name,
+      o.phone,
+      o.city,
+      o.address,
+      o.delivery_type,
+      o.status,
+      o.created_at,
+      c.name AS campus_name
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN campuses c ON c.id = o.campus_id
+    WHERE o.vendor_id = ?
+      AND o.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED')
+      AND oi.received_from_vendor = 0
+      AND (oi.is_unavailable IS NULL OR oi.is_unavailable = 0)
+      AND (oi.in_office_stock IS NULL OR oi.in_office_stock = 0)
+    ORDER BY o.created_at ASC`,
+    targetVendorId,
+  );
+
+  // 3. For each order, fetch items
+  const orderIds = orderRows.map((o: any) => o.id);
+  const orderItemsMap = new Map<string, any[]>();
+  if (orderIds.length > 0) {
+    const allItems = await all<any>(
+      `SELECT oi.* FROM order_items oi WHERE oi.order_id IN (${orderIds.map(() => "?").join(",")})`,
+      ...orderIds,
+    );
+    for (const it of allItems) {
+      if (!orderItemsMap.has(it.order_id)) {
+        orderItemsMap.set(it.order_id, []);
+      }
+      orderItemsMap.get(it.order_id)!.push(it);
+    }
+  }
+
+  const ordersList = orderRows.map((o: any) => ({
+    id: o.id,
+    reference: o.reference,
+    name: o.name,
+    phone: o.phone,
+    city: o.city,
+    address: o.address,
+    deliveryType: o.delivery_type,
+    campusName: o.campus_name || null,
+    status: o.status,
+    createdAt: o.created_at,
+    items: (orderItemsMap.get(o.id) || []).map((i: any) => ({
+      code: i.code,
+      title: i.title,
+      pages: Number(i.pages || 0),
+      quantity: Number(i.quantity || 1),
+      isUnavailable: Boolean(i.is_unavailable),
+      inOfficeStock: Boolean(i.in_office_stock),
+      receivedFromVendor: Boolean(i.received_from_vendor),
+    })),
+  }));
+
+  const totalQty = manifestBooks.reduce((sum, b) => sum + b.totalQty, 0);
+  const totalPages = manifestBooks.reduce((sum, b) => sum + b.totalPages, 0);
+  const totalCost = manifestBooks.reduce((sum, b) => sum + b.totalCost, 0);
+
+  return {
+    ok: true,
+    batchId: `BATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${vendor.id.slice(0, 4).toUpperCase()}`,
+    generatedAt: new Date().toISOString(),
+    vendor: {
+      id: vendor.id,
+      name: vendor.name,
+      phone: vendor.phone,
+      email: vendor.email,
+      perPageRate,
+      bindingRate,
+    },
+    books: manifestBooks,
+    orders: ordersList,
+    summary: {
+      totalTitles: manifestBooks.length,
+      totalBooks: totalQty,
+      totalPages,
+      totalCost,
+      totalOrders: ordersList.length,
+    },
   };
 }

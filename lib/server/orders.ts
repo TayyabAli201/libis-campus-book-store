@@ -611,7 +611,7 @@ export async function listOrders(
     args.push(...Array(3).fill("%" + q.slice(0, 100) + "%"));
   }
   if (status === "REFUNDS_DUE") {
-    filters.push("(o.refund_status = 'REFUND_PENDING' OR o.refund_due > 0)");
+    filters.push("(o.refund_due > 0 AND o.refund_status = 'REFUND_PENDING')");
   } else if (status && status !== "all") {
     const statuses = status
       .split(",")
@@ -843,7 +843,7 @@ export async function listOrders(
   status_counts["PRINTED"] = printedRow?.cnt || 0;
 
   const refundsDueRow = await one<{ cnt: number }>(
-    `SELECT COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} AND (o.refund_status='REFUND_PENDING' OR o.refund_due > 0)`,
+    `SELECT COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} AND o.refund_due > 0 AND o.refund_status = 'REFUND_PENDING'`,
     ...tabArgs,
   );
   status_counts["REFUNDS_DUE"] = refundsDueRow?.cnt || 0;
@@ -1083,7 +1083,7 @@ export async function decidePayment(
     excessPaid = Math.max(0, paid - o.total);
     const existingRefundPaid = Number(o.refund_amount || 0);
     refundDue = Math.max(0, excessPaid - existingRefundPaid);
-    refundStatus = excessPaid > 0 ? (refundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+    refundStatus = refundDue > 0 ? "REFUND_PENDING" : (Number(o.refund_amount || 0) > 0 ? "REFUNDED" : "NONE");
     refundNote = excessPaid > 0 ? (dueNoteText || "Overpayment / Change to return to student") : (o.refund_note || null);
 
     // Settle reservations only for orders created before stock tracking was removed.
@@ -1230,7 +1230,7 @@ export async function recordDuePayment(
   const excess = Math.max(0, newAmountPaid - Number(o.total || 0));
   const existingRefundPaid = Number(o.refund_amount || 0);
   const newRefundDue = Math.max(0, excess - existingRefundPaid);
-  const newRefundStatus = excess > 0 ? (newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+  const newRefundStatus = newRefundDue > 0 ? "REFUND_PENDING" : (existingRefundPaid > 0 ? "REFUNDED" : "NONE");
   const cleanNote = (note || "").trim();
 
   const statements = [
@@ -1741,7 +1741,7 @@ export async function editOrderItems(
   const excessPaid = Math.max(0, newAmountPaid - newTotal);
   const existingRefundPaid = Number(o.refund_amount || 0);
   const newRefundDue = Math.max(0, excessPaid - existingRefundPaid);
-  const newRefundStatus = excessPaid > 0 ? (newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+  const newRefundStatus = newRefundDue > 0 ? "REFUND_PENDING" : (existingRefundPaid > 0 ? "REFUNDED" : "NONE");
 
   statements.push(
     stmt(
@@ -2592,7 +2592,7 @@ export async function toggleItemUnavailable(
   const excessPaid = Math.max(0, newAmountPaid - newTotal);
   const existingRefundPaid = Number(o.refund_amount || 0);
   const newRefundDue = Math.max(0, excessPaid - existingRefundPaid);
-  const newRefundStatus = excessPaid > 0 ? (newRefundDue === 0 ? "REFUNDED" : "REFUND_PENDING") : (o.refund_status || "NONE");
+  const newRefundStatus = newRefundDue > 0 ? "REFUND_PENDING" : (existingRefundPaid > 0 ? "REFUNDED" : "NONE");
 
   const at = now();
   const cleanReason = (reason || (isVendor ? "Vendor reported unavailable / out of print" : "Marked unavailable by admin")).trim();

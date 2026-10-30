@@ -76,6 +76,7 @@ import {
   createVendorPayment,
   deleteVendorPayment,
   getVendorPendingBooks,
+  getVendorBatchPrintManifest,
 } from "@/lib/server/vendors";
 import { upload } from "@/lib/server/uploads";
 import { bootstrap } from "@/lib/server/seed";
@@ -433,6 +434,12 @@ async function handle(req: Request) {
           guest(req),
         ),
       );
+    if (p[0] === "vendor-batch-manifest" && method === "GET") {
+      const u = await user(req);
+      const url = new URL(req.url);
+      const vendorId = url.searchParams.get("vendor_id") || undefined;
+      return ok(await getVendorBatchPrintManifest(u, vendorId));
+    }
     if (p[0] === "orders" && p[1] && method === "GET") {
       if (p.length > 3 || (p[2] && p[2] !== "receipt"))
         throw new AppError(404, "Endpoint not found.");
@@ -1222,6 +1229,14 @@ async function handle(req: Request) {
       if (method === "GET") {
         const vendorId = url.searchParams.get("vendor_id") || undefined;
         return ok(await getVendorPendingBooks(u, vendorId));
+      }
+    }
+    if (section === "vendor-batch-manifest") {
+      const u = await user(req);
+      const url = new URL(req.url);
+      if (method === "GET") {
+        const vendorId = url.searchParams.get("vendor_id") || undefined;
+        return ok(await getVendorBatchPrintManifest(u, vendorId));
       }
     }
     if (section === "vendor-ledger" || section === "vendor-payments") {

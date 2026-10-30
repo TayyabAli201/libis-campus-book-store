@@ -39,7 +39,7 @@ export default {
     headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     headers.set(
       "Permissions-Policy",
-      "camera=(), microphone=(), geolocation=(self)",
+      "camera=(self), microphone=(), geolocation=(self)",
     );
     if (!import.meta.env.DEV) {
       headers.set(
