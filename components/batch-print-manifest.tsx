@@ -185,14 +185,13 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
                       <th className="py-1 px-2 text-center">Pages / Bk</th>
                       <th className="py-1 px-2 text-center bg-indigo-50/60 font-black text-indigo-900">Required Copies</th>
                       <th className="py-1 px-2 text-right font-black">Total Sheets</th>
-                      <th className="py-1 px-2">Binding Specification</th>
                       <th className="py-1 px-2 text-right">Earning</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 font-mono">
                     {data.books.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-6 text-center text-slate-500 font-sans">
+                        <td colSpan={7} className="p-6 text-center text-slate-500 font-sans">
                           No pending print jobs in queue for this vendor.
                         </td>
                       </tr>
@@ -220,11 +219,6 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
                               {b.totalQty} {b.totalQty === 1 ? "Copy" : "Copies"}
                             </td>
                             <td className="py-1 px-2 text-right font-bold text-slate-900">{b.totalPages.toLocaleString()} pgs</td>
-                            <td className="py-1 px-2 font-sans">
-                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-[10px] font-semibold text-slate-700">
-                                {b.bindingType}
-                              </span>
-                            </td>
                             <td className="py-1 px-2 text-right font-bold text-emerald-800 font-sans">
                               Rs. {b.totalCost.toLocaleString()}
                             </td>
