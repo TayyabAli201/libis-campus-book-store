@@ -14326,6 +14326,26 @@ function SettingsPage() {
                   onChange={(e) => setForm({ ...form, account_title: e.target.value })}
                 />
               </Field>
+              <Field label="Bank Payment QR Code URL">
+                <input
+                  value={form.bank_qr_url || ""}
+                  placeholder="/meezan-qr.png"
+                  onChange={(e) => setForm({ ...form, bank_qr_url: e.target.value })}
+                />
+                <span className="small-text muted">
+                  Default: /meezan-qr.png (Meezan Bank Dynamic QR for fast student mobile scanning)
+                </span>
+                {(form.bank_qr_url || "/meezan-qr.png") && (
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                    <img
+                      src={form.bank_qr_url || "/meezan-qr.png"}
+                      alt="Bank QR Preview"
+                      style={{ width: 64, height: 64, objectFit: "contain", border: "1px solid var(--border)", borderRadius: 6, background: "#fff", padding: 4 }}
+                    />
+                    <span className="small-text">Active Payment QR Code Preview</span>
+                  </div>
+                )}
+              </Field>
             </div>
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>

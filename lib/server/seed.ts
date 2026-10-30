@@ -33,6 +33,7 @@ export async function bootstrap(req: Request) {
     bank_account: "11550109645933",
     bank_iban: "PK29MEZN0011550109645933",
     account_title: "DIGITAL GROWTH HUB",
+    bank_qr_url: "/meezan-qr.png",
     delivery_campus: 10000,
     delivery_campus_enabled: true,
     delivery_lahore: 50000,

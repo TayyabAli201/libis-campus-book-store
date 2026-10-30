@@ -30,6 +30,9 @@ import {
   AlertTriangle,
   ExternalLink,
   Info,
+  QrCode,
+  Maximize2,
+  X,
 } from "lucide-react";
 
 function FacebookIcon({ size = 18 }: { size?: number }) {
@@ -1558,8 +1561,23 @@ function Checkout({ data }: { data: Catalog }) {
     [step, setStep] = useState(1),
     [slip, setSlip] = useState<any>(null),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [copiedField, setCopiedField] = useState<string | null>(null),
+    [showQrModal, setShowQrModal] = useState(false);
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  const copyToClipboard = (text: string, field: string, label: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopiedField(field);
+        toast.success(`${label} copied!`);
+        setTimeout(() => setCopiedField(null), 2200);
+      })
+      .catch(() => {
+        toast.error(`Please copy manually: ${text}`);
+      });
+  };
 
 
   useEffect(() => {
@@ -2032,50 +2050,517 @@ function Checkout({ data }: { data: Catalog }) {
             <div className="stack">
               <div>
                 <h3 style={{ margin: 0 }}>Transfer {money(quote!.total)}</h3>
+                <p style={{ margin: "4px 0 0 0", color: "var(--muted-foreground)", fontSize: "0.88rem" }}>
+                  Scan the Meezan Bank QR code with your mobile app or transfer to the official account details below:
+                </p>
               </div>
 
-              {/* 1. First, Meezan Bank Account details */}
-              <div className="bank-card">
-                <span className="eyebrow">{quote!.settings.bank_name}</span>
-                <small>ACCOUNT NUMBER</small>
-                <strong>{quote!.settings.bank_account}</strong>
-                <button
-                  className="btn compact"
-                  onClick={() =>
-                    navigator.clipboard
-                      .writeText(quote!.settings.bank_account)
-                      .then(() => toast.success("Account number copied."))
-                      .catch(() =>
-                        toast.error(
-                          "Copy unavailable. Select the number above.",
-                        ),
-                      )
-                  }
+              {/* Meezan Bank Payment Card & Instant QR Code */}
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #18122B 0%, #2A1747 50%, #16102B 100%)",
+                  color: "#f8fafc",
+                  borderRadius: "16px",
+                  padding: "24px",
+                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
+                  border: "1px solid rgba(168, 85, 247, 0.25)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Decorative glow */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "-40px",
+                    right: "-40px",
+                    width: "160px",
+                    height: "160px",
+                    background: "radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, transparent 70%)",
+                    pointerEvents: "none",
+                  }}
+                />
+
+                {/* Card Header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+                    paddingBottom: "16px",
+                    marginBottom: "20px",
+                  }}
                 >
-                  <Copy size={16} />
-                  Copy Account Number
-                </button>
-                <small style={{ marginTop: 8 }}>IBAN NUMBER</small>
-                <strong>{quote!.settings.bank_iban || "PK29MEZN0011550109645933"}</strong>
-                <button
-                  className="btn compact"
-                  onClick={() =>
-                    navigator.clipboard
-                      .writeText(quote!.settings.bank_iban || "PK29MEZN0011550109645933")
-                      .then(() => toast.success("IBAN number copied."))
-                      .catch(() =>
-                        toast.error(
-                          "Copy unavailable. Select the IBAN above.",
-                        ),
-                      )
-                  }
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.1)",
+                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#c084fc",
+                      }}
+                    >
+                      <Building2 size={22} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "0.05em", color: "#ffffff" }}>
+                          {quote!.settings.bank_name || "MEEZAN BANK"}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: "12px",
+                            background: "rgba(16, 185, 129, 0.2)",
+                            color: "#34d399",
+                            border: "1px solid rgba(16, 185, 129, 0.35)",
+                          }}
+                        >
+                          Verified Business Account
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "0.75rem", color: "rgba(255, 255, 255, 0.65)", display: "block" }}>
+                        Direct Bank Transfer • Raast • Any Digital Wallet
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "rgba(255, 255, 255, 0.08)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      padding: "6px 14px",
+                      borderRadius: "10px",
+                      textAlign: "right",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.7rem", color: "rgba(255, 255, 255, 0.65)", display: "block" }}>
+                      Amount to Pay
+                    </span>
+                    <strong style={{ fontSize: "1.2rem", color: "#38bdf8", fontWeight: 800 }}>
+                      {money(quote!.total)}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Card Body Grid: Left Details, Right QR */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                    gap: "20px",
+                    alignItems: "center",
+                  }}
                 >
-                  <Copy size={16} />
-                  Copy IBAN Number
-                </button>
-                <small style={{ marginTop: 8 }}>ACCOUNT TITLE</small>
-                <b>{quote!.settings.account_title}</b>
+                  {/* Left Column: Bank Details & 1-Click Copy */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    {/* Account Title */}
+                    <div
+                      style={{
+                        background: "rgba(0, 0, 0, 0.22)",
+                        borderRadius: "12px",
+                        padding: "12px 14px",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <small style={{ color: "rgba(255, 255, 255, 0.6)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.08em" }}>
+                          ACCOUNT TITLE
+                        </small>
+                        <button
+                          type="button"
+                          className="btn compact"
+                          onClick={() => copyToClipboard(quote!.settings.account_title || "DIGITAL GROWTH HUB", "title", "Account Title")}
+                          style={{
+                            padding: "3px 10px",
+                            fontSize: "0.75rem",
+                            borderRadius: "6px",
+                            background: copiedField === "title" ? "#10b981" : "rgba(255, 255, 255, 0.12)",
+                            color: "#fff",
+                            border: "none",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          {copiedField === "title" ? <Check size={13} /> : <Copy size={13} />}
+                          {copiedField === "title" ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff", letterSpacing: "0.03em" }}>
+                        {quote!.settings.account_title || "DIGITAL GROWTH HUB"}
+                      </div>
+                    </div>
+
+                    {/* Account Number */}
+                    <div
+                      style={{
+                        background: "rgba(0, 0, 0, 0.22)",
+                        borderRadius: "12px",
+                        padding: "12px 14px",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <small style={{ color: "rgba(255, 255, 255, 0.6)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.08em" }}>
+                          ACCOUNT NUMBER
+                        </small>
+                        <button
+                          type="button"
+                          className="btn compact"
+                          onClick={() => copyToClipboard(quote!.settings.bank_account || "11550109645933", "acc", "Account Number")}
+                          style={{
+                            padding: "3px 10px",
+                            fontSize: "0.75rem",
+                            borderRadius: "6px",
+                            background: copiedField === "acc" ? "#10b981" : "rgba(255, 255, 255, 0.12)",
+                            color: "#fff",
+                            border: "none",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          {copiedField === "acc" ? <Check size={13} /> : <Copy size={13} />}
+                          {copiedField === "acc" ? "Copied!" : "Copy Number"}
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "1.28rem",
+                          fontWeight: 800,
+                          letterSpacing: "0.1em",
+                          fontFamily: "monospace, Courier",
+                          color: "#38bdf8",
+                        }}
+                      >
+                        {quote!.settings.bank_account || "11550109645933"}
+                      </div>
+                    </div>
+
+                    {/* IBAN */}
+                    <div
+                      style={{
+                        background: "rgba(0, 0, 0, 0.22)",
+                        borderRadius: "12px",
+                        padding: "12px 14px",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <small style={{ color: "rgba(255, 255, 255, 0.6)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.08em" }}>
+                          IBAN NUMBER
+                        </small>
+                        <button
+                          type="button"
+                          className="btn compact"
+                          onClick={() => copyToClipboard(quote!.settings.bank_iban || "PK29MEZN0011550109645933", "iban", "IBAN")}
+                          style={{
+                            padding: "3px 10px",
+                            fontSize: "0.75rem",
+                            borderRadius: "6px",
+                            background: copiedField === "iban" ? "#10b981" : "rgba(255, 255, 255, 0.12)",
+                            color: "#fff",
+                            border: "none",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          {copiedField === "iban" ? <Check size={13} /> : <Copy size={13} />}
+                          {copiedField === "iban" ? "Copied!" : "Copy IBAN"}
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.96rem",
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          fontFamily: "monospace, Courier",
+                          color: "#e2e8f0",
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        {quote!.settings.bank_iban || "PK29MEZN0011550109645933"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: QR Code Container */}
+                  <div
+                    style={{
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1.5px solid rgba(255, 255, 255, 0.12)",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#ffffff",
+                        padding: "10px",
+                        borderRadius: "12px",
+                        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.25)",
+                        cursor: "pointer",
+                        position: "relative",
+                      }}
+                      onClick={() => setShowQrModal(true)}
+                      title="Click to view full-size QR code"
+                    >
+                      <img
+                        src={quote!.settings.bank_qr_url || "/meezan-qr.png"}
+                        alt="Meezan Bank Payment QR Code"
+                        style={{
+                          width: "160px",
+                          height: "160px",
+                          objectFit: "contain",
+                          display: "block",
+                          borderRadius: "6px",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: "12px", width: "100%" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                        <QrCode size={15} style={{ color: "#c084fc" }} /> Scan & Pay via Any App
+                      </span>
+                      <p style={{ margin: "4px 0 10px 0", fontSize: "0.72rem", color: "rgba(255, 255, 255, 0.65)", lineHeight: "1.35" }}>
+                        Meezan App • Raast • SadaPay • NayaPay • Easypaisa • JazzCash
+                      </p>
+
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                        <button
+                          type="button"
+                          className="btn compact"
+                          onClick={() => setShowQrModal(true)}
+                          style={{
+                            padding: "5px 12px",
+                            fontSize: "0.75rem",
+                            borderRadius: "6px",
+                            background: "rgba(255, 255, 255, 0.12)",
+                            color: "#fff",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          <Maximize2 size={13} />
+                          Enlarge QR
+                        </button>
+
+                        <a
+                          href={quote!.settings.bank_qr_url || "/meezan-qr.png"}
+                          download="meezan-payment-qr.png"
+                          style={{
+                            padding: "5px 12px",
+                            fontSize: "0.75rem",
+                            borderRadius: "6px",
+                            background: "rgba(255, 255, 255, 0.12)",
+                            color: "#fff",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            textDecoration: "none",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          <Download size={13} />
+                          Save QR
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Step-by-Step Info */}
+                <div
+                  style={{
+                    marginTop: "20px",
+                    paddingTop: "14px",
+                    borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    fontSize: "0.82rem",
+                    color: "rgba(255, 255, 255, 0.8)",
+                  }}
+                >
+                  <Info size={18} style={{ color: "#38bdf8", flexShrink: 0 }} />
+                  <span>
+                    <strong>Next Step:</strong> Transfer exact amount <strong style={{ color: "#38bdf8" }}>{money(quote!.total)}</strong>, take a screenshot of your transfer receipt, and upload it below.
+                  </span>
+                </div>
               </div>
+
+              {/* QR Code Full Zoom Modal */}
+              {showQrModal && (
+                <div
+                  style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: "rgba(0, 0, 0, 0.78)",
+                    backdropFilter: "blur(6px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 99999,
+                    padding: "16px",
+                  }}
+                  onClick={() => setShowQrModal(false)}
+                >
+                  <div
+                    style={{
+                      background: "var(--card, #ffffff)",
+                      color: "var(--foreground, #0f172a)",
+                      borderRadius: "18px",
+                      maxWidth: "420px",
+                      width: "100%",
+                      padding: "24px",
+                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                      border: "1px solid var(--border, rgba(0, 0, 0, 0.1))",
+                      position: "relative",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowQrModal(false)}
+                      style={{
+                        position: "absolute",
+                        top: "14px",
+                        right: "14px",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--muted-foreground)",
+                        padding: "6px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      aria-label="Close"
+                    >
+                      <X size={20} />
+                    </button>
+
+                    <div style={{ textAlign: "center", marginBottom: "16px" }}>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                          color: "#1d64b4",
+                          display: "block",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        {quote!.settings.bank_name || "MEEZAN BANK"}
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>
+                        Scan & Pay via Any App
+                      </h3>
+                      <p style={{ margin: "4px 0 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                        Transfer exact amount: <strong style={{ color: "#1d64b4" }}>{money(quote!.total)}</strong>
+                      </p>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#ffffff",
+                        padding: "14px",
+                        borderRadius: "14px",
+                        border: "2px solid #e2e8f0",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        boxShadow: "inset 0 2px 4px rgba(0,0,0,0.04)",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      <img
+                        src={quote!.settings.bank_qr_url || "/meezan-qr.png"}
+                        alt="Meezan Bank QR"
+                        style={{
+                          width: "270px",
+                          height: "270px",
+                          objectFit: "contain",
+                          display: "block",
+                        }}
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        background: "var(--muted, #f1f5f9)",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        fontSize: "0.82rem",
+                        marginBottom: "16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--muted-foreground)" }}>Title:</span>
+                        <strong>{quote!.settings.account_title || "DIGITAL GROWTH HUB"}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--muted-foreground)" }}>Account #:</span>
+                        <strong style={{ fontFamily: "monospace", letterSpacing: "0.05em" }}>{quote!.settings.bank_account || "11550109645933"}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--muted-foreground)" }}>IBAN:</span>
+                        <strong style={{ fontFamily: "monospace", fontSize: "0.78rem" }}>{quote!.settings.bank_iban || "PK29MEZN0011550109645933"}</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <a
+                        href={quote!.settings.bank_qr_url || "/meezan-qr.png"}
+                        download="meezan-payment-qr.png"
+                        className="btn primary"
+                        style={{ flex: 1, textDecoration: "none", textAlign: "center", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+                      >
+                        <Download size={16} />
+                        Download QR
+                      </a>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setShowQrModal(false)}
+                        style={{ padding: "8px 16px" }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 2. Then, Picture Upload field */}
               <ProofUploader

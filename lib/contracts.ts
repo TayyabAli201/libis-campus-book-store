@@ -363,6 +363,7 @@ export const settingsInput = z.object({
   bank_account: str(60),
   bank_iban: z.string().max(60).optional().default("PK29MEZN0011550109645933"),
   account_title: str(150),
+  bank_qr_url: z.string().max(2000).optional().nullable().default("/meezan-qr.png"),
   delivery_campus: z.number().int().min(0).max(10000000).optional().default(10000),
   delivery_campus_enabled: z.boolean().optional().default(true),
   delivery_lahore: z.number().int().min(0).max(10000000),

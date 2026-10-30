@@ -52,6 +52,7 @@ export async function getSettings() {
     bank_account: raw.bank_account || "11550109645933",
     bank_iban: raw.bank_iban || "PK29MEZN0011550109645933",
     account_title: raw.account_title || "DIGITAL GROWTH HUB",
+    bank_qr_url: raw.bank_qr_url || "/meezan-qr.png",
     delivery_campus: typeof raw.delivery_campus === "number" ? raw.delivery_campus : 10000,
     delivery_campus_enabled: raw.delivery_campus_enabled !== false,
     delivery_lahore: typeof raw.delivery_lahore === "number" ? raw.delivery_lahore : 50000,
