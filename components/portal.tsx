@@ -62,6 +62,7 @@ import {
 import { ShippingLabelModal } from "./shipping-label";
 import { BatchPrintManifestModal } from "./batch-print-manifest";
 import { PakPostManifestModal } from "./pak-post-manifest";
+import { QuickTrackingModal } from "./quick-tracking-modal";
 import {
   SidebarProvider,
   Sidebar,
@@ -7442,7 +7443,8 @@ function Orders({
     [removingQueueOrder, setRemovingQueueOrder] = useState<any | null>(null),
     [selectedIds, setSelectedIds] = useState<string[]>([]),
     [labelModalOrders, setLabelModalOrders] = useState<any[] | null>(null),
-    [gpoManifestOrders, setGpoManifestOrders] = useState<any[] | null>(null);
+    [gpoManifestOrders, setGpoManifestOrders] = useState<any[] | null>(null),
+    [quickTrackingModalOrders, setQuickTrackingModalOrders] = useState<any[] | null>(null);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -8522,6 +8524,26 @@ function Orders({
             <span>GPO Booking Sheet</span>
           </button>
         )}
+        {deliveryTypeList.includes("other") && (
+          <button
+            type="button"
+            className="btn compact"
+            onClick={() => {
+              const courierOrders = (data?.rows || []).filter(isOtherCityOrder);
+              if (courierOrders.length === 0) {
+                toast.info("No Other City courier orders found.");
+                return;
+              }
+              setQuickTrackingModalOrders(courierOrders);
+            }}
+            disabled={loading || !(data?.rows && data.rows.length > 0)}
+            title="Quick enter Pakistan Post UMS / courier tracking numbers and send 1-click WhatsApp messages"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.82rem", fontWeight: 600, color: "#0284c7" }}
+          >
+            <Truck size={13} style={{ color: "#0284c7" }} />
+            <span>Quick Tracking IDs</span>
+          </button>
+        )}
         {activeTab === "SHIPPED" && (() => {
           const shippedOrders = (data?.rows || []).filter((o: any) => o.status === "SHIPPED");
           const count = shippedOrders.length;
@@ -8552,6 +8574,40 @@ function Orders({
             >
               <Tag size={14} />
               <span>Print All Shipped Labels ({count})</span>
+            </button>
+          );
+        })()}
+        {activeTab === "SHIPPED" && (() => {
+          const courierOrders = (data?.rows || []).filter(isOtherCityOrder);
+          const count = courierOrders.length;
+          const pendingCount = courierOrders.filter((o: any) => !o.courier_tracking_id).length;
+          return (
+            <button
+              type="button"
+              className="btn compact"
+              onClick={() => {
+                if (count === 0) {
+                  toast.info("No Other City courier orders found in Shipped status.");
+                  return;
+                }
+                setQuickTrackingModalOrders(courierOrders);
+              }}
+              disabled={loading || count === 0}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                background: "#0284c7",
+                borderColor: "#0284c7",
+                color: "#ffffff",
+                boxShadow: "0 2px 4px rgba(2, 132, 199, 0.25)",
+              }}
+              title="Quickly enter UMS / courier tracking numbers and send 1-click WhatsApp messages"
+            >
+              <Truck size={14} />
+              <span>Quick Tracking IDs {pendingCount > 0 ? `(${pendingCount} pending)` : ""}</span>
             </button>
           );
         })()}
@@ -8827,6 +8883,26 @@ function Orders({
                 </button>
               )}
 
+              {selectedRows.some(isOtherCityOrder) && (
+                <button
+                  type="button"
+                  className="btn compact"
+                  onClick={() => setQuickTrackingModalOrders(selectedRows.filter(isOtherCityOrder))}
+                  style={{
+                    background: "#0284c7",
+                    borderColor: "#0284c7",
+                    color: "#fff",
+                    fontWeight: 600,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                  title={`Quick enter tracking IDs for selected ${selectedRows.filter(isOtherCityOrder).length} Other City courier order(s)`}
+                >
+                  <Truck size={13} /> Quick Tracking ({selectedRows.filter(isOtherCityOrder).length})
+                </button>
+              )}
+
               <button
                 type="button"
                 className="btn compact"
@@ -9002,17 +9078,46 @@ function Orders({
                 {isOther && !isVendor && (
                   <div style={{ marginTop: 4 }}>
                     {o.courier_name && o.courier_tracking_id ? (
-                      <button
-                        type="button"
-                        className="courier-tracking-pill"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingCourierOrder(o);
-                        }}
-                        title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit tracking details.`}
-                      >
-                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
-                      </button>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="courier-tracking-pill"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCourierOrder(o);
+                          }}
+                          title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit tracking details.`}
+                        >
+                          <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
+                        </button>
+                        {o.phone && (
+                          <a
+                            href={getWhatsAppUrl(o)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn compact"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              padding: "2px 7px",
+                              borderRadius: 4,
+                              background: "#25D366",
+                              color: "#fff",
+                              border: "none",
+                              textDecoration: "none",
+                              cursor: "pointer",
+                            }}
+                            title={`Send 1-Click WhatsApp tracking message to ${o.name} (${o.phone})`}
+                          >
+                            <MessageCircle size={11} />
+                            <span>WhatsApp</span>
+                          </a>
+                        )}
+                      </div>
                     ) : o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING" ? (
                       <button
                         type="button"
@@ -9440,17 +9545,46 @@ function Orders({
                 isOther ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {o.courier_name && o.courier_tracking_id ? (
-                      <button
-                        type="button"
-                        className="courier-tracking-pill"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingCourierOrder(o);
-                        }}
-                        title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit.`}
-                      >
-                        <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
-                      </button>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="courier-tracking-pill"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCourierOrder(o);
+                          }}
+                          title={`Shipped via ${o.courier_name} (${o.courier_tracking_id}). Click to edit.`}
+                        >
+                          <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
+                        </button>
+                        {o.phone && (
+                          <a
+                            href={getWhatsAppUrl(o)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn compact"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              padding: "2px 7px",
+                              borderRadius: 4,
+                              background: "#25D366",
+                              color: "#fff",
+                              border: "none",
+                              textDecoration: "none",
+                              cursor: "pointer",
+                            }}
+                            title={`Send 1-Click WhatsApp tracking message to ${o.name} (${o.phone})`}
+                          >
+                            <MessageCircle size={11} />
+                            <span>WhatsApp</span>
+                          </a>
+                        )}
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -10164,6 +10298,16 @@ function Orders({
         <PakPostManifestModal
           orders={gpoManifestOrders}
           onClose={() => setGpoManifestOrders(null)}
+        />
+      )}
+
+      {quickTrackingModalOrders && (
+        <QuickTrackingModal
+          orders={quickTrackingModalOrders}
+          onClose={() => setQuickTrackingModalOrders(null)}
+          onSaved={reload}
+          isAdmin={isAdmin}
+          isVendor={isVendor}
         />
       )}
     </>
@@ -13019,6 +13163,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showBatchManifest, setShowBatchManifest] = useState(false);
   const [vendorGpoOrders, setVendorGpoOrders] = useState<any[] | null>(null);
+  const [vendorTrackingOrders, setVendorTrackingOrders] = useState<any[] | null>(null);
   const { data: ledger, error: ledgerError, loading: ledgerLoading, reload: reloadLedger } =
     useData<VendorLedger>("manage/vendor-ledger");
   const { data: ordersData, error: ordersError, loading: ordersLoading, reload: reloadOrders } =
@@ -13480,6 +13625,41 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           >
             <FileText size={16} /> GPO Booking Sheet
           </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/manage/orders?delivery_type=other&pageSize=100");
+                if (res.ok) {
+                  const d = (await res.json()) as any;
+                  const courierOrders = (d?.rows || []).filter(isOtherCityOrder);
+                  if (courierOrders.length === 0) {
+                    toast.info("No Other City courier orders assigned to you.");
+                    return;
+                  }
+                  setVendorTrackingOrders(courierOrders);
+                } else {
+                  toast.error("Failed to load courier orders.");
+                }
+              } catch {
+                toast.error("Failed to load courier orders.");
+              }
+            }}
+            className="btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 18px",
+              background: "#0284c7",
+              borderColor: "#0284c7",
+              color: "#fff",
+              fontWeight: 600,
+            }}
+            title="Quick enter Pakistan Post UMS / courier tracking numbers and send WhatsApp updates"
+          >
+            <Truck size={16} /> Quick Tracking IDs
+          </button>
           <a
             href="/vendor/ledger"
             className="btn"
@@ -13752,6 +13932,15 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
         <PakPostManifestModal
           orders={vendorGpoOrders}
           onClose={() => setVendorGpoOrders(null)}
+        />
+      )}
+      {vendorTrackingOrders && (
+        <QuickTrackingModal
+          orders={vendorTrackingOrders}
+          onClose={() => setVendorTrackingOrders(null)}
+          onSaved={reloadOrders}
+          isVendor={true}
+          isAdmin={false}
         />
       )}
     </div>
