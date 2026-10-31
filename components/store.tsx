@@ -80,6 +80,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useApp, ThemeSwitch } from "./providers";
 import { WhatsAppIcon } from "./whatsapp-icon";
+import { StoreChatbot } from "./store-chatbot";
 import {
   BookObject,
   BookExperience,
@@ -190,15 +191,7 @@ export function Store({
       {data && data.settings.store_open && (
         <>
           <Footer data={data} />
-          <a
-            className="whatsapp"
-            href={whatsapp(data.settings)}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Contact on WhatsApp"
-          >
-            <WhatsAppIcon size={26} />
-          </a>
+          <StoreChatbot data={data} whatsappUrl={whatsapp(data.settings)} />
         </>
       )}
     </StoreMotion>
@@ -423,38 +416,185 @@ function Header({ settings }: { settings?: StoreSettings }) {
     </>
   );
 }
-function Cover({ book, small = false }: { book: Book; small?: boolean }) {
+function MiniVUCover({
+  book,
+  size = "normal",
+}: {
+  book: { code?: string; title?: string; course_code?: string };
+  size?: "normal" | "compact";
+}) {
+  const isCompact = size === "compact";
+  const w = isCompact ? "52px" : "68px";
+  const h = isCompact ? "74px" : "96px";
+  const code = (book?.course_code || book?.code || "VU").toUpperCase();
+  const title = book?.title || "Course Material";
+
+  return (
+    <div
+      className="vu-mini-cover"
+      style={{
+        width: w,
+        height: h,
+        borderRadius: "5px",
+        flexShrink: 0,
+        position: "relative",
+        overflow: "hidden",
+        backgroundColor: "#163a70",
+        background: "linear-gradient(175deg, #1d437e 0%, #153569 50%, #0d2244 100%)",
+        border: "1px solid rgba(255, 255, 255, 0.22)",
+        boxShadow: "0 3px 8px rgba(0, 0, 0, 0.25), inset -2px 0 4px rgba(0,0,0,0.35)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        color: "#ffffff",
+        boxSizing: "border-box",
+        userSelect: "none",
+      }}
+      title={`${title} (${code})`}
+    >
+      {/* 3D Left Spine Crease */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: isCompact ? "3px" : "4px",
+          background: "linear-gradient(90deg, rgba(0,0,0,0.45) 0%, rgba(255,255,255,0.15) 60%, rgba(0,0,0,0.35) 100%)",
+          zIndex: 3,
+        }}
+      />
+
+      {/* Top Header: Logo / VU badge + Notes */}
+      <div
+        style={{
+          backgroundColor: "#143362",
+          borderBottom: "1px solid rgba(255,255,255,0.15)",
+          padding: isCompact ? "2px 3px 2px 5px" : "3px 4px 3px 6px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span
+          style={{
+            fontSize: isCompact ? "0.44rem" : "0.52rem",
+            fontWeight: 800,
+            color: "#ffffff",
+            letterSpacing: "0.04em",
+          }}
+        >
+          VU
+        </span>
+        <span
+          style={{
+            fontSize: isCompact ? "0.36rem" : "0.42rem",
+            fontWeight: 600,
+            color: "#fbbf24",
+            fontStyle: "italic",
+          }}
+        >
+          Notes
+        </span>
+      </div>
+
+      {/* Yellow/Gold Course Code Ribbon */}
+      <div
+        style={{
+          backgroundColor: "#f59e0b",
+          color: "#0f172a",
+          padding: isCompact ? "1px 2px 1px 5px" : "2px 4px 2px 6px",
+          textAlign: "right",
+          fontWeight: 900,
+          fontSize: isCompact ? "0.48rem" : "0.58rem",
+          letterSpacing: "0.02em",
+          lineHeight: 1.1,
+          boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+        }}
+      >
+        {code}
+      </div>
+
+      {/* Center Title Body */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: isCompact ? "2px 3px 2px 6px" : "3px 4px 3px 7px",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            fontSize: isCompact ? "0.48rem" : "0.58rem",
+            fontWeight: 700,
+            lineHeight: 1.18,
+            color: "#f8fafc",
+            display: "-webkit-box",
+            WebkitLineClamp: isCompact ? 2 : 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+          }}
+        >
+          {title}
+        </div>
+      </div>
+
+      {/* Footer Navy Bar: VIRTUAL UNIVERSITY */}
+      <div
+        style={{
+          backgroundColor: "#0b1a32",
+          borderTop: "1px solid #f59e0b",
+          padding: isCompact ? "1.5px 2px 1.5px 4px" : "2px 3px 2px 5px",
+          textAlign: "center",
+          fontSize: isCompact ? "0.32rem" : "0.38rem",
+          fontWeight: 700,
+          color: "#e2e8f0",
+          letterSpacing: "0.03em",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        VIRTUAL UNIVERSITY
+      </div>
+    </div>
+  );
+}
+
+function Cover({
+  book,
+  small = false,
+  size = "normal",
+}: {
+  book: Book;
+  small?: boolean;
+  size?: "normal" | "compact";
+}) {
   if (!small)
     return (
       <div className="catalog-book-stage">
         <VUBookCover3D book={book} />
       </div>
     );
-  return book.cover ? (
-    <img
-      className={small ? "cover-thumb" : "book-cover"}
-      src={book.cover}
-      alt={`${book.title} cover`}
-      loading="lazy"
-      width={300}
-      height={360}
-    />
-  ) : (
-    <div
-      className={
-        "cover-placeholder category-" + book.category + (small ? " small" : "")
-      }
-    >
-      <BookOpen size={small ? 24 : 35} />
-      {!small && (
-        <>
-          <span className="cover-code">{book.code}</span>
-          <span className="cover-title">{book.title}</span>
-          <span className="cover-edition">COURSE MATERIALS</span>
-        </>
-      )}
-    </div>
-  );
+  if (book.cover) {
+    return (
+      <img
+        className={size === "compact" ? "cover-thumb compact" : "cover-thumb"}
+        src={book.cover}
+        alt={`${book.title} cover`}
+        loading="lazy"
+        width={size === "compact" ? 52 : 70}
+        height={size === "compact" ? 74 : 96}
+      />
+    );
+  }
+  return <MiniVUCover book={book} size={size} />;
 }
 function BookCard({ book }: { book: Book }) {
   const { add } = useApp();
@@ -2055,6 +2195,58 @@ function Checkout({ data }: { data: Catalog }) {
                 </p>
               </div>
 
+              {/* Order Books Summary Strip in Payment Step */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  padding: "10px 14px",
+                  borderRadius: "12px",
+                  backgroundColor: "rgba(37, 99, 235, 0.08)",
+                  border: "1px solid rgba(37, 99, 235, 0.2)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      color: "var(--primary)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      display: "block",
+                    }}
+                  >
+                    ORDER ITEMS ({quote!.items?.length || cart.length})
+                  </span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--foreground)" }}>
+                    {quote!.items?.map((it: any) => it.code || it.course_code).filter(Boolean).join(", ")}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  {(quote!.items || cart).slice(0, 5).map((it: any) => {
+                    const b = it.book || data.books.find((bk) => bk.id === it.id || bk.code === it.code);
+                    return (
+                      <div key={it.id || it.code} title={`${it.title || b?.title} (${it.code || b?.code})`}>
+                        {b ? (
+                          <Cover book={b} small size="compact" />
+                        ) : (
+                          <MiniVUCover book={{ code: it.code, title: it.title } as any} size="compact" />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(quote!.items || cart).length > 5 && (
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted-foreground)" }}>
+                      +{(quote!.items || cart).length - 5} more
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Meezan Bank Payment Card & Instant QR Code */}
               <div
                 style={{
@@ -2730,11 +2922,9 @@ function Checkout({ data }: { data: Catalog }) {
             return (
               <div className="summary-item checkout-book-item" key={i.id || i.code}>
                 {bookObj ? (
-                  <Cover book={bookObj} small />
+                  <Cover book={bookObj} small size="compact" />
                 ) : (
-                  <div className="cover-placeholder small">
-                    <BookOpen size={20} />
-                  </div>
+                  <MiniVUCover book={{ code: i.code, title: i.title } as any} size="compact" />
                 )}
                 <div className="summary-item-details">
                   <div className="summary-book-code">{i.code}</div>
@@ -4613,6 +4803,18 @@ function Footer({ data }: { data: Catalog }) {
             </div>
           )}
           <div className="footer-support-item">
+            <span className="footer-support-label">Bank Name:</span>{" "}
+            <strong className="footer-bank-name">
+              {s.bank_name || "Meezan Bank"}
+            </strong>
+          </div>
+          <div className="footer-support-item">
+            <span className="footer-support-label">Account Title:</span>{" "}
+            <strong className="footer-bank-name">
+              {s.account_title || "DIGITAL GROWTH HUB"}
+            </strong>
+          </div>
+          <div className="footer-support-item">
             <span className="footer-support-label">Bank Account:</span>{" "}
             <strong className="footer-account-num">
               {s.bank_account || "11550109645933"}
@@ -4620,14 +4822,8 @@ function Footer({ data }: { data: Catalog }) {
           </div>
           <div className="footer-support-item">
             <span className="footer-support-label">IBAN:</span>{" "}
-            <strong className="footer-account-num" style={{ fontSize: "0.8rem" }}>
+            <strong className="footer-account-num footer-iban-text" style={{ fontSize: "0.8rem" }}>
               {s.bank_iban || "PK29MEZN0011550109645933"}
-            </strong>
-          </div>
-          <div className="footer-support-item">
-            <span className="footer-support-label">Bank Name:</span>{" "}
-            <strong className="footer-bank-name">
-              {s.bank_name || "Meezan Bank"}
             </strong>
           </div>
           {s.distribution_center_address && (

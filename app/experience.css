@@ -3901,6 +3901,42 @@ footer {
   color: #f59e0b;
   font-weight: 700;
   letter-spacing: 0.03em;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.footer-iban-text {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .footer-main {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 25px 15px !important;
+  }
+
+  .footer-main > div:first-child {
+    grid-column: 1 / -1 !important;
+  }
+
+  .footer-main > div:last-child {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    margin-top: 8px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-support-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 0.85rem;
+  }
 }
 
 .dark .footer-account-num {
@@ -7337,3 +7373,27 @@ footer {
     flex: 1 1 100%;
   }
 }
+
+/* Enhanced Book Covers for Cart, Checkout and Payment */
+.cover-thumb {
+  width: 68px;
+  height: 94px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  padding: 0 !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+  display: block;
+}
+
+.cover-thumb.compact {
+  width: 52px;
+  height: 74px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  padding: 0 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  display: block;
+}
+
