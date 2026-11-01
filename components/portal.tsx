@@ -57,6 +57,9 @@ import {
   QrCode,
   Layers,
   FileText,
+  AlertCircle,
+  PackageCheck,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { ShippingLabelModal } from "./shipping-label";
@@ -978,6 +981,7 @@ const dashboardMetrics: {
   hint: string;
   icon: LucideIcon;
   tone: string;
+  href?: string;
 }[] = [
   {
     key: "gross_revenue",
@@ -985,20 +989,7 @@ const dashboardMetrics: {
     hint: "Verified student payments",
     icon: Coins,
     tone: "featured",
-  },
-  {
-    key: "total_vendor_cost",
-    label: "Vendor Payment",
-    hint: "Shipped orders (Printing + delivery)",
-    icon: Factory,
-    tone: "amber",
-  },
-  {
-    key: "vendor_queue_cost",
-    label: "In Printing Queue",
-    hint: "Committed printing cost",
-    icon: Printer,
-    tone: "purple",
+    href: "/orders",
   },
   {
     key: "net_profit",
@@ -1006,6 +997,31 @@ const dashboardMetrics: {
     hint: "Total Sales minus Vendor Production",
     icon: Banknote,
     tone: "green",
+    href: "/vendors",
+  },
+  {
+    key: "total_vendor_cost",
+    label: "Vendor Payment",
+    hint: "Shipped orders (Printing + delivery)",
+    icon: Factory,
+    tone: "amber",
+    href: "/vendors",
+  },
+  {
+    key: "vendor_queue_cost",
+    label: "In Printing Queue",
+    hint: "Committed printing cost",
+    icon: Printer,
+    tone: "purple",
+    href: "/orders?status=PROCESSING",
+  },
+  {
+    key: "office_stock_savings",
+    label: "Office Stock Savings",
+    hint: "Saved by shelf fulfillment",
+    icon: PackageCheck,
+    tone: "green",
+    href: "/books",
   },
   {
     key: "total_orders",
@@ -1013,6 +1029,7 @@ const dashboardMetrics: {
     hint: "Orders in this period",
     icon: ShoppingBag,
     tone: "blue",
+    href: "/orders",
   },
   {
     key: "total_print_books",
@@ -1020,6 +1037,7 @@ const dashboardMetrics: {
     hint: "Books to print & deliver",
     icon: BookOpen,
     tone: "blue",
+    href: "/orders?status=PROCESSING",
   },
   {
     key: "pending_payments",
@@ -1027,6 +1045,15 @@ const dashboardMetrics: {
     hint: "Awaiting slip verification",
     icon: ShieldCheck,
     tone: "amber",
+    href: "/orders?status=PAYMENT_PENDING",
+  },
+  {
+    key: "refunds_due_orders",
+    label: "Refunds Pending",
+    hint: "Advance return owed to students",
+    icon: AlertCircle,
+    tone: "rose",
+    href: "/orders?tab=REFUNDS_DUE",
   },
   {
     key: "total_books",
@@ -1034,6 +1061,7 @@ const dashboardMetrics: {
     hint: "Active courses in catalog",
     icon: Library,
     tone: "blue",
+    href: "/books",
   },
 ];
 function Dashboard({
@@ -1048,59 +1076,86 @@ function Dashboard({
   const quickLinks = [
     {
       label: "Live Orders",
-      description: "From checkout to delivery",
+      description: "Checkout to delivery",
       href: "/orders",
       icon: ShoppingBag,
+      tone: "blue",
       allowed: isAdmin || user.permissions.includes("orders.read"),
     },
     {
       label: "Verify Payments",
-      description: "Review uploaded receipts",
+      description: "Review receipts",
       href: "/orders?status=PAYMENT_PENDING",
       icon: ShieldCheck,
+      badgeKey: "pending_payments",
+      tone: "amber",
+      allowed: isAdmin,
+    },
+    {
+      label: "Refunds Pending",
+      description: "Student balance & return",
+      href: "/orders?tab=REFUNDS_DUE",
+      icon: AlertCircle,
+      badgeKey: "refunds_due_orders",
+      tone: "rose",
       allowed: isAdmin,
     },
     {
       label: "Manage Books",
-      description: "Book catalog & course prices",
+      description: "Catalog & page rates",
       href: "/books",
       icon: Library,
+      tone: "indigo",
       allowed: isAdmin || user.permissions.includes("books.read"),
     },
     {
       label: "Printing Vendors",
-      description: "Vendor rates, print queues & ledgers",
+      description: "Queues & ledgers",
       href: "/vendors",
       icon: Factory,
+      tone: "purple",
       allowed: isAdmin,
     },
     {
       label: "Pricing Rates",
-      description: "Set page rates per category",
+      description: "Per-page formula",
       href: "/pricing",
       icon: Coins,
-      allowed: isAdmin,
-    },
-    {
-      label: "System Settings",
-      description: "Storefront & maintenance config",
-      href: "/settings",
-      icon: Settings,
+      tone: "emerald",
       allowed: isAdmin,
     },
     {
       label: "Registered Students",
-      description: "Student accounts & history",
+      description: "Accounts & directory",
       href: "/students",
       icon: Users,
+      tone: "sky",
       allowed: isAdmin || user.permissions.includes("students.read"),
     },
     {
+      label: "System Settings",
+      description: "Storefront & delivery",
+      href: "/settings",
+      icon: Settings,
+      tone: "slate",
+      allowed: isAdmin,
+    },
+    {
       label: "Audit Log",
-      description: "System activity records",
+      description: "Activity records",
       href: "/audit",
       icon: ScrollText,
+      tone: "slate",
       allowed: isAdmin,
+    },
+    {
+      label: "Storefront View",
+      description: "Live student portal",
+      href: "/",
+      icon: ExternalLink,
+      tone: "blue",
+      external: true,
+      allowed: true,
     },
   ].filter((link) => link.allowed);
   const [range, setRange] = useState("30"),
@@ -1114,21 +1169,57 @@ function Dashboard({
   return (
     <>
       {!reportsOnly && !!quickLinks.length && (
-        <section className="dashboard-welcome">
-          <nav className="dashboard-shortcuts" aria-label="Quick actions">
-            {quickLinks.map(({ label, description, href, icon: Icon }) => (
-              <a key={href} href={base + href}>
-                <span className="shortcut-icon">
-                  <Icon size={20} />
-                </span>
-                <span>
-                  <strong>{label}</strong>
-                  <small>{description}</small>
-                </span>
-                <ArrowUpRight size={18} className="shortcut-arrow" />
-              </a>
-            ))}
-          </nav>
+        <section className="dashboard-matte-shell" aria-label="Quick navigation">
+          <div className="matte-shell-header">
+            <div className="matte-shell-title">
+              <span className="matte-pulse-dot" />
+              <strong>Quick Navigation</strong>
+            </div>
+            <span className="matte-shell-hint">Direct shortcuts to active bookstore modules</span>
+          </div>
+          <div className="dashboard-matte-grid">
+            {quickLinks.map(({ label, description, href, icon: Icon, badgeKey, tone, external }: any) => {
+              const badgeCount =
+                badgeKey === "pending_payments"
+                  ? Number((data as any)?.pipeline?.pending_payments ?? (data as any)?.stats?.pending_payments ?? 0)
+                  : badgeKey === "refunds_due_orders"
+                  ? Number((data as any)?.pipeline?.refunds_due_orders ?? (data as any)?.stats?.refunds_due_orders ?? 0)
+                  : 0;
+
+              const dynamicDesc =
+                badgeKey === "pending_payments" && badgeCount > 0
+                  ? `${badgeCount} ${badgeCount === 1 ? "review" : "reviews"} pending`
+                  : badgeKey === "refunds_due_orders" && badgeCount > 0
+                  ? `${money(Number((data as any)?.pipeline?.total_refund_due_amount ?? 0))} due`
+                  : description;
+
+              return (
+                <a
+                  key={href}
+                  href={external ? href : base + href}
+                  {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+                  className={`dashboard-matte-card tone-${tone}${badgeCount > 0 ? " has-alert" : ""}`}
+                >
+                  <div className="matte-card-top">
+                    <span className="matte-icon-badge">
+                      <Icon size={16} />
+                    </span>
+                    {badgeCount > 0 ? (
+                      <span className={`matte-alert-pill pill-${tone}`}>
+                        {badgeCount}
+                      </span>
+                    ) : (
+                      <ArrowUpRight size={13} className="matte-card-arrow" />
+                    )}
+                  </div>
+                  <div className="matte-card-bottom">
+                    <strong className="matte-card-title">{label}</strong>
+                    <small className="matte-card-desc">{dynamicDesc}</small>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
         </section>
       )}
       <div className="dashboard-controls">
@@ -1221,10 +1312,209 @@ function Dashboard({
       <Result loading={loading} error={error}>
         {data && (
           <>
+            {!reportsOnly && data.pipeline && (
+              <div
+                className="operational-pipeline-bar"
+                style={{
+                  margin: "0 0 20px",
+                  padding: "14px 16px",
+                  background: "var(--card, #ffffff)",
+                  border: "1px solid var(--border, #e2e8f0)",
+                  borderRadius: "14px",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "1.1rem" }}>⚡</span>
+                    <strong style={{ fontSize: "0.94rem" }}>Live Order Fulfillment Pipeline</strong>
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                      Current active orders across fulfillment stages
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", fontWeight: 600 }}>
+                    Click any stage to view matching orders
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                    gap: "10px",
+                  }}
+                >
+                  {/* 1. Review Payments */}
+                  <a
+                    href={base + "/orders?status=PAYMENT_PENDING"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: (data.pipeline.pending_payments > 0) ? "rgba(245, 158, 11, 0.12)" : "var(--muted)",
+                      border: (data.pipeline.pending_payments > 0) ? "1.5px solid #f59e0b" : "1px solid var(--border)",
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)" }}>1. PAYMENTS</span>
+                      <ShieldCheck size={14} style={{ color: (data.pipeline.pending_payments > 0) ? "#d97706" : "var(--muted-foreground)" }} />
+                    </div>
+                    <strong style={{ fontSize: "1.1rem", color: (data.pipeline.pending_payments > 0) ? "#d97706" : "var(--foreground)" }}>
+                      {data.pipeline.pending_payments}
+                    </strong>
+                    <small style={{ fontSize: "0.68rem", color: "var(--muted-foreground)" }}>
+                      {data.pipeline.pending_payments > 0 ? "Slips to verify ⚠️" : "All verified ✓"}
+                    </small>
+                  </a>
+
+                  {/* 2. Assign to Vendor */}
+                  <a
+                    href={base + "/orders?status=CONFIRMED"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: (data.pipeline.unassigned_orders > 0) ? "rgba(59, 130, 246, 0.12)" : "var(--muted)",
+                      border: (data.pipeline.unassigned_orders > 0) ? "1.5px solid #3b82f6" : "1px solid var(--border)",
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)" }}>2. ASSIGN PRESS</span>
+                      <Factory size={14} style={{ color: (data.pipeline.unassigned_orders > 0) ? "#2563eb" : "var(--muted-foreground)" }} />
+                    </div>
+                    <strong style={{ fontSize: "1.1rem", color: (data.pipeline.unassigned_orders > 0) ? "#2563eb" : "var(--foreground)" }}>
+                      {data.pipeline.unassigned_orders}
+                    </strong>
+                    <small style={{ fontSize: "0.68rem", color: "var(--muted-foreground)" }}>
+                      {data.pipeline.unassigned_orders > 0 ? "Needs vendor push" : "All assigned ✓"}
+                    </small>
+                  </a>
+
+                  {/* 3. In Printing Queue */}
+                  <a
+                    href={base + "/orders?status=PROCESSING"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: (data.pipeline.in_printing_orders > 0) ? "rgba(147, 51, 234, 0.1)" : "var(--muted)",
+                      border: (data.pipeline.in_printing_orders > 0) ? "1.5px solid #a855f7" : "1px solid var(--border)",
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)" }}>3. PRINT QUEUE</span>
+                      <Printer size={14} style={{ color: (data.pipeline.in_printing_orders > 0) ? "#9333ea" : "var(--muted-foreground)" }} />
+                    </div>
+                    <strong style={{ fontSize: "1.1rem", color: (data.pipeline.in_printing_orders > 0) ? "#9333ea" : "var(--foreground)" }}>
+                      {data.pipeline.in_printing_orders}
+                    </strong>
+                    <small style={{ fontSize: "0.68rem", color: "var(--muted-foreground)" }}>
+                      At printing presses
+                    </small>
+                  </a>
+
+                  {/* 4. Campus Pickup */}
+                  <a
+                    href={base + "/orders?status=SHIPPED"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: (data.pipeline.campus_ready_orders > 0) ? "rgba(16, 185, 129, 0.1)" : "var(--muted)",
+                      border: (data.pipeline.campus_ready_orders > 0) ? "1.5px solid #10b981" : "1px solid var(--border)",
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)" }}>4. CAMPUS PICKUP</span>
+                      <Building2 size={14} style={{ color: (data.pipeline.campus_ready_orders > 0) ? "#059669" : "var(--muted-foreground)" }} />
+                    </div>
+                    <strong style={{ fontSize: "1.1rem", color: (data.pipeline.campus_ready_orders > 0) ? "#059669" : "var(--foreground)" }}>
+                      {data.pipeline.campus_ready_orders}
+                    </strong>
+                    <small style={{ fontSize: "0.68rem", color: "var(--muted-foreground)" }}>
+                      Ready at Qanchi campus
+                    </small>
+                  </a>
+
+                  {/* 5. Courier / In Transit */}
+                  <a
+                    href={base + "/orders?status=SHIPPED"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: (data.pipeline.dispatched_orders > 0) ? "rgba(6, 182, 212, 0.1)" : "var(--muted)",
+                      border: (data.pipeline.dispatched_orders > 0) ? "1.5px solid #06b6d4" : "1px solid var(--border)",
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)" }}>5. IN TRANSIT</span>
+                      <Truck size={14} style={{ color: (data.pipeline.dispatched_orders > 0) ? "#0891b2" : "var(--muted-foreground)" }} />
+                    </div>
+                    <strong style={{ fontSize: "1.1rem", color: (data.pipeline.dispatched_orders > 0) ? "#0891b2" : "var(--foreground)" }}>
+                      {data.pipeline.dispatched_orders}
+                    </strong>
+                    <small style={{ fontSize: "0.68rem", color: "var(--muted-foreground)" }}>
+                      Rider & Post Courier
+                    </small>
+                  </a>
+
+                  {/* 6. Pending Refunds */}
+                  <a
+                    href={base + "/orders?tab=REFUNDS_DUE"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: (data.pipeline.refunds_due_orders > 0) ? "rgba(239, 68, 68, 0.12)" : "var(--muted)",
+                      border: (data.pipeline.refunds_due_orders > 0) ? "1.5px solid #ef4444" : "1px solid var(--border)",
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: (data.pipeline.refunds_due_orders > 0) ? "#dc2626" : "var(--muted-foreground)" }}>
+                        6. REFUNDS DUE
+                      </span>
+                      <AlertCircle size={14} style={{ color: (data.pipeline.refunds_due_orders > 0) ? "#dc2626" : "var(--muted-foreground)" }} />
+                    </div>
+                    <strong style={{ fontSize: "1.1rem", color: (data.pipeline.refunds_due_orders > 0) ? "#dc2626" : "var(--foreground)" }}>
+                      {data.pipeline.refunds_due_orders}
+                    </strong>
+                    <small style={{ fontSize: "0.68rem", color: (data.pipeline.refunds_due_orders > 0) ? "#dc2626" : "var(--muted-foreground)", fontWeight: data.pipeline.refunds_due_orders > 0 ? 700 : 400 }}>
+                      {data.pipeline.refunds_due_orders > 0 ? money(data.pipeline.total_refund_due_amount) : "No refunds due ✓"}
+                    </small>
+                  </a>
+                </div>
+              </div>
+            )}
+
             {!reportsOnly && (
               <div className="metrics">
                 {dashboardMetrics.map(
-                  ({ key, label, hint, icon: Icon, tone }) => {
+                  ({ key, label, hint, icon: Icon, tone, href }) => {
                     let mainDisplay: React.ReactNode = "";
                     let subDisplay: React.ReactNode = hint;
 
@@ -1241,6 +1531,10 @@ function Dashboard({
                       const qBks = Number(data.stats.queue_books || 0);
                       const qPgs = Number(data.stats.queue_pages || 0);
                       subDisplay = `${qOrders} ${qOrders === 1 ? "Order" : "Orders"} · ${qBks} ${qBks === 1 ? "Book" : "Books"} · ${qPgs.toLocaleString()} Pages`;
+                    } else if (key === "office_stock_savings") {
+                      mainDisplay = money(Number(data.stats.office_stock_savings || 0));
+                      const shelfBks = Number(data.stats.total_office_stock_books || 0);
+                      subDisplay = `${shelfBks} ${shelfBks === 1 ? "Book" : "Books"} fulfilled from campus shelf`;
                     } else if (key === "net_profit") {
                       mainDisplay = money(Number(data.stats.net_profit || 0));
                       subDisplay = "Total Sales minus Vendor (Shipped + Queue)";
@@ -1257,49 +1551,205 @@ function Dashboard({
                       subDisplay = `${pgs.toLocaleString()} pgs · ${shelfBks} from Office Shelf`;
                     } else if (key === "pending_payments") {
                       mainDisplay = Number(data.stats.pending_payments || 0).toLocaleString();
+                    } else if (key === "refunds_due_orders") {
+                      const rCount = Number(data.stats.refunds_due_orders || 0);
+                      const rAmt = Number(data.stats.total_refund_due_amount || 0);
+                      mainDisplay = `${rCount} ${rCount === 1 ? "Order" : "Orders"}`;
+                      subDisplay = rCount > 0 ? `Total: ${money(rAmt)} due` : "No pending refunds ✓";
                     } else {
                       mainDisplay = Number(data.stats[key] || 0).toLocaleString();
                     }
 
+                    const metricHref = href ? base + href : undefined;
+                    const MetricComp: any = metricHref ? "a" : "div";
                     return (
-                      <div className={`metric metric-${tone}`} key={key}>
+                      <MetricComp
+                        {...(metricHref ? { href: metricHref } : {})}
+                        className={`metric metric-${tone}${metricHref ? " metric-clickable" : ""}`}
+                        key={key}
+                      >
                         <div className="metric-heading">
                           <span>{label}</span>
-                          <span className="metric-icon">
-                            <Icon size={19} />
+                          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span className="metric-icon">
+                              <Icon size={18} />
+                            </span>
+                            {metricHref && <ArrowUpRight size={13} className="metric-click-arrow" />}
                           </span>
                         </div>
                         <strong>{mainDisplay}</strong>
                         <small>{subDisplay}</small>
-                      </div>
+                      </MetricComp>
                     );
                   }
                 )}
               </div>
             )}
-            {data.stats.pending_payments > 0 && (
-              <div className="notice dashboard-notice">
-                <span className="notice-icon">
-                  <Bell size={18} />
-                </span>
-                <div>
-                  <strong>
-                    {data.stats.pending_payments}{" "}
-                    {data.stats.pending_payments === 1
-                      ? "payment needs"
-                      : "payments need"}{" "}
-                    a review
-                  </strong>
-                  <p>Payment reviews help your next orders move forward.</p>
+
+            {/* Smart Operational Action Banners */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "16px 0" }}>
+              {data.stats.pending_payments > 0 && (
+                <div className="notice dashboard-notice">
+                  <span className="notice-icon"><Bell size={18} /></span>
+                  <div>
+                    <strong>
+                      {data.stats.pending_payments} {data.stats.pending_payments === 1 ? "payment proof needs" : "payment proofs need"} review
+                    </strong>
+                    <p>Review student transfer receipts to confirm orders and move them to printing.</p>
+                  </div>
+                  {isAdmin && (
+                    <a href="/admin/orders?status=PAYMENT_PENDING" className="text-link">
+                      Review payments <ArrowUpRight size={16} />
+                    </a>
+                  )}
                 </div>
-                {isAdmin && (
-                  <a href="/admin/orders?status=PAYMENT_PENDING" className="text-link">
-                    Review payments <ArrowUpRight size={16} />
+              )}
+
+              {data.stats.unassigned_orders > 0 && (
+                <div className="notice dashboard-notice" style={{ borderColor: "#3b82f6", background: "rgba(59, 130, 246, 0.08)" }}>
+                  <span className="notice-icon" style={{ color: "#2563eb" }}><Factory size={18} /></span>
+                  <div>
+                    <strong style={{ color: "#1d4ed8" }}>
+                      {data.stats.unassigned_orders} verified {data.stats.unassigned_orders === 1 ? "order is" : "orders are"} waiting to be assigned to printing vendors
+                    </strong>
+                    <p>Push these orders to vendor queues or fulfill directly from office stock.</p>
+                  </div>
+                  {isAdmin && (
+                    <a href="/admin/orders?status=CONFIRMED" className="text-link" style={{ color: "#2563eb" }}>
+                      Assign vendors <ArrowUpRight size={16} />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {data.stats.refunds_due_orders > 0 && (
+                <div className="notice dashboard-notice" style={{ borderColor: "#ef4444", background: "rgba(239, 68, 68, 0.08)" }}>
+                  <span className="notice-icon" style={{ color: "#dc2626" }}><AlertCircle size={18} /></span>
+                  <div>
+                    <strong style={{ color: "#b91c1c" }}>
+                      {data.stats.refunds_due_orders} student {data.stats.refunds_due_orders === 1 ? "refund is" : "refunds are"} pending ({money(data.stats.total_refund_due_amount)})
+                    </strong>
+                    <p>Refunds due for unavailable book shortages or student transfer overpayments.</p>
+                  </div>
+                  {isAdmin && (
+                    <a href="/admin/orders?tab=REFUNDS_DUE" className="text-link" style={{ color: "#dc2626" }}>
+                      Process refunds <ArrowUpRight size={16} />
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Charts data={data} />
+
+            {/* Recent Orders Overview Table for Admin */}
+            {isAdmin && data.recent_orders && data.recent_orders.length > 0 && (
+              <div className="panel stack" style={{ marginTop: "24px", gap: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.05rem" }}>Recent Order Activity</h3>
+                    <p style={{ margin: "2px 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                      Latest customer orders across all campuses and delivery routes
+                    </p>
+                  </div>
+                  <a href="/admin/orders" className="btn compact">
+                    View All Orders ({data.stats.total_orders}) →
                   </a>
-                )}
+                </div>
+
+                <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
+                    <thead>
+                      <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Reference</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Student</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Delivery Route</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Books</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Total</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Assigned Vendor</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600 }}>Status</th>
+                        <th style={{ padding: "9px 12px", fontWeight: 600, textAlign: "right" }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recent_orders.map((o: any, idx: number) => {
+                        const isCampus = o.delivery_type === "campus";
+                        const isLahore = o.delivery_type === "lahore" || o.delivery_type === "lahore_home";
+                        return (
+                          <tr
+                            key={o.id}
+                            style={{
+                              borderBottom: idx < data.recent_orders.length - 1 ? "1px solid var(--border)" : "none",
+                              background: idx % 2 === 0 ? "transparent" : "var(--muted)",
+                            }}
+                          >
+                            <td style={{ padding: "10px 12px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                              <a href={`/admin/orders/${o.id}`} style={{ color: "var(--primary)", textDecoration: "none" }}>
+                                {o.reference || `#${o.id.slice(0, 8)}`}
+                              </a>
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <strong>{o.name}</strong>
+                              {o.phone && (
+                                <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)" }}>
+                                  {o.phone}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                              <span
+                                style={{
+                                  fontSize: "0.74rem",
+                                  fontWeight: 600,
+                                  padding: "2px 7px",
+                                  borderRadius: "6px",
+                                  background: isCampus ? "rgba(16, 185, 129, 0.12)" : isLahore ? "rgba(59, 130, 246, 0.12)" : "rgba(168, 85, 247, 0.12)",
+                                  color: isCampus ? "#059669" : isLahore ? "#2563eb" : "#9333ea",
+                                }}
+                              >
+                                {isCampus ? "🏫 Qanchi Campus" : isLahore ? "🛵 Lahore Home" : "🚚 Other City"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                              {o.total_books} {o.total_books === 1 ? "Book" : "Books"}
+                            </td>
+                            <td style={{ padding: "10px 12px", fontWeight: 700 }}>
+                              {money(o.total)}
+                            </td>
+                            <td style={{ padding: "10px 12px", fontSize: "0.78rem" }}>
+                              {o.vendor_name === "Unassigned" ? (
+                                <span style={{ color: "#d97706", fontWeight: 600 }}>⚠️ Unassigned</span>
+                              ) : (
+                                <span>🏭 {o.vendor_name}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <span
+                                style={{
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  padding: "2px 7px",
+                                  borderRadius: "6px",
+                                  background: "var(--muted)",
+                                  color: "var(--foreground)",
+                                }}
+                              >
+                                {o.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                              <a href={`/admin/orders/${o.id}`} className="btn compact">
+                                View
+                              </a>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-            <Charts data={data} />
           </>
         )}
       </Result>

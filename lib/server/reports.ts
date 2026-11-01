@@ -27,6 +27,46 @@ export async function reports(u: User, from: string, to: string, vendorId?: stri
 
   const verifiedFilter = `${filter} AND p.status='VERIFIED' AND o.status NOT IN ('CANCELLED','REFUND_REQUESTED')`;
 
+  // Real-time Operational Workflow Pipeline
+  const pipeline = await one<any>(
+    `SELECT 
+      COALESCE(SUM(p.status IN ('PENDING','MANUAL_REVIEW','NEW_SLIP_REQUESTED')),0) AS pending_payments,
+      COALESCE(SUM(CASE WHEN p.status='VERIFIED' AND o.status='CONFIRMED' AND (o.vendor_id IS NULL OR o.vendor_id = '') THEN 1 ELSE 0 END),0) AS unassigned_orders,
+      COALESCE(SUM(CASE WHEN o.status='PROCESSING' THEN 1 ELSE 0 END),0) AS in_printing_orders,
+      COALESCE(SUM(CASE WHEN o.status='SHIPPED' AND o.delivery_type='campus' THEN 1 ELSE 0 END),0) AS campus_ready_orders,
+      COALESCE(SUM(CASE WHEN o.status='SHIPPED' AND o.delivery_type!='campus' THEN 1 ELSE 0 END),0) AS dispatched_orders,
+      COALESCE(SUM(CASE WHEN o.refund_due > 0 AND o.refund_status='REFUND_PENDING' THEN 1 ELSE 0 END),0) AS refunds_due_orders,
+      COALESCE(SUM(CASE WHEN o.refund_due > 0 AND o.refund_status='REFUND_PENDING' THEN o.refund_due ELSE 0 END),0) AS total_refund_due_amount
+     FROM orders o 
+     JOIN payments p ON o.id=p.order_id 
+     WHERE ${filter}`,
+    ...args,
+  );
+
+  // Recent Activity for Admin Overview Table
+  const recentOrders = await all<any>(
+    `SELECT 
+      o.id,
+      o.reference,
+      o.name,
+      o.phone,
+      o.city,
+      o.delivery_type,
+      o.total,
+      o.status,
+      o.created_at,
+      p.status AS payment_status,
+      COALESCE(v.name, 'Unassigned') AS vendor_name,
+      (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND is_unavailable = 0) AS total_books
+     FROM orders o 
+     JOIN payments p ON o.id = p.order_id 
+     LEFT JOIN vendors v ON v.id = o.vendor_id 
+     WHERE ${filter} 
+     ORDER BY o.created_at DESC 
+     LIMIT 8`,
+    ...args,
+  );
+
   // Item-level volumes and vendor printing costs for verified orders
   const itemStats = await one<any>(
     `SELECT 
@@ -171,7 +211,23 @@ export async function reports(u: User, from: string, to: string, vendorId?: stri
       total_print_books: Number(itemStats?.total_print_books || 0),
       total_office_stock_books: Number(itemStats?.total_office_stock_books || 0),
       total_pages_printed: Number(itemStats?.total_pages_printed || 0),
+      unassigned_orders: Number(pipeline?.unassigned_orders || 0),
+      in_printing_orders: Number(pipeline?.in_printing_orders || 0),
+      campus_ready_orders: Number(pipeline?.campus_ready_orders || 0),
+      dispatched_orders: Number(pipeline?.dispatched_orders || 0),
+      refunds_due_orders: Number(pipeline?.refunds_due_orders || 0),
+      total_refund_due_amount: Number(pipeline?.total_refund_due_amount || 0),
     },
+    pipeline: {
+      pending_payments: Number(pipeline?.pending_payments || 0),
+      unassigned_orders: Number(pipeline?.unassigned_orders || 0),
+      in_printing_orders: Number(pipeline?.in_printing_orders || 0),
+      campus_ready_orders: Number(pipeline?.campus_ready_orders || 0),
+      dispatched_orders: Number(pipeline?.dispatched_orders || 0),
+      refunds_due_orders: Number(pipeline?.refunds_due_orders || 0),
+      total_refund_due_amount: Number(pipeline?.total_refund_due_amount || 0),
+    },
+    recent_orders: recentOrders,
     daily,
     best,
     category,
