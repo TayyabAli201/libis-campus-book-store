@@ -2961,172 +2961,415 @@ a.map-pin-pill:hover {
   color: white;
 }
 
-/* Static Non-Clickable Campus Pill (Single Color, No Hover Effect) */
-.campus-static-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  background: color-mix(in srgb, #2563eb 12%, transparent);
-  color: #1d4ed8;
-  border: 1px solid color-mix(in srgb, #2563eb 32%, transparent);
-  margin-top: 4px;
-  cursor: default;
-  pointer-events: none;
-  user-select: none;
-  transition: none !important;
-}
-.campus-static-pill:hover {
-  background: color-mix(in srgb, #2563eb 12%, transparent) !important;
-  color: #1d4ed8 !important;
-  border-color: color-mix(in srgb, #2563eb 32%, transparent) !important;
-}
-:is(.dark *) .campus-static-pill {
-  background: color-mix(in srgb, #3b82f6 18%, transparent);
-  color: #93c5fd;
-  border-color: color-mix(in srgb, #3b82f6 38%, transparent);
-}
-:is(.dark *) .campus-static-pill:hover {
-  background: color-mix(in srgb, #3b82f6 18%, transparent) !important;
-  color: #93c5fd !important;
-  border-color: color-mix(in srgb, #3b82f6 38%, transparent) !important;
-}
-
-/* Static Non-Clickable Other City Pill (Courier Shipping, No Map Link, No Hover Effect) */
-.other-static-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  background: color-mix(in srgb, #d97706 12%, transparent);
-  color: #b45309;
-  border: 1px solid color-mix(in srgb, #d97706 32%, transparent);
-  margin-top: 4px;
-  cursor: default;
-  pointer-events: none;
-  user-select: none;
-  transition: none !important;
-}
-.other-static-pill:hover {
-  background: color-mix(in srgb, #d97706 12%, transparent) !important;
-  color: #b45309 !important;
-  border-color: color-mix(in srgb, #d97706 32%, transparent) !important;
-}
-:is(.dark *) .other-static-pill {
-  background: color-mix(in srgb, #fbbf24 16%, transparent);
-  color: #fde68a;
-  border-color: color-mix(in srgb, #fbbf24 35%, transparent);
-}
-:is(.dark *) .other-static-pill:hover {
-  background: color-mix(in srgb, #fbbf24 16%, transparent) !important;
-  color: #fde68a !important;
-  border-color: color-mix(in srgb, #fbbf24 35%, transparent) !important;
-}
-
-/* Category Variant 1: VU Qanchi Campus (University Blue Shade) */
+/* ==========================================================================
+   Order Route & Destination Badges - Clean Solid Matte (2026)
+   ========================================================================== */
+.campus-static-pill,
 .map-pin-pill.campus-badge {
-  background: color-mix(in srgb, #2563eb 12%, transparent);
-  color: #1d4ed8;
-  border-color: color-mix(in srgb, #2563eb 32%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #1e40af;
+  border: 1px solid #cbd5e1;
+  margin-top: 2px;
+  cursor: default;
+  user-select: none;
+  transition: all 0.16s ease;
+}
+
+a.map-pin-pill.campus-badge {
+  cursor: pointer;
 }
 a.map-pin-pill.campus-badge:hover {
-  background: #2563eb;
+  background: #1e40af;
   color: #ffffff;
+  border-color: #1e40af;
 }
+
+.dark .campus-static-pill,
+.dark .map-pin-pill.campus-badge,
+:is(.dark *) .campus-static-pill,
 :is(.dark *) .map-pin-pill.campus-badge {
-  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  background: #172554;
   color: #93c5fd;
-  border-color: color-mix(in srgb, #3b82f6 38%, transparent);
+  border-color: #1e3a8a;
 }
+.dark a.map-pin-pill.campus-badge:hover,
 :is(.dark *) a.map-pin-pill.campus-badge:hover {
-  background: #2563eb;
+  background: #3b82f6;
   color: #ffffff;
 }
 
-/* Category Variant 2: Lahore Route (Bykea Red Type Ride) */
+/* Lahore Route */
 .map-pin-pill.lahore-badge {
-  background: color-mix(in srgb, #dc2626 12%, transparent);
-  color: #b91c1c;
-  border-color: color-mix(in srgb, #dc2626 32%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  margin-top: 2px;
+  cursor: default;
+  user-select: none;
+  transition: all 0.16s ease;
+}
+
+a.map-pin-pill.lahore-badge {
+  cursor: pointer;
 }
 a.map-pin-pill.lahore-badge:hover {
-  background: #dc2626;
+  background: #991b1b;
   color: #ffffff;
+  border-color: #991b1b;
 }
+
+.dark .map-pin-pill.lahore-badge,
 :is(.dark *) .map-pin-pill.lahore-badge {
-  background: color-mix(in srgb, #ef4444 18%, transparent);
+  background: #2a151b;
   color: #fca5a5;
-  border-color: color-mix(in srgb, #ef4444 38%, transparent);
+  border-color: #5c1d24;
 }
+.dark a.map-pin-pill.lahore-badge:hover,
 :is(.dark *) a.map-pin-pill.lahore-badge:hover {
-  background: #dc2626;
+  background: #ef4444;
   color: #ffffff;
 }
 
-/* Category Variant 3: Other Cities (Courier / Postal Shipping) */
+/* Other Cities (Courier) */
+.other-static-pill,
 .map-pin-pill.other-badge {
-  background: color-mix(in srgb, #d97706 12%, transparent);
-  color: #b45309;
-  border-color: color-mix(in srgb, #d97706 32%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #fefce8;
+  color: #854d0e;
+  border: 1px solid #fef08a;
+  margin-top: 2px;
+  cursor: default;
+  user-select: none;
+  transition: all 0.16s ease;
+}
+
+a.map-pin-pill.other-badge {
+  cursor: pointer;
 }
 a.map-pin-pill.other-badge:hover {
-  background: #d97706;
+  background: #854d0e;
   color: #ffffff;
-}
-:is(.dark *) .map-pin-pill.other-badge {
-  background: color-mix(in srgb, #fbbf24 16%, transparent);
-  color: #fde68a;
-  border-color: color-mix(in srgb, #fbbf24 35%, transparent);
-}
-:is(.dark *) a.map-pin-pill.other-badge:hover {
-  background: #f59e0b;
-  color: #ffffff;
+  border-color: #854d0e;
 }
 
-/* Other City External Courier Tracking Buttons & Badges */
+.dark .other-static-pill,
+.dark .map-pin-pill.other-badge,
+:is(.dark *) .other-static-pill,
+:is(.dark *) .map-pin-pill.other-badge {
+  background: #2a2113;
+  color: #fde047;
+  border-color: #5c481d;
+}
+.dark a.map-pin-pill.other-badge:hover,
+:is(.dark *) a.map-pin-pill.other-badge:hover {
+  background: #eab308;
+  color: #000000;
+}
+
+/* Vendor Badge (e.g. Ahmed Printing) - Clean Slate */
+.vendor-badge-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 2px 7px !important;
+  border-radius: 6px !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  margin-top: 2px !important;
+}
+
+.dark .vendor-badge-pill {
+  background: #1e293b !important;
+  color: #cbd5e1 !important;
+  border-color: #334155 !important;
+}
+
+/* Received Book Badges */
+.rcvd-all-pill {
+  background: #f0fdf4 !important;
+  color: #166534 !important;
+  border: 1px solid #bbf7d0 !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  padding: 2px 7px !important;
+}
+.dark .rcvd-all-pill {
+  background: rgba(22, 101, 52, 0.22) !important;
+  color: #86efac !important;
+  border-color: rgba(74, 222, 128, 0.3) !important;
+}
+
+.rcvd-partial-pill {
+  background: #fffbeb !important;
+  color: #92400e !important;
+  border: 1px solid #fde68a !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  padding: 2px 7px !important;
+}
+.dark .rcvd-partial-pill {
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: #fde68a !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Printed & Printing Queue Badges */
+.printed-status-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
+  width: fit-content !important;
+  background: #f0fdf4 !important;
+  color: #166534 !important;
+  border: 1px solid #bbf7d0 !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+  font-size: 0.71rem !important;
+  font-weight: 600 !important;
+}
+.dark .printed-status-pill {
+  background: rgba(22, 101, 52, 0.22) !important;
+  color: #86efac !important;
+  border-color: rgba(74, 222, 128, 0.3) !important;
+}
+
+.print-queue-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
+  width: fit-content !important;
+  background: #f5f3ff !important;
+  color: #5b21b6 !important;
+  border: 1px solid #ddd6fe !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+  font-size: 0.71rem !important;
+  font-weight: 600 !important;
+}
+.dark .print-queue-pill {
+  background: rgba(109, 40, 217, 0.18) !important;
+  color: #c4b5fd !important;
+  border-color: rgba(147, 51, 234, 0.3) !important;
+}
+
+/* Solid Action Buttons - Clean 2026 Solid Matte Colors (No Black) */
+.ship-courier-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: 7px !important;
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border: 1px solid #0369a1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.15) !important;
+  transition: all 0.16s ease !important;
+}
+.ship-courier-btn:hover {
+  background: #0369a1 !important;
+  transform: translateY(-1px) !important;
+}
+.dark .ship-courier-btn {
+  background: #0284c7 !important;
+  border-color: #38bdf8 !important;
+}
+.dark .ship-courier-btn:hover {
+  background: #0369a1 !important;
+}
+
+.mark-delivered-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: 7px !important;
+  background: #047857 !important;
+  color: #ffffff !important;
+  border: 1px solid #047857 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(4, 120, 87, 0.12) !important;
+  transition: all 0.16s ease !important;
+}
+.mark-delivered-btn:hover {
+  background: #065f46 !important;
+  transform: translateY(-1px) !important;
+}
+
+.mark-shipped-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: 7px !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid #1d4ed8 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15) !important;
+  transition: all 0.16s ease !important;
+}
+.mark-shipped-btn:hover {
+  background: #1d4ed8 !important;
+  transform: translateY(-1px) !important;
+}
+.dark .mark-shipped-btn {
+  background: #2563eb !important;
+  border-color: #3b82f6 !important;
+}
+.dark .mark-shipped-btn:hover {
+  background: #1d4ed8 !important;
+}
+
+.send-campus-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: 7px !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid #1d4ed8 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15) !important;
+  transition: all 0.16s ease !important;
+  white-space: nowrap !important;
+}
+.send-campus-btn:hover {
+  background: #1d4ed8 !important;
+  transform: translateY(-1px) !important;
+}
+.dark .send-campus-btn {
+  background: #2563eb !important;
+  border-color: #3b82f6 !important;
+}
+.dark .send-campus-btn:hover {
+  background: #1d4ed8 !important;
+}
+
+.mark-printed-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  background: #059669 !important;
+  color: #ffffff !important;
+  border: 1px solid #047857 !important;
+  box-shadow: 0 1px 2px rgba(5, 150, 105, 0.15) !important;
+  transition: all 0.16s ease !important;
+}
+.mark-printed-btn:hover {
+  background: #047857 !important;
+  transform: translateY(-1px) !important;
+}
+.dark .mark-printed-btn {
+  background: #059669 !important;
+  border-color: #10b981 !important;
+}
+
+.unmark-print-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  background: var(--muted, #f1f5f9) !important;
+  color: var(--foreground, #334155) !important;
+  border: 1px solid var(--border, #cbd5e1) !important;
+  transition: all 0.16s ease !important;
+}
+.unmark-print-btn:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+.dark .unmark-print-btn {
+  background: #1e293b !important;
+  color: #cbd5e1 !important;
+  border-color: #334155 !important;
+}
+.dark .unmark-print-btn:hover {
+  background: #334155 !important;
+  color: #ffffff !important;
+}
+
+/* Other City External Courier Tracking Buttons & Badges - Clean Solid Matte */
 .courier-add-tracking-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  background: color-mix(in srgb, #2563eb 10%, transparent);
-  color: #1d4ed8;
-  border: 1px dashed #60a5fa;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #1e40af;
+  border: 1px dashed #94a3b8;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.16s ease;
   text-decoration: none;
   line-height: 1.2;
 }
 
 .courier-add-tracking-btn:hover {
-  background: #2563eb;
+  background: #1e40af;
   color: #ffffff;
   border-style: solid;
-  border-color: #1d4ed8;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
-  transform: translateY(-1px);
+  border-color: #1e40af;
 }
 
+.dark .courier-add-tracking-btn,
 :is(.dark *) .courier-add-tracking-btn {
-  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  background: #172554;
   color: #93c5fd;
   border-color: #3b82f6;
 }
 
+.dark .courier-add-tracking-btn:hover,
 :is(.dark *) .courier-add-tracking-btn:hover {
   background: #3b82f6;
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
-  transform: translateY(-1px);
 }
 
 .courier-tracking-pill {
@@ -3135,34 +3378,33 @@ a.map-pin-pill.other-badge:hover {
   gap: 4px;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  background: color-mix(in srgb, #059669 12%, transparent);
-  color: #047857;
-  border: 1px solid #10b981;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.16s ease;
   line-height: 1.2;
 }
 
 .courier-tracking-pill:hover {
-  background: #059669;
+  background: #166534;
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.28);
-  transform: translateY(-1px);
+  border-color: #166534;
 }
 
+.dark .courier-tracking-pill,
 :is(.dark *) .courier-tracking-pill {
-  background: color-mix(in srgb, #10b981 18%, transparent);
-  color: #6ee7b7;
-  border-color: #059669;
+  background: #052e16;
+  color: #86efac;
+  border-color: #14532d;
 }
 
+.dark .courier-tracking-pill:hover,
 :is(.dark *) .courier-tracking-pill:hover {
-  background: #10b981;
+  background: #16a34a;
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
-  transform: translateY(-1px);
 }
 
 .quick-courier-pill {
@@ -5367,11 +5609,11 @@ footer {
   font-size: 0.77rem;
   font-weight: 600;
   cursor: pointer;
-  border: 1.5px solid #cbd5e1;
-  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
   color: #334155;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.16s ease;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -5379,40 +5621,38 @@ footer {
 }
 
 .date-range-preset-pill:hover {
-  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+  background: #eff6ff !important;
   color: #1d4ed8 !important;
   border-color: #3b82f6 !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2) !important;
+  transform: translateY(-1px);
 }
 
 .date-range-preset-pill.active {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  background: #2563eb !important;
   color: #ffffff !important;
-  border-color: #1e40af !important;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25) !important;
 }
 
 .dark .date-range-preset-pill {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.16) !important;
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
   color: #cbd5e1 !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: none !important;
 }
 
 .dark .date-range-preset-pill:hover {
   border-color: #38bdf8 !important;
   color: #ffffff !important;
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%) !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4) !important;
+  background: #172554 !important;
+  transform: translateY(-1px);
 }
 
 .dark .date-range-preset-pill.active {
-  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+  background: #2563eb !important;
   color: #ffffff !important;
-  border-color: #7dd3fc !important;
-  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.5), 0 0 14px rgba(56, 189, 248, 0.4) !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3) !important;
 }
 
 /* Navigation Header */
@@ -5533,39 +5773,35 @@ footer {
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  font-weight: 650;
-  color: #be123c;
-  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
-  border: 1.5px solid #fecdd3;
+  font-weight: 600;
+  color: #e11d48;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
   cursor: pointer;
-  padding: 7px 14px;
-  border-radius: 9px;
-  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.08);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 6px 13px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(225, 29, 72, 0.05);
+  transition: all 0.16s ease;
   outline: none;
 }
 
 .date-range-reset-btn:hover {
-  background: #fecdd3 !important;
+  background: #ffe4e6 !important;
   border-color: #fda4af !important;
-  color: #9f1239 !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2) !important;
+  color: #be123c !important;
+  transform: translateY(-1px);
 }
 
 .dark .date-range-reset-btn {
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.12) 100%) !important;
-  border: 1.5px solid rgba(248, 113, 113, 0.45) !important;
-  color: #fca5a5 !important;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2) !important;
+  background: #4c0519 !important;
+  border: 1px solid #881337 !important;
+  color: #fda4af !important;
 }
 
 .dark .date-range-reset-btn:hover {
-  border-color: #ef4444 !important;
+  background: #881337 !important;
+  border-color: #f43f5e !important;
   color: #ffffff !important;
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.3) 0%, rgba(185, 28, 28, 0.2) 100%) !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.45) !important;
 }
 
 .date-range-cancel-btn {
@@ -5573,38 +5809,35 @@ footer {
   align-items: center;
   gap: 5px;
   font-size: 0.82rem;
-  font-weight: 650;
-  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-  border: 1.5px solid #cbd5e1;
-  color: #475569;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
   cursor: pointer;
-  padding: 7px 16px;
-  border-radius: 9px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 6px 15px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.16s ease;
   outline: none;
 }
 
 .date-range-cancel-btn:hover {
   border-color: #94a3b8 !important;
-  color: #1e293b !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  transform: translateY(-1px);
 }
 
 .dark .date-range-cancel-btn {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
   color: #e2e8f0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 .dark .date-range-cancel-btn:hover {
-  border-color: rgba(255, 255, 255, 0.4) !important;
+  border-color: #475569 !important;
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.16) !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.2) !important;
+  background: #334155 !important;
 }
 
 .date-range-apply-btn {
@@ -5612,16 +5845,15 @@ footer {
   align-items: center;
   gap: 7px;
   font-size: 0.82rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%);
-  border: 1.5px solid #0369a1;
+  font-weight: 600;
+  background: #2563eb;
+  border: 1px solid #1d4ed8;
   color: #ffffff;
   cursor: pointer;
-  padding: 8px 20px;
-  border-radius: 9px;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  letter-spacing: 0.02em;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 7px 18px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+  transition: all 0.16s ease;
   outline: none;
 }
 
@@ -6058,44 +6290,38 @@ footer {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Toolbar Export Button - Vibrant Emerald Excel Theme */
+/* Toolbar Export Button - Clean Solid Matte Emerald */
 .toolbar-export-btn {
-  height: 40px !important;
-  padding: 0 16px !important;
-  border-radius: 10px !important;
-  border: 1.5px solid #059669 !important;
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  border: 1px solid #059669 !important;
+  background: #059669 !important;
   color: #ffffff !important;
-  font-size: 0.84rem !important;
-  font-weight: 700 !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 7px !important;
   white-space: nowrap !important;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.2) !important;
+  transition: all 0.16s ease !important;
   cursor: pointer !important;
 }
 
 .toolbar-export-btn .toolbar-btn-icon-circle {
-  background: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
   color: #ffffff !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 4px !important;
 }
 
 .toolbar-export-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+  background: #047857 !important;
   border-color: #047857 !important;
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5) !important;
-  transform: translateY(-2px);
-}
-
-.toolbar-export-btn:hover:not(:disabled) .toolbar-btn-icon-circle {
-  background: rgba(255, 255, 255, 0.35) !important;
-  transform: scale(1.1);
-}
-
-.toolbar-export-btn:hover:not(:disabled) .toolbar-export-icon {
-  transform: translateY(1.5px);
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+  transform: translateY(-1px);
 }
 
 .toolbar-export-btn:active:not(:disabled) {
@@ -6109,60 +6335,56 @@ footer {
 }
 
 .toolbar-export-icon {
-  transition: transform 0.2s ease;
+  transition: transform 0.16s ease;
 }
 
-/* Toolbar Batch Action Button (Change All Status) - Vibrant Sapphire Theme */
+/* Toolbar Batch Action Button (Change All Status) - Clean Solid Matte Blue */
 .toolbar-batch-btn {
-  height: 40px !important;
-  padding: 0 16px !important;
-  border-radius: 10px !important;
-  font-size: 0.84rem !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  font-size: 0.82rem !important;
   font-weight: 600 !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 7px !important;
   white-space: nowrap !important;
-  border: 1.5px dashed #cbd5e1 !important;
+  border: 1px dashed #cbd5e1 !important;
   background: #f8fafc !important;
   color: #64748b !important;
   opacity: 0.75;
   cursor: not-allowed;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: all 0.16s ease !important;
 }
 
 .toolbar-batch-btn .toolbar-btn-icon-circle {
   background: #e2e8f0;
   color: #64748b;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
 }
 
 .toolbar-batch-btn.active {
   opacity: 1 !important;
   cursor: pointer !important;
-  border: 1.5px solid #1e40af !important;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  border: 1px solid #1d4ed8 !important;
+  background: #2563eb !important;
   color: #ffffff !important;
-  font-weight: 700 !important;
-  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.38) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25) !important;
 }
 
 .toolbar-batch-btn.active .toolbar-btn-icon-circle {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.22);
   color: #ffffff;
 }
 
 .toolbar-batch-btn.active:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.52) !important;
-  filter: brightness(1.08);
-}
-
-.toolbar-batch-btn.active:hover:not(:disabled) .toolbar-btn-icon-circle {
-  transform: scale(1.1);
-}
-
-.toolbar-batch-btn.active:hover:not(:disabled) .toolbar-batch-icon {
-  transform: translateX(2.5px);
+  background: #1d4ed8 !important;
+  border-color: #1e40af !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35) !important;
+  transform: translateY(-1px);
 }
 
 .toolbar-batch-btn.active:active:not(:disabled) {
@@ -6170,7 +6392,7 @@ footer {
 }
 
 .toolbar-batch-icon {
-  transition: transform 0.2s ease;
+  transition: transform 0.16s ease;
 }
 
 .toolbar-batch-btn:disabled,
@@ -6384,827 +6606,364 @@ footer {
 }
 
 /* ==========================================================================
-   Table Action Buttons (View order / Review payment)
-   Light Colorful Jewel Design - Luminous, Gentle & Beautifully Harmonized
+   Table Action Buttons (View order / Review payment) - Modern Solid Matte (2026)
    ========================================================================== */
 .table-action-btn,
 .view-order-btn {
-  height: 32px !important;
-  padding: 0 14px !important;
-  border-radius: 8px !important;
-  font-size: 0.8rem !important;
-  font-weight: 650 !important;
-  letter-spacing: 0.01ch !important;
+  height: 30px !important;
+  padding: 0 11px !important;
+  border-radius: 7px !important;
+  font-size: 0.77rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01ch !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 7px !important;
+  gap: 5px !important;
   white-space: nowrap !important;
-  position: relative !important;
-  overflow: hidden !important;
   cursor: pointer !important;
   text-decoration: none !important;
   line-height: 1 !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  border: 1.5px solid #93c5fd !important;
-  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%) !important;
-  color: #0369a1 !important;
-  box-shadow:
-    0 2px 6px rgba(14, 165, 233, 0.15),
-    inset 0 1px 0 #ffffff !important;
+  background: var(--card, #ffffff) !important;
+  border: 1px solid var(--border, #cbd5e1) !important;
+  color: var(--foreground, #0f172a) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+  transition: all 0.16s ease !important;
 }
 
-/* Icon */
+.table-action-btn .table-action-shimmer {
+  display: none !important;
+}
+
 .table-action-btn .table-action-icon,
 .view-order-btn .view-order-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #0284c7;
-  transition: color 0.2s ease, transform 0.2s ease;
-  flex-shrink: 0;
+  color: var(--muted-foreground, #64748b);
+  transition: color 0.16s ease;
 }
 
 .table-action-btn .table-action-icon svg,
 .view-order-btn .view-order-icon svg {
-  width: 13.5px;
-  height: 13.5px;
+  width: 12px;
+  height: 12px;
 }
 
-/* Label */
 .table-action-btn .table-action-label {
-  position: relative;
-  z-index: 1;
-  color: #0369a1;
-  transition: color 0.2s ease;
+  color: inherit;
 }
 
-/* Light Sheen Shimmer */
-.table-action-btn .table-action-shimmer {
-  position: absolute;
-  top: -60%;
-  left: -70%;
-  width: 50%;
-  height: 220%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.6) 50%,
-    transparent 100%
-  );
-  transform: rotate(25deg);
-  pointer-events: none;
-  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 2;
-}
-
-/* Hover State - Rich Vibrant Azure Bloom */
 .table-action-btn:hover,
 .view-order-btn:hover {
-  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
-  border-color: #0284c7 !important;
-  color: #ffffff !important;
-  transform: translateY(-1.5px) !important;
-  box-shadow:
-    0 4px 14px rgba(14, 165, 233, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  background: var(--muted, #f1f5f9) !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06) !important;
 }
 
-.table-action-btn:hover .table-action-icon,
-.view-order-btn:hover .view-order-icon {
-  color: #ffffff !important;
-  transform: scale(1.12);
+.table-action-btn:hover .table-action-icon svg,
+.view-order-btn:hover .view-order-icon svg {
+  color: #0f172a;
 }
 
-.table-action-btn:hover .table-action-label {
-  color: #ffffff !important;
-}
-
-.table-action-btn:hover .table-action-shimmer {
-  transform: translateX(400%) rotate(25deg);
-}
-
-/* Active State */
-.table-action-btn:active,
-.view-order-btn:active {
-  transform: translateY(0) !important;
-  background: #0284c7 !important;
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.25),
-    0 1px 2px rgba(0, 0, 0, 0.1) !important;
-}
-
-/* Payment Review Variant - Warm Luminous Amber Pastel */
-.table-action-btn.payment {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
-  border-color: #fcd34d !important;
-  color: #92400e !important;
-  box-shadow:
-    0 2px 6px rgba(217, 119, 6, 0.15),
-    inset 0 1px 0 #ffffff !important;
-}
-
-.table-action-btn.payment .table-action-icon {
-  color: #d97706;
-}
-
-.table-action-btn.payment .table-action-label {
-  color: #92400e;
-}
-
-.table-action-btn.payment:hover {
-  border-color: #d97706 !important;
-  color: #ffffff !important;
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
-  box-shadow:
-    0 4px 14px rgba(217, 119, 6, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-}
-
-.table-action-btn.payment:hover .table-action-icon {
-  color: #ffffff !important;
-}
-
-.table-action-btn.payment:hover .table-action-label {
-  color: #ffffff !important;
-}
-
-/* ==========================================================================
-   Dark Theme (Default) - Luminous Sky-Cyan / Azure Jewel Button
-   ========================================================================== */
 .dark .table-action-btn,
 .dark .view-order-btn {
-  border: 1.5px solid rgba(125, 211, 252, 0.45) !important;
-  background: linear-gradient(
-    135deg,
-    rgba(56, 189, 248, 0.16) 0%,
-    rgba(37, 99, 235, 0.28) 100%
-  ) !important;
-  color: #e0f2fe !important;
-  box-shadow:
-    0 2px 10px rgba(14, 165, 233, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
-}
-
-.dark .table-action-btn .table-action-icon,
-.dark .view-order-btn .view-order-icon {
-  color: #38bdf8 !important;
-}
-
-.dark .table-action-btn .table-action-label {
-  color: #e0f2fe !important;
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
 }
 
 .dark .table-action-btn:hover,
 .dark .view-order-btn:hover {
-  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
-  border-color: #7dd3fc !important;
-  color: #ffffff !important;
-  box-shadow:
-    0 4px 18px rgba(14, 165, 233, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
-
-.dark .table-action-btn:hover .table-action-icon,
-.dark .view-order-btn:hover .view-order-icon {
+  background: #334155 !important;
+  border-color: #475569 !important;
   color: #ffffff !important;
 }
 
-.dark .table-action-btn:hover .table-action-label {
-  color: #ffffff !important;
+.dark .table-action-btn .table-action-icon svg,
+.dark .view-order-btn .view-order-icon svg {
+  color: #94a3b8;
+}
+.dark .table-action-btn:hover .table-action-icon svg,
+.dark .view-order-btn:hover .view-order-icon svg {
+  color: #ffffff;
+}
+
+/* Payment Review Variant - Subtle Solid Amber */
+.table-action-btn.payment {
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+}
+
+.table-action-btn.payment .table-action-icon svg {
+  color: #b45309;
+}
+
+.table-action-btn.payment:hover {
+  background: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #78350f !important;
 }
 
 .dark .table-action-btn.payment {
-  border: 1.5px solid rgba(252, 211, 77, 0.45) !important;
-  background: linear-gradient(
-    135deg,
-    rgba(245, 158, 11, 0.18) 0%,
-    rgba(217, 119, 6, 0.26) 100%
-  ) !important;
-  color: #fef3c7 !important;
-  box-shadow:
-    0 2px 10px rgba(245, 158, 11, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
-}
-
-.dark .table-action-btn.payment .table-action-icon {
-  color: #fbbf24 !important;
-}
-
-.dark .table-action-btn.payment .table-action-label {
-  color: #fef3c7 !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #fde68a !important;
 }
 
 .dark .table-action-btn.payment:hover {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
-  border-color: #fde68a !important;
+  background: rgba(245, 158, 11, 0.22) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
   color: #ffffff !important;
-  box-shadow:
-    0 4px 18px rgba(217, 119, 6, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
 }
 
-/* Table Delete Order Button */
+/* Table Delete Order Button: Clean Ghost Icon Button */
 .order-delete-btn {
-  border-radius: 8px !important;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  height: 30px !important;
+  width: 30px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  border: 1px solid var(--border, #cbd5e1) !important;
+  color: var(--muted-foreground, #94a3b8) !important;
+  box-shadow: none !important;
+  transition: all 0.16s ease !important;
 }
 
 .order-delete-btn:hover {
-  transform: scale(1.1) !important;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--destructive) 25%, transparent) !important;
+  background: #fef2f2 !important;
+  border-color: #fca5a5 !important;
+  color: #dc2626 !important;
+  transform: translateY(-1px) !important;
 }
 
-/* Orders Table Pagination Buttons */
-.pagination .btn {
-  border-radius: 8px !important;
-  font-weight: 550 !important;
-  font-size: 0.82rem !important;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+.dark .order-delete-btn {
+  border-color: #334155 !important;
+  color: #64748b !important;
 }
 
-.pagination .btn:hover:not(:disabled) {
-  border-color: var(--primary) !important;
-  background: color-mix(in srgb, var(--primary) 8%, var(--card)) !important;
-  color: var(--primary) !important;
-  transform: translateY(-1px);
+.dark .order-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  color: #f87171 !important;
 }
 
 /* ==========================================================================
-   Admin Orders Workflow Tabs & Enhanced Pagination
+   Orders Workflow Stage Tabs - Modern 2026 Segmented Matte Design
    ========================================================================== */
-.orders-workflow-tabs-container {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 8px;
-  margin-bottom: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  border: 1.5px solid #d5e3f2;
-  border-radius: 14px;
-  box-shadow:
-    0 4px 18px -2px rgba(37, 99, 166, 0.08),
-    0 1px 3px rgba(37, 99, 166, 0.04);
+/* ==========================================================================
+   Orders Workflow Stage Cards - Modern 2026 Overview-Aligned Grid (Option 1)
+   ========================================================================== */
+.orders-workflow-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
   width: 100%;
   box-sizing: border-box;
 }
 
-.dark .orders-workflow-tabs-container {
-  background: linear-gradient(180deg, #15273b 0%, #102033 100%) !important;
-  border: 1.5px solid #304b66 !important;
-  box-shadow:
-    0 4px 20px -2px rgba(0, 0, 0, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.2) !important;
-}
-
-.orders-workflow-tab {
-  flex: 1 1 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6.5px;
-  padding: 7px 12px;
+.order-workflow-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 10px;
-  font-size: 0.81rem;
-  font-weight: 650;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   cursor: pointer;
-  white-space: nowrap;
-  outline: none;
-  min-width: fit-content;
+  text-align: left;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
   user-select: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-height: 80px;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
-.orders-workflow-tab:hover {
-  transform: translateY(-1.5px);
+.order-workflow-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
-.orders-workflow-tab:active {
-  transform: translateY(0);
+.dark .order-workflow-card {
+  background: #132032;
+  border-color: #293e56;
 }
 
-.orders-tab-badge {
+.dark .order-workflow-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.owc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  width: 100%;
+}
+
+.owc-icon-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1;
-  transition: all 0.2s ease;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
 }
 
-.orders-workflow-tab.active .orders-tab-badge {
-  background: rgba(255, 255, 255, 0.28) !important;
-  color: #ffffff !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+.owc-count-pill {
+  font-size: 0.92rem;
+  font-weight: 750;
+  padding: 1px 7px;
+  border-radius: 6px;
+  line-height: 1.2;
+  transition: all 0.16s ease;
 }
 
-/* ==========================================================================
-   Light Theme: 10 Workflow Status Button Variations (2026 Trending Style)
-   ========================================================================== */
-
-/* 1. All Orders (Slate / Indigo) */
-.orders-workflow-tab.tab-all {
-  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-  border: 1.5px solid #cbd5e1;
-  color: #334155;
-}
-.orders-workflow-tab.tab-all .orders-tab-badge {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-.orders-workflow-tab.tab-all:hover {
-  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-  border-color: #94a3b8;
-  color: #0f172a;
-  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2);
-}
-.orders-workflow-tab.tab-all.active {
-  background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%) !important;
-  border-color: #1e3a8a !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(30, 64, 175, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+.owc-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-/* 2. Pending (Warm Amber / Gold) */
-.orders-workflow-tab.tab-pending {
-  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
-  border: 1.5px solid #fde68a;
-  color: #b45309;
-}
-.orders-workflow-tab.tab-pending .orders-tab-badge {
-  background: #fde68a;
-  color: #78350f;
-}
-.orders-workflow-tab.tab-pending:hover {
-  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
-  border-color: #f59e0b;
-  color: #78350f;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
-}
-.orders-workflow-tab.tab-pending.active {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
-  border-color: #b45309 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
-.orders-workflow-tab.tab-pending:not(.active) .orders-tab-badge.urgent {
-  background: #ef4444 !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
-  animation: pulse-badge 2s infinite;
+.owc-title {
+  display: block;
+  font-size: 0.80rem;
+  font-weight: 650;
+  color: var(--foreground, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
 }
 
-/* 3. Confirmed (Cyan / Electric Ocean) */
-.orders-workflow-tab.tab-confirmed {
-  background: linear-gradient(180deg, #ecfeff 0%, #cffafe 100%);
-  border: 1.5px solid #a5f3fc;
-  color: #0e7490;
-}
-.orders-workflow-tab.tab-confirmed .orders-tab-badge {
-  background: #a5f3fc;
-  color: #155e75;
-}
-.orders-workflow-tab.tab-confirmed:hover {
-  background: linear-gradient(180deg, #cffafe 0%, #a5f3fc 100%);
-  border-color: #06b6d4;
-  color: #164e63;
-  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
-}
-.orders-workflow-tab.tab-confirmed.active {
-  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%) !important;
-  border-color: #155e75 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(8, 145, 178, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+.dark .owc-title {
+  color: #f8fafc;
 }
 
-/* 4. Printing (Purple / Vivid Violet) */
-.orders-workflow-tab.tab-printing {
-  background: linear-gradient(180deg, #faf5ff 0%, #f3e8ff 100%);
-  border: 1.5px solid #e9d5ff;
-  color: #7e22ce;
-}
-.orders-workflow-tab.tab-printing .orders-tab-badge {
-  background: #e9d5ff;
-  color: #581c87;
-}
-.orders-workflow-tab.tab-printing:hover {
-  background: linear-gradient(180deg, #f3e8ff 0%, #e9d5ff 100%);
-  border-color: #a855f7;
-  color: #581c87;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
-}
-.orders-workflow-tab.tab-printing.active {
-  background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
-  border-color: #6b21a8 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+.owc-hint {
+  font-size: 0.69rem;
+  color: var(--muted-foreground, #64748b);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 5. Ready (Radiant Orange / Copper) */
-.orders-workflow-tab.tab-ready {
-  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
-  border: 1.5px solid #fed7aa;
-  color: #c2410c;
-}
-.orders-workflow-tab.tab-ready .orders-tab-badge {
-  background: #fed7aa;
-  color: #9a3412;
-}
-.orders-workflow-tab.tab-ready:hover {
-  background: linear-gradient(180deg, #ffedd5 0%, #fed7aa 100%);
-  border-color: #f97316;
-  color: #7c2d12;
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
-}
-.orders-workflow-tab.tab-ready.active {
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important;
-  border-color: #9a3412 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+.dark .owc-hint {
+  color: #94a3b8;
 }
 
-/* 6. Shipped (Vibrant Sky / Royal Blue) */
-.orders-workflow-tab.tab-shipped {
-  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
-  border: 1.5px solid #bae6fd;
-  color: #0369a1;
-}
-.orders-workflow-tab.tab-shipped .orders-tab-badge {
-  background: #bae6fd;
-  color: #075985;
-}
-.orders-workflow-tab.tab-shipped:hover {
-  background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
-  border-color: #0284c7;
-  color: #0c4a6e;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
-}
-.orders-workflow-tab.tab-shipped.active {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
-  border-color: #075985 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
+/* Tone: Blue (All Orders) */
+.order-workflow-card.tone-blue .owc-icon-badge { background: #eff6ff; color: #2563eb; }
+.order-workflow-card.tone-blue .owc-count-pill { background: #eff6ff; color: #2563eb; }
+.order-workflow-card.tone-blue:hover { border-color: #93c5fd; }
+.order-workflow-card.tone-blue.active { border: 2px solid #2563eb !important; background: #f8faff !important; }
+.dark .order-workflow-card.tone-blue .owc-icon-badge { background: #172554; color: #93c5fd; }
+.dark .order-workflow-card.tone-blue .owc-count-pill { background: #172554; color: #93c5fd; }
+.dark .order-workflow-card.tone-blue.active { border-color: #3b82f6 !important; background: #0e1e38 !important; }
 
-/* 7. Delivered (Emerald / Spring Mint) */
-.orders-workflow-tab.tab-delivered {
-  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
-  border: 1.5px solid #bbf7d0;
-  color: #15803d;
-}
-.orders-workflow-tab.tab-delivered .orders-tab-badge {
-  background: #bbf7d0;
-  color: #166534;
-}
-.orders-workflow-tab.tab-delivered:hover {
-  background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
-  border-color: #22c55e;
-  color: #14532d;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
-}
-.orders-workflow-tab.tab-delivered.active {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
-  border-color: #166534 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
+/* Tone: Amber (Pending Payment) */
+.order-workflow-card.tone-amber .owc-icon-badge { background: #fffbeb; color: #d97706; }
+.order-workflow-card.tone-amber .owc-count-pill { background: #fffbeb; color: #d97706; }
+.order-workflow-card.tone-amber:hover { border-color: #fde68a; }
+.order-workflow-card.tone-amber.active { border: 2px solid #d97706 !important; background: #fffdf5 !important; }
+.dark .order-workflow-card.tone-amber .owc-icon-badge { background: #451a03; color: #fde68a; }
+.dark .order-workflow-card.tone-amber .owc-count-pill { background: #451a03; color: #fde68a; }
+.dark .order-workflow-card.tone-amber.active { border-color: #f59e0b !important; background: #241402 !important; }
 
-/* 8. Cancelled (Rose / Crimson) */
-.orders-workflow-tab.tab-cancelled {
-  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
-  border: 1.5px solid #fecdd3;
-  color: #be123c;
-}
-.orders-workflow-tab.tab-cancelled .orders-tab-badge {
-  background: #fecdd3;
-  color: #9f1239;
-}
-.orders-workflow-tab.tab-cancelled:hover {
-  background: linear-gradient(180deg, #ffe4e6 0%, #fecdd3 100%);
-  border-color: #f43f5e;
-  color: #881337;
-  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.25);
-}
-.orders-workflow-tab.tab-cancelled.active {
-  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%) !important;
-  border-color: #9f1239 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
+/* Tone: Sky (Confirmed) */
+.order-workflow-card.tone-sky .owc-icon-badge { background: #f0f9ff; color: #0284c7; }
+.order-workflow-card.tone-sky .owc-count-pill { background: #f0f9ff; color: #0284c7; }
+.order-workflow-card.tone-sky:hover { border-color: #bae6fd; }
+.order-workflow-card.tone-sky.active { border: 2px solid #0284c7 !important; background: #f8fcff !important; }
+.dark .order-workflow-card.tone-sky .owc-icon-badge { background: #082f49; color: #7dd3fc; }
+.dark .order-workflow-card.tone-sky .owc-count-pill { background: #082f49; color: #7dd3fc; }
+.dark .order-workflow-card.tone-sky.active { border-color: #38bdf8 !important; background: #082038 !important; }
 
-/* 9. Rejected (Ruby / Deep Red) */
-.orders-workflow-tab.tab-rejected {
-  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
-  border: 1.5px solid #fecaca;
-  color: #b91c1c;
-}
-.orders-workflow-tab.tab-rejected .orders-tab-badge {
-  background: #fecaca;
-  color: #991b1b;
-}
-.orders-workflow-tab.tab-rejected:hover {
-  background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
-  border-color: #ef4444;
-  color: #7f1d1d;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
-}
-.orders-workflow-tab.tab-rejected.active {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
-  border-color: #991b1b !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
+/* Tone: Purple (Printing Pending) */
+.order-workflow-card.tone-purple .owc-icon-badge { background: #f5f3ff; color: #7c3aed; }
+.order-workflow-card.tone-purple .owc-count-pill { background: #f5f3ff; color: #7c3aed; }
+.order-workflow-card.tone-purple:hover { border-color: #ddd6fe; }
+.order-workflow-card.tone-purple.active { border: 2px solid #7c3aed !important; background: #faf8ff !important; }
+.dark .order-workflow-card.tone-purple .owc-icon-badge { background: #2e1065; color: #c4b5fd; }
+.dark .order-workflow-card.tone-purple .owc-count-pill { background: #2e1065; color: #c4b5fd; }
+.dark .order-workflow-card.tone-purple.active { border-color: #a855f7 !important; background: #1e1136 !important; }
 
-/* 10. Refunded (Sea Green / Mint Teal) */
-.orders-workflow-tab.tab-refunded {
-  background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
-  border: 1.5px solid #99f6e4;
-  color: #0f766e;
-}
-.orders-workflow-tab.tab-refunded .orders-tab-badge {
-  background: #99f6e4;
-  color: #115e59;
-}
-.orders-workflow-tab.tab-refunded:hover {
-  background: linear-gradient(180deg, #ccfbf1 0%, #99f6e4 100%);
-  border-color: #14b8a6;
-  color: #134e4a;
-  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
-}
-.orders-workflow-tab.tab-refunded.active {
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
-  border-color: #115e59 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
+/* Tone: Emerald (Printed / Ready) */
+.order-workflow-card.tone-emerald .owc-icon-badge { background: #ecfdf5; color: #059669; }
+.order-workflow-card.tone-emerald .owc-count-pill { background: #ecfdf5; color: #059669; }
+.order-workflow-card.tone-emerald:hover { border-color: #a7f3d0; }
+.order-workflow-card.tone-emerald.active { border: 2px solid #059669 !important; background: #f6fef9 !important; }
+.dark .order-workflow-card.tone-emerald .owc-icon-badge { background: #064e3b; color: #6ee7b7; }
+.dark .order-workflow-card.tone-emerald .owc-count-pill { background: #064e3b; color: #6ee7b7; }
+.dark .order-workflow-card.tone-emerald.active { border-color: #10b981 !important; background: #092c22 !important; }
 
-/* ==========================================================================
-   Dark Theme: 10 Workflow Status Button Variations (Neon Glowing 2026 Style)
-   ========================================================================== */
+/* Tone: Cyan (Shipped) */
+.order-workflow-card.tone-cyan .owc-icon-badge { background: #ecfeff; color: #0891b2; }
+.order-workflow-card.tone-cyan .owc-count-pill { background: #ecfeff; color: #0891b2; }
+.order-workflow-card.tone-cyan:hover { border-color: #a5f3fc; }
+.order-workflow-card.tone-cyan.active { border: 2px solid #0891b2 !important; background: #f6feff !important; }
+.dark .order-workflow-card.tone-cyan .owc-icon-badge { background: #164e63; color: #67e8f9; }
+.dark .order-workflow-card.tone-cyan .owc-count-pill { background: #164e63; color: #67e8f9; }
+.dark .order-workflow-card.tone-cyan.active { border-color: #06b6d4 !important; background: #082935 !important; }
 
-/* Dark Tab 1: All Orders */
-.dark .orders-workflow-tab.tab-all {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.65) 0%, rgba(15, 23, 42, 0.65) 100%) !important;
-  border: 1.5px solid rgba(148, 163, 184, 0.3) !important;
-  color: #cbd5e1 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
-}
-.dark .orders-workflow-tab.tab-all .orders-tab-badge {
-  background: rgba(255, 255, 255, 0.12) !important;
-  color: #e2e8f0 !important;
-}
-.dark .orders-workflow-tab.tab-all:hover {
-  border-color: #94a3b8 !important;
-  color: #ffffff !important;
-  background: rgba(51, 65, 85, 0.5) !important;
-  box-shadow: 0 0 14px rgba(148, 163, 184, 0.35) !important;
-}
-.dark .orders-workflow-tab.tab-all.active {
-  background: linear-gradient(135deg, #334155 0%, #1e293b 100%) !important;
-  border-color: #cbd5e1 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 18px rgba(30, 41, 59, 0.6), 0 0 14px rgba(148, 163, 184, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-}
+/* Tone: Green (Delivered) */
+.order-workflow-card.tone-green .owc-icon-badge { background: #f0fdf4; color: #16a34a; }
+.order-workflow-card.tone-green .owc-count-pill { background: #f0fdf4; color: #16a34a; }
+.order-workflow-card.tone-green:hover { border-color: #bbf7d0; }
+.order-workflow-card.tone-green.active { border: 2px solid #16a34a !important; background: #f7fdf9 !important; }
+.dark .order-workflow-card.tone-green .owc-icon-badge { background: #14532d; color: #86efac; }
+.dark .order-workflow-card.tone-green .owc-count-pill { background: #14532d; color: #86efac; }
+.dark .order-workflow-card.tone-green.active { border-color: #22c55e !important; background: #0c301a !important; }
 
-/* Dark Tab 2: Pending (Golden Amber Glow) */
-.dark .orders-workflow-tab.tab-pending {
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.16) 0%, rgba(217, 119, 6, 0.1) 100%) !important;
-  border: 1.5px solid rgba(251, 191, 36, 0.4) !important;
-  color: #fde68a !important;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-pending .orders-tab-badge {
-  background: rgba(245, 158, 11, 0.25) !important;
-  color: #fef3c7 !important;
-  border: 1px solid rgba(252, 211, 77, 0.35);
-}
-.dark .orders-workflow-tab.tab-pending:hover {
-  border-color: #fbbf24 !important;
-  color: #ffffff !important;
-  background: rgba(245, 158, 11, 0.25) !important;
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-pending.active {
-  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%) !important;
-  border-color: #fde68a !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.6), 0 0 18px rgba(251, 191, 36, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
+/* Tone: Rose (Cancelled) */
+.order-workflow-card.tone-rose .owc-icon-badge { background: #fff1f2; color: #e11d48; }
+.order-workflow-card.tone-rose .owc-count-pill { background: #fff1f2; color: #e11d48; }
+.order-workflow-card.tone-rose:hover { border-color: #fecdd3; }
+.order-workflow-card.tone-rose.active { border: 2px solid #e11d48 !important; background: #fff8f8 !important; }
+.dark .order-workflow-card.tone-rose .owc-icon-badge { background: #4c0519; color: #fda4af; }
+.dark .order-workflow-card.tone-rose .owc-count-pill { background: #4c0519; color: #fda4af; }
+.dark .order-workflow-card.tone-rose.active { border-color: #f43f5e !important; background: #2c0912 !important; }
 
-/* Dark Tab 3: Confirmed (Electric Cyan Glow) */
-.dark .orders-workflow-tab.tab-confirmed {
-  background: linear-gradient(180deg, rgba(6, 182, 212, 0.16) 0%, rgba(8, 145, 178, 0.1) 100%) !important;
-  border: 1.5px solid rgba(34, 211, 238, 0.4) !important;
-  color: #a5f3fc !important;
-  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-confirmed .orders-tab-badge {
-  background: rgba(6, 182, 212, 0.25) !important;
-  color: #cffafe !important;
-  border: 1px solid rgba(103, 232, 249, 0.35);
-}
-.dark .orders-workflow-tab.tab-confirmed:hover {
-  border-color: #22d3ee !important;
-  color: #ffffff !important;
-  background: rgba(6, 182, 212, 0.25) !important;
-  box-shadow: 0 0 16px rgba(34, 211, 238, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-confirmed.active {
-  background: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%) !important;
-  border-color: #67e8f9 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.6), 0 0 18px rgba(34, 211, 238, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
+/* Tone: Red (Rejected) */
+.order-workflow-card.tone-red .owc-icon-badge { background: #fef2f2; color: #dc2626; }
+.order-workflow-card.tone-red .owc-count-pill { background: #fef2f2; color: #dc2626; }
+.order-workflow-card.tone-red:hover { border-color: #fecaca; }
+.order-workflow-card.tone-red.active { border: 2px solid #dc2626 !important; background: #fff8f8 !important; }
+.dark .order-workflow-card.tone-red .owc-icon-badge { background: #450a0a; color: #fca5a5; }
+.dark .order-workflow-card.tone-red .owc-count-pill { background: #450a0a; color: #fca5a5; }
+.dark .order-workflow-card.tone-red.active { border-color: #ef4444 !important; background: #260a0a !important; }
 
-/* Dark Tab 4: Printing (Neon Violet Glow) */
-.dark .orders-workflow-tab.tab-printing {
-  background: linear-gradient(180deg, rgba(168, 85, 247, 0.16) 0%, rgba(147, 51, 234, 0.1) 100%) !important;
-  border: 1.5px solid rgba(192, 132, 252, 0.4) !important;
-  color: #e9d5ff !important;
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-printing .orders-tab-badge {
-  background: rgba(168, 85, 247, 0.25) !important;
-  color: #f3e8ff !important;
-  border: 1px solid rgba(192, 132, 252, 0.35);
-}
-.dark .orders-workflow-tab.tab-printing:hover {
-  border-color: #c084fc !important;
-  color: #ffffff !important;
-  background: rgba(168, 85, 247, 0.25) !important;
-  box-shadow: 0 0 16px rgba(192, 132, 252, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-printing.active {
-  background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%) !important;
-  border-color: #d8b4fe !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.6), 0 0 18px rgba(192, 132, 252, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
+/* Tone: Teal (Refunded) */
+.order-workflow-card.tone-teal .owc-icon-badge { background: #f0fdfa; color: #0d9488; }
+.order-workflow-card.tone-teal .owc-count-pill { background: #f0fdfa; color: #0d9488; }
+.order-workflow-card.tone-teal:hover { border-color: #99f6e4; }
+.order-workflow-card.tone-teal.active { border: 2px solid #0d9488 !important; background: #f7fdfc !important; }
+.dark .order-workflow-card.tone-teal .owc-icon-badge { background: #134e4a; color: #5eead4; }
+.dark .order-workflow-card.tone-teal .owc-count-pill { background: #134e4a; color: #5eead4; }
+.dark .order-workflow-card.tone-teal.active { border-color: #14b8a6 !important; background: #082d2b !important; }
 
-/* Dark Tab 5: Ready (Radiant Orange Glow) */
-.dark .orders-workflow-tab.tab-ready {
-  background: linear-gradient(180deg, rgba(249, 115, 22, 0.16) 0%, rgba(234, 88, 12, 0.1) 100%) !important;
-  border: 1.5px solid rgba(251, 146, 60, 0.4) !important;
-  color: #fed7aa !important;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-ready .orders-tab-badge {
-  background: rgba(249, 115, 22, 0.25) !important;
-  color: #ffedd5 !important;
-  border: 1px solid rgba(251, 146, 60, 0.35);
-}
-.dark .orders-workflow-tab.tab-ready:hover {
-  border-color: #fb923c !important;
-  color: #ffffff !important;
-  background: rgba(249, 115, 22, 0.25) !important;
-  box-shadow: 0 0 16px rgba(251, 146, 60, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-ready.active {
-  background: linear-gradient(135deg, #f97316 0%, #c2410c 100%) !important;
-  border-color: #fdba74 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.6), 0 0 18px rgba(251, 146, 60, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
+/* Tone: Orange (Refunds Pending Alert) */
+.order-workflow-card.tone-orange .owc-icon-badge { background: #fff7ed; color: #ea580c; }
+.order-workflow-card.tone-orange .owc-count-pill { background: #ea580c; color: #ffffff; }
+.order-workflow-card.tone-orange:hover { border-color: #fed7aa; }
+.order-workflow-card.tone-orange.active { border: 2px solid #ea580c !important; background: #fffaf5 !important; }
+.dark .order-workflow-card.tone-orange .owc-icon-badge { background: #431407; color: #fdba74; }
+.dark .order-workflow-card.tone-orange .owc-count-pill { background: #ea580c; color: #ffffff; }
+.dark .order-workflow-card.tone-orange.active { border-color: #f97316 !important; background: #2b0f06 !important; }
 
-/* Dark Tab 6: Shipped (Electric Azure Glow) */
-.dark .orders-workflow-tab.tab-shipped {
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.16) 0%, rgba(2, 132, 199, 0.1) 100%) !important;
-  border: 1.5px solid rgba(56, 189, 248, 0.4) !important;
-  color: #bae6fd !important;
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-shipped .orders-tab-badge {
-  background: rgba(14, 165, 233, 0.25) !important;
-  color: #e0f2fe !important;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-}
-.dark .orders-workflow-tab.tab-shipped:hover {
-  border-color: #38bdf8 !important;
-  color: #ffffff !important;
-  background: rgba(14, 165, 233, 0.25) !important;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-shipped.active {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
-  border-color: #7dd3fc !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.6), 0 0 18px rgba(56, 189, 248, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
-
-/* Dark Tab 7: Delivered (Luminous Emerald Glow) */
-.dark .orders-workflow-tab.tab-delivered {
-  background: linear-gradient(180deg, rgba(34, 197, 94, 0.16) 0%, rgba(22, 163, 74, 0.1) 100%) !important;
-  border: 1.5px solid rgba(74, 222, 128, 0.4) !important;
-  color: #bbf7d0 !important;
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-delivered .orders-tab-badge {
-  background: rgba(34, 197, 94, 0.25) !important;
-  color: #dcfce7 !important;
-  border: 1px solid rgba(74, 222, 128, 0.35);
-}
-.dark .orders-workflow-tab.tab-delivered:hover {
-  border-color: #4ade80 !important;
-  color: #ffffff !important;
-  background: rgba(34, 197, 94, 0.25) !important;
-  box-shadow: 0 0 16px rgba(74, 222, 128, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-delivered.active {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
-  border-color: #86efac !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.6), 0 0 18px rgba(74, 222, 128, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
-
-/* Dark Tab 8: Cancelled (Neon Rose Glow) */
-.dark .orders-workflow-tab.tab-cancelled {
-  background: linear-gradient(180deg, rgba(244, 63, 94, 0.16) 0%, rgba(225, 29, 72, 0.1) 100%) !important;
-  border: 1.5px solid rgba(251, 113, 133, 0.4) !important;
-  color: #fecdd3 !important;
-  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-cancelled .orders-tab-badge {
-  background: rgba(244, 63, 94, 0.25) !important;
-  color: #ffe4e6 !important;
-  border: 1px solid rgba(251, 113, 133, 0.35);
-}
-.dark .orders-workflow-tab.tab-cancelled:hover {
-  border-color: #fb7185 !important;
-  color: #ffffff !important;
-  background: rgba(244, 63, 94, 0.25) !important;
-  box-shadow: 0 0 16px rgba(251, 113, 133, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-cancelled.active {
-  background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%) !important;
-  border-color: #fda4af !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(244, 63, 94, 0.6), 0 0 18px rgba(251, 113, 133, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
-
-/* Dark Tab 9: Rejected (Ruby Crimson Glow) */
-.dark .orders-workflow-tab.tab-rejected {
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.16) 0%, rgba(220, 38, 38, 0.1) 100%) !important;
-  border: 1.5px solid rgba(248, 113, 113, 0.4) !important;
-  color: #fecaca !important;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-rejected .orders-tab-badge {
-  background: rgba(239, 68, 68, 0.25) !important;
-  color: #fee2e2 !important;
-  border: 1px solid rgba(248, 113, 113, 0.35);
-}
-.dark .orders-workflow-tab.tab-rejected:hover {
-  border-color: #f87185 !important;
-  color: #ffffff !important;
-  background: rgba(239, 68, 68, 0.25) !important;
-  box-shadow: 0 0 16px rgba(248, 113, 113, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-rejected.active {
-  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
-  border-color: #fca5a5 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6), 0 0 18px rgba(248, 113, 113, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
-
-/* Dark Tab 10: Refunded (Electric Teal Glow) */
-.dark .orders-workflow-tab.tab-refunded {
-  background: linear-gradient(180deg, rgba(20, 184, 166, 0.16) 0%, rgba(13, 148, 136, 0.1) 100%) !important;
-  border: 1.5px solid rgba(45, 212, 191, 0.4) !important;
-  color: #99f6e4 !important;
-  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.15) !important;
-}
-.dark .orders-workflow-tab.tab-refunded .orders-tab-badge {
-  background: rgba(20, 184, 166, 0.25) !important;
-  color: #ccfbf1 !important;
-  border: 1px solid rgba(45, 212, 191, 0.35);
-}
-.dark .orders-workflow-tab.tab-refunded:hover {
-  border-color: #2dd4bf !important;
-  color: #ffffff !important;
-  background: rgba(20, 184, 166, 0.25) !important;
-  box-shadow: 0 0 16px rgba(45, 212, 191, 0.45) !important;
-}
-.dark .orders-workflow-tab.tab-refunded.active {
-  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%) !important;
-  border-color: #5eead4 !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 20px rgba(20, 184, 166, 0.6), 0 0 18px rgba(45, 212, 191, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
-}
-
-@keyframes pulse-badge {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-/* Quick Delivery Channel Chips */
+/* Delivery Channel Chips - Modern Solid Matte */
 .orders-delivery-chips-bar {
   display: flex;
   align-items: center;
@@ -7217,38 +6976,51 @@ footer {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--foreground);
-  font-size: 0.82rem;
+  padding: 5px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--card, #ffffff);
+  color: var(--foreground, #334155);
+  font-size: 0.78rem;
   font-weight: 550;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: all 0.18s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: all 0.16s ease;
 }
 
 .orders-delivery-chip:hover {
-  border-color: var(--primary);
-  color: var(--foreground);
-  background: var(--secondary);
+  border-color: #94a3b8;
+  color: #0f172a;
+  background: var(--muted, #f8fafc);
   transform: translateY(-1px);
 }
 
+/* Delivery Chips Active: Modern Blue instead of Black */
 .orders-delivery-chip.active {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: #2563eb !important;
+  border-color: #2563eb !important;
   color: #ffffff !important;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25) !important;
+}
+
+.dark .orders-delivery-chip {
+  background: #111827;
+  border-color: #1e293b;
+  color: #94a3b8;
+}
+
+.dark .orders-delivery-chip:hover {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
 }
 
 .dark .orders-delivery-chip.active {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  border-color: #3b82f6;
+  background: #2563eb !important;
+  border-color: #2563eb !important;
   color: #ffffff !important;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.45);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
 }
 
 /* Enhanced Pagination Bar */
@@ -7335,20 +7107,19 @@ footer {
 
 /* Responsive adjustments for Orders page */
 @media (max-width: 860px) {
-  .orders-workflow-tab {
-    flex: 1 1 calc(33.333% - 6px);
+  .orders-workflow-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 640px) {
-  .orders-workflow-tabs-container {
-    padding: 5px;
-    gap: 5px;
+  .orders-workflow-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
-  .orders-workflow-tab {
-    flex: 1 1 calc(50% - 6px);
-    padding: 6px 8px;
-    font-size: 0.77rem;
+  .order-workflow-card {
+    padding: 8px 10px;
+    min-height: 72px;
   }
   .orders-pagination-bar {
     flex-direction: column;
@@ -7397,3 +7168,223 @@ footer {
   display: block;
 }
 
+
+.send-vendor-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  background: var(--muted, #f1f5f9) !important;
+  color: var(--primary, #2563eb) !important;
+  border: 1px solid var(--border, #cbd5e1) !important;
+  cursor: pointer !important;
+  transition: all 0.16s ease !important;
+}
+.send-vendor-btn:hover {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+.dark .send-vendor-btn {
+  background: #1e293b !important;
+  color: #60a5fa !important;
+  border-color: #334155 !important;
+}
+.dark .send-vendor-btn:hover {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Mark Shipped Button */
+.mark-shipped-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 3px 9px !important;
+  border-radius: 6px !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid #1d4ed8 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.16s ease !important;
+}
+.mark-shipped-btn:hover {
+  background: #1d4ed8 !important;
+  border-color: #1e40af !important;
+}
+.dark .mark-shipped-btn {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+.dark .mark-shipped-btn:hover {
+  background: #1d4ed8 !important;
+}
+
+/* Campus Dispatched Badges */
+.campus-received-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  padding: 2px 7px !important;
+  border-radius: 6px !important;
+  background: #f0f9ff !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd !important;
+  width: fit-content !important;
+  line-height: 1.3 !important;
+}
+.dark .campus-received-pill,
+:is(.dark *) .campus-received-pill {
+  background: #082f49 !important;
+  color: #7dd3fc !important;
+  border-color: #0c4a6e !important;
+}
+
+.campus-partial-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  padding: 2px 7px !important;
+  border-radius: 6px !important;
+  background: #fefce8 !important;
+  color: #854d0e !important;
+  border: 1px solid #fef08a !important;
+  width: fit-content !important;
+  line-height: 1.3 !important;
+}
+.dark .campus-partial-pill,
+:is(.dark *) .campus-partial-pill {
+  background: #422006 !important;
+  color: #fde047 !important;
+  border-color: #713f12 !important;
+}
+
+/* ==========================================================================
+   Data Table Status Badges - Clean Modern Solid Matte (2026)
+   ========================================================================== */
+.data-table .status,
+.status {
+  border-radius: 6px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  line-height: 1.35 !important;
+  transition: all 0.16s ease !important;
+}
+
+.data-table .status .status-dot,
+.status .status-dot {
+  width: 5px !important;
+  height: 5px !important;
+}
+
+/* Good / Verified / Delivered / Paid */
+.status.status-good,
+.status.good,
+.data-table .status.status-good,
+.data-table .status.good {
+  background: #f0fdf4 !important;
+  color: #166534 !important;
+  border: 1px solid #bbf7d0 !important;
+}
+.dark .status.status-good,
+.dark .status.good,
+:is(.dark *) .status.status-good,
+:is(.dark *) .status.good,
+.dark .data-table .status.status-good,
+.dark .data-table .status.good {
+  background: #052e16 !important;
+  color: #86efac !important;
+  border-color: #14532d !important;
+}
+
+/* Processing / Printing */
+.status.status-purple,
+.data-table .status.status-purple {
+  background: #f5f3ff !important;
+  color: #6b21a8 !important;
+  border: 1px solid #ddd6fe !important;
+}
+.dark .status.status-purple,
+:is(.dark *) .status.status-purple,
+.dark .data-table .status.status-purple {
+  background: #2e1065 !important;
+  color: #c4b5fd !important;
+  border-color: #4c1d95 !important;
+}
+
+/* Shipped / Info */
+.status.status-info,
+.data-table .status.status-info {
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  border: 1px solid #bfdbfe !important;
+}
+.dark .status.status-info,
+:is(.dark *) .status.status-info,
+.dark .data-table .status.status-info {
+  background: #172554 !important;
+  color: #93c5fd !important;
+  border-color: #1e3a8a !important;
+}
+
+/* Pending / Warning */
+.status.status-warn,
+.data-table .status.status-warn {
+  background: #fefce8 !important;
+  color: #854d0e !important;
+  border: 1px solid #fef08a !important;
+}
+.dark .status.status-warn,
+:is(.dark *) .status.status-warn,
+.dark .data-table .status.status-warn {
+  background: #422006 !important;
+  color: #fde047 !important;
+  border-color: #713f12 !important;
+}
+
+/* Bad / Danger / Cancelled / Rejected */
+.status.status-bad,
+.status.bad,
+.data-table .status.status-bad,
+.data-table .status.bad {
+  background: #fef2f2 !important;
+  color: #991b1b !important;
+  border: 1px solid #fecaca !important;
+}
+.dark .status.status-bad,
+.dark .status.bad,
+:is(.dark *) .status.status-bad,
+:is(.dark *) .status.bad,
+.dark .data-table .status.status-bad,
+.dark .data-table .status.bad {
+  background: #450a0a !important;
+  color: #fca5a5 !important;
+  border-color: #7f1d1d !important;
+}
+
+/* Teal / Refunded */
+.status.status-teal,
+.data-table .status.status-teal {
+  background: #f0fdfa !important;
+  color: #0f766e !important;
+  border: 1px solid #99f6e4 !important;
+}
+.dark .status.status-teal,
+:is(.dark *) .status.status-teal,
+.dark .data-table .status.status-teal {
+  background: #042f2e !important;
+  color: #5eead4 !important;
+  border-color: #134e4a !important;
+}

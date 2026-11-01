@@ -5548,7 +5548,7 @@ function StudentRefundManagementPanel({
               <button type="button" className="btn compact" onClick={() => setModalOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn primary compact" disabled={saving} style={{ background: "#dc2626" }}>
+              <button type="submit" className="btn primary compact" disabled={saving} style={{ background: "#dc2626", borderColor: "#b91c1c", color: "#ffffff", borderRadius: 7 }}>
                 {saving ? "Recording…" : "Confirm Refund"}
               </button>
             </div>
@@ -5745,7 +5745,8 @@ function SuperAdminDueManagementPanel({
                 fontSize: "0.78rem",
                 fontWeight: 600,
                 padding: "4px 10px",
-                background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)",
+                borderRadius: 7,
+                background: "#d97706",
                 borderColor: "#b45309",
                 color: "#ffffff",
               }}
@@ -6231,7 +6232,7 @@ function SuperAdminDueManagementPanel({
                 type="submit"
                 className="btn primary"
                 disabled={recording || !recordAmount}
-                style={{ background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)", borderColor: "#b45309", color: "#ffffff" }}
+                style={{ background: "#d97706", borderColor: "#b45309", color: "#ffffff", borderRadius: 7 }}
               >
                 {recording ? "Saving Payment…" : "Save Payment Record"}
               </button>
@@ -6935,7 +6936,7 @@ function OrderModalPopup({
                                   setBusy(false);
                                 }
                               }}
-                              style={{ gap: 6, background: "linear-gradient(135deg, #059669 0%, #047857 100%)", borderColor: "#047857", color: "#ffffff" }}
+                              style={{ gap: 6, background: "#059669", borderColor: "#047857", color: "#ffffff", borderRadius: 7 }}
                             >
                               <CheckCircle2 size={14} /> Mark as Delivered
                             </button>
@@ -7007,7 +7008,7 @@ function OrderModalPopup({
                                   setBusy(false);
                                 }
                               }}
-                              style={{ gap: 6, background: "linear-gradient(135deg, #1d64b4 0%, #154c8a 100%)", borderColor: "#16467c", color: "#ffffff" }}
+                              style={{ gap: 6, background: "#2563eb", borderColor: "#1d4ed8", color: "#ffffff", borderRadius: 7 }}
                             >
                               <Building2 size={14} /> Send to Campus
                             </button>
@@ -7262,12 +7263,13 @@ function OrderModalPopup({
                               className="btn compact primary"
                               style={{
                                 background: isPartial
-                                  ? "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
+                                  ? "#d97706"
                                   : isOverpaid
-                                    ? "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)"
+                                    ? "#dc2626"
                                     : undefined,
-                                borderColor: isPartial ? "#b45309" : isOverpaid ? "#dc2626" : undefined,
+                                borderColor: isPartial ? "#b45309" : isOverpaid ? "#b91c1c" : undefined,
                                 color: isPartial || isOverpaid ? "#ffffff" : undefined,
+                                borderRadius: 7,
                               }}
                               onClick={() =>
                                 setDecision({
@@ -7490,24 +7492,26 @@ type WorkflowTab = {
   id: string;
   label: string;
   title: string;
-  icon: string;
+  hint?: string;
+  icon: any;
   statuses: string[];
   color: string;
+  tone?: string;
   urgent?: boolean;
 };
 
 const ORDER_WORKFLOW_TABS: WorkflowTab[] = [
-  { id: "ALL", label: "All Orders", title: "All Orders", icon: "📋", statuses: [], color: "all" },
-  { id: "PAYMENT_PENDING", label: "Pending", title: "Pending Payment Verification", icon: "⏳", statuses: ["PAYMENT_PENDING"], urgent: true, color: "pending" },
-  { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready for Printing Queue", icon: "📑", statuses: ["CONFIRMED"], color: "confirmed" },
-  { id: "PROCESSING", label: "Printing (Pending)", title: "Orders Currently in Printing (Pending)", icon: "🖨️", statuses: ["PROCESSING"], urgent: true, color: "printing" },
-  { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", icon: "📦", statuses: ["PROCESSING"], color: "confirmed" },
-  { id: "SHIPPED", label: "Shipped", title: "Shipped / With Rider", icon: "🚚", statuses: ["SHIPPED"], color: "shipped" },
-  { id: "DELIVERED", label: "Delivered", title: "Delivered / Completed", icon: "✅", statuses: ["DELIVERED"], color: "delivered" },
-  { id: "CANCELLED", label: "Cancelled", title: "Cancelled Orders", icon: "❌", statuses: ["CANCELLED"], color: "cancelled" },
-  { id: "REJECTED", label: "Rejected", title: "Rejected Orders", icon: "🚫", statuses: ["REJECTED"], color: "rejected" },
-  { id: "REFUND_REQUESTED", label: "Refunded", title: "Refund Requested / Processed", icon: "💸", statuses: ["REFUND_REQUESTED"], color: "refunded" },
-  { id: "REFUNDS_DUE", label: "Refunds Pending", title: "Orders with pending student advance refund", icon: "⚠️", statuses: ["REFUNDS_DUE"], urgent: true, color: "pending" },
+  { id: "ALL", label: "All Orders", title: "All Orders", hint: "All bookstore orders", icon: ShoppingBag, statuses: [], color: "all", tone: "blue" },
+  { id: "PAYMENT_PENDING", label: "Pending", title: "Pending Payment Verification", hint: "Awaiting receipt verify", icon: Clock3, statuses: ["PAYMENT_PENDING"], urgent: true, color: "pending", tone: "amber" },
+  { id: "CONFIRMED", label: "Confirmed", title: "Confirmed / Ready for Printing Queue", hint: "Verified & approved", icon: ShieldCheck, statuses: ["CONFIRMED"], color: "confirmed", tone: "sky" },
+  { id: "PROCESSING", label: "Printing (Pending)", title: "Orders Currently in Printing (Pending)", hint: "In press printing queue", icon: Printer, statuses: ["PROCESSING"], urgent: true, color: "printing", tone: "purple" },
+  { id: "PRINTED", label: "Printed / Ready", title: "Orders Printed & Ready for Dispatch", hint: "Printed & ready to pack", icon: CheckCircle2, statuses: ["PROCESSING"], color: "ready", tone: "emerald" },
+  { id: "SHIPPED", label: "Shipped", title: "Shipped / With Rider", hint: "In transit / courier", icon: Truck, statuses: ["SHIPPED"], color: "shipped", tone: "cyan" },
+  { id: "DELIVERED", label: "Delivered", title: "Delivered / Completed", hint: "Handed to student", icon: PackageCheck, statuses: ["DELIVERED"], color: "delivered", tone: "green" },
+  { id: "CANCELLED", label: "Cancelled", title: "Cancelled Orders", hint: "Student cancelled", icon: XCircle, statuses: ["CANCELLED"], color: "cancelled", tone: "rose" },
+  { id: "REJECTED", label: "Rejected", title: "Rejected Orders", hint: "Invalid slip / rejected", icon: X, statuses: ["REJECTED"], color: "rejected", tone: "red" },
+  { id: "REFUND_REQUESTED", label: "Refunded", title: "Refund Requested / Processed", hint: "Settled balance", icon: RotateCcw, statuses: ["REFUND_REQUESTED"], color: "refunded", tone: "teal" },
+  { id: "REFUNDS_DUE", label: "Refunds Pending", title: "Orders with pending student advance refund", hint: "Advance return due", icon: AlertCircle, statuses: ["REFUNDS_DUE"], urgent: true, color: "pending", tone: "orange" },
 ];
 
 const ORDER_DELIVERY_CHIPS = [
@@ -7530,126 +7534,48 @@ const VENDOR_STAGES_CONFIG: {
   label: string;
   title: string;
   icon: LucideIcon;
-  iconSize: number;
   subtext: (count: number) => string;
-  theme: {
-    activeBorder: string;
-    activeBg: string;
-    activeText: string;
-    activeIconBg: string;
-    activeIconColor: string;
-    indicator: string;
-    idleBorder: string;
-    idleBg: string;
-    idleText: string;
-    idleIconBg: string;
-    idleIconColor: string;
-  };
+  tone: string;
 }[] = [
   {
     id: "PROCESSING",
     label: "Printing (Pending)",
     title: "Orders Currently In Printing Queue (Urgent Action Required)",
     icon: Printer,
-    iconSize: 24,
     subtext: (c) => (c === 0 ? "Queue clear" : "Action needed (Print now)"),
-    theme: {
-      activeBorder: "var(--destructive)",
-      activeBg: "linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, var(--card) 100%)",
-      activeText: "var(--status-danger-text)",
-      activeIconBg: "var(--destructive)",
-      activeIconColor: "#ffffff",
-      indicator: "var(--destructive)",
-      idleBorder: "var(--status-danger-border)",
-      idleBg: "var(--status-danger-bg)",
-      idleText: "var(--status-danger-text)",
-      idleIconBg: "var(--status-danger-bg)",
-      idleIconColor: "var(--status-danger-text)",
-    },
+    tone: "purple",
   },
   {
     id: "PRINTED",
     label: "Printed / Ready",
     title: "Orders Printed & Ready for Dispatch",
     icon: CheckCircle2,
-    iconSize: 22,
     subtext: (c) => (c === 0 ? "None ready" : "Ready for dispatch"),
-    theme: {
-      activeBorder: "var(--status-good-border)",
-      activeBg: "linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, var(--card) 100%)",
-      activeText: "var(--status-good-text)",
-      activeIconBg: "#10b981",
-      activeIconColor: "#ffffff",
-      indicator: "#10b981",
-      idleBorder: "var(--status-good-border)",
-      idleBg: "var(--status-good-bg)",
-      idleText: "var(--status-good-text)",
-      idleIconBg: "var(--status-good-bg)",
-      idleIconColor: "var(--status-good-text)",
-    },
+    tone: "emerald",
   },
   {
     id: "SHIPPED",
     label: "Shipped",
     title: "Orders Shipped / Handed Over",
     icon: Truck,
-    iconSize: 22,
     subtext: (c) => (c === 0 ? "None in transit" : "In transit to student"),
-    theme: {
-      activeBorder: "var(--status-info-border)",
-      activeBg: "linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, var(--card) 100%)",
-      activeText: "var(--status-info-text)",
-      activeIconBg: "#2563eb",
-      activeIconColor: "#ffffff",
-      indicator: "#3b82f6",
-      idleBorder: "var(--status-info-border)",
-      idleBg: "var(--status-info-bg)",
-      idleText: "var(--status-info-text)",
-      idleIconBg: "var(--status-info-bg)",
-      idleIconColor: "var(--status-info-text)",
-    },
+    tone: "cyan",
   },
   {
     id: "DELIVERED",
     label: "Delivered",
     title: "Delivered & Completed Orders",
     icon: Package,
-    iconSize: 22,
     subtext: (c) => (c === 0 ? "No completions yet" : "Successfully delivered"),
-    theme: {
-      activeBorder: "var(--status-purple-border)",
-      activeBg: "linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, var(--card) 100%)",
-      activeText: "var(--status-purple-text)",
-      activeIconBg: "#7c3aed",
-      activeIconColor: "#ffffff",
-      indicator: "#8b5cf6",
-      idleBorder: "var(--status-purple-border)",
-      idleBg: "var(--status-purple-bg)",
-      idleText: "var(--status-purple-text)",
-      idleIconBg: "var(--status-purple-bg)",
-      idleIconColor: "var(--status-purple-text)",
-    },
+    tone: "green",
   },
   {
     id: "ALL",
     label: "All Orders",
     title: "All Assigned Orders",
     icon: ShoppingBag,
-    iconSize: 22,
     subtext: (c) => (c === 0 ? "Total volume" : "Total assigned orders"),
-    theme: {
-      activeBorder: "var(--primary)",
-      activeBg: "linear-gradient(135deg, rgba(37, 99, 235, 0.14) 0%, var(--card) 100%)",
-      activeText: "var(--foreground)",
-      activeIconBg: "var(--primary)",
-      activeIconColor: "#ffffff",
-      indicator: "var(--primary)",
-      idleBorder: "var(--border)",
-      idleBg: "var(--card)",
-      idleText: "var(--foreground)",
-      idleIconBg: "var(--secondary)",
-      idleIconColor: "var(--foreground)",
-    },
+    tone: "blue",
   },
 ];
 
@@ -8510,9 +8436,9 @@ function Orders({
           className="notice dashboard-notice vendor-printing-notice"
           style={{
             marginBottom: 16,
-            background: "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.02) 100%)",
-            border: "1.5px solid rgba(239, 68, 68, 0.35)",
-            borderRadius: 12,
+            background: "rgba(239, 68, 68, 0.06)",
+            border: "1px solid rgba(239, 68, 68, 0.25)",
+            borderRadius: 8,
             padding: "13px 18px",
             display: "flex",
             alignItems: "center",
@@ -8551,7 +8477,7 @@ function Orders({
       )}
 
       {isVendor ? (
-        <div className="vendor-workflow-cards-grid" role="tablist" aria-label="Vendor Order Stages">
+        <div className="orders-workflow-cards-grid" role="tablist" aria-label="Vendor Order Stages">
           {VENDOR_STAGES_CONFIG.map((stage) => {
             const active = activeTab === stage.id;
             const count =
@@ -8567,34 +8493,6 @@ function Orders({
             const StageIcon = stage.icon;
             const isProcessingUrgent = stage.id === "PROCESSING" && count > 0;
 
-            const cardBorder = active
-              ? `2px solid ${stage.theme.activeBorder}`
-              : `1.5px solid ${stage.theme.idleBorder}`;
-
-            const cardBg = active
-              ? stage.theme.activeBg
-              : stage.theme.idleBg;
-
-            const iconBg = active
-              ? stage.theme.activeIconBg
-              : stage.theme.idleIconBg;
-
-            const iconColor = active
-              ? stage.theme.activeIconColor
-              : stage.theme.idleIconColor;
-
-            const textColor = active
-              ? stage.theme.activeText
-              : isProcessingUrgent
-                ? stage.theme.idleText
-                : stage.id === "PRINTED"
-                  ? stage.theme.idleText
-                  : stage.id === "SHIPPED"
-                    ? stage.theme.idleText
-                    : stage.id === "DELIVERED"
-                      ? stage.theme.idleText
-                      : "var(--foreground)";
-
             return (
               <button
                 key={stage.id}
@@ -8602,11 +8500,7 @@ function Orders({
                 role="tab"
                 aria-selected={active}
                 title={stage.title}
-                className={`vendor-stage-card ${active ? "active" : ""}`}
-                style={{
-                  border: cardBorder,
-                  background: cardBg,
-                }}
+                className={`order-workflow-card tone-${stage.tone || "blue"} ${active ? "active" : ""}`}
                 onClick={() => {
                   setPage(1);
                   setActiveTab(stage.id);
@@ -8625,106 +8519,31 @@ function Orders({
                   }
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    width: "100%",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                    {isProcessingUrgent && <span className="vendor-urgent-dot" title="Action required: pending printing" />}
-                    <span
-                      style={{
-                        fontSize: "0.86rem",
-                        fontWeight: 700,
-                        color: textColor,
-                        letterSpacing: "0.2px",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {stage.label}
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      background: iconBg,
-                      color: iconColor,
-                      flexShrink: 0,
-                      boxShadow: active ? "0 2px 8px rgba(0,0,0,0.12)" : undefined,
-                      transition: "all 0.18s ease",
-                    }}
-                  >
-                    <StageIcon size={stage.iconSize || 22} />
+                <div className="owc-top">
+                  <span className="owc-icon-badge">
+                    <StageIcon size={15} />
+                  </span>
+                  <span className={`owc-count-pill ${count > 0 ? "has-count" : ""}`}>
+                    {count}
                   </span>
                 </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                    <strong
-                      style={{
-                        fontSize: "1.9rem",
-                        fontWeight: 800,
-                        lineHeight: 1.1,
-                        color: textColor,
-                      }}
-                    >
-                      {count}
-                    </strong>
-                    <span
-                      style={{
-                        fontSize: "0.76rem",
-                        color: "var(--muted-foreground)",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {count === 1 ? "order" : "orders"}
-                    </span>
+                <div className="owc-bottom">
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    {isProcessingUrgent && <span className="vendor-urgent-dot" title="Action required: pending printing" />}
+                    <strong className="owc-title">{stage.label}</strong>
                   </div>
-                  <div
-                    style={{
-                      fontSize: "0.75rem",
-                      color: active ? stage.theme.activeText : "var(--muted-foreground)",
-                      marginTop: 3,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {stage.subtext(count)}
-                  </div>
+                  <small className="owc-hint">{stage.subtext(count)}</small>
                 </div>
-
-                {active && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -2,
-                      left: "15%",
-                      right: "15%",
-                      height: 3,
-                      borderRadius: "3px 3px 0 0",
-                      background: stage.theme.indicator,
-                    }}
-                  />
-                )}
               </button>
             );
           })}
         </div>
       ) : (
-        <div className="orders-workflow-tabs-container" role="tablist" aria-label="Order Workflow Stages">
+        <div className="orders-workflow-cards-grid" role="tablist" aria-label="Order Workflow Stages">
           {ORDER_WORKFLOW_TABS.map((tab) => {
             const active = isTabActive(tab);
-            const count = getTabCount(tab);
+            const count = getTabCount(tab) ?? 0;
+            const TabIcon = tab.icon;
             return (
               <button
                 key={tab.id}
@@ -8732,7 +8551,7 @@ function Orders({
                 role="tab"
                 aria-selected={active}
                 title={tab.title || tab.label}
-                className={`orders-workflow-tab tab-${tab.color} ${active ? "active" : ""}`}
+                className={`order-workflow-card tone-${tab.tone || tab.color} ${active ? "active" : ""}`}
                 onClick={() => {
                   setPage(1);
                   setActiveTab(tab.id);
@@ -8754,17 +8573,22 @@ function Orders({
                   }
                 }}
               >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-                {count !== undefined && (
-                  <span
-                    className={`orders-tab-badge ${
-                      tab.urgent && !active && count > 0 ? "urgent" : ""
-                    }`}
-                  >
+                <div className="owc-top">
+                  <span className="owc-icon-badge">
+                    {typeof TabIcon === "string" ? (
+                      <span>{TabIcon}</span>
+                    ) : TabIcon ? (
+                      <TabIcon size={15} />
+                    ) : null}
+                  </span>
+                  <span className={`owc-count-pill ${count > 0 ? "has-count" : ""}`}>
                     {count}
                   </span>
-                )}
+                </div>
+                <div className="owc-bottom">
+                  <strong className="owc-title">{tab.label}</strong>
+                  {tab.hint && <small className="owc-hint">{tab.hint}</small>}
+                </div>
               </button>
             );
           })}
@@ -9464,19 +9288,6 @@ function Orders({
               o.vendor_name ? (
                 <span
                   className="vendor-badge-pill"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: "0.72rem",
-                    fontWeight: 600,
-                    padding: "2px 7px",
-                    borderRadius: 9999,
-                    background: "rgba(139, 92, 246, 0.12)",
-                    color: "#7c3aed",
-                    border: "1px solid #c4b5fd",
-                    width: "fit-content",
-                  }}
                   title={`Assigned to ${o.vendor_name}${o.vendor_phone ? ` (${o.vendor_phone})` : ""}`}
                 >
                   <Factory size={11} /> {o.vendor_name}
@@ -9484,22 +9295,10 @@ function Orders({
               ) : ["CONFIRMED", "PROCESSING"].includes(o.status) ? (
                 <button
                   type="button"
+                  className="send-vendor-btn"
                   onClick={(e) => {
                     e.stopPropagation();
                     setAssigningOrder(o);
-                  }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: "0.72rem",
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 9999,
-                    background: "rgba(59, 130, 246, 0.1)",
-                    color: "#2563eb",
-                    border: "1px solid #93c5fd",
-                    cursor: "pointer",
                   }}
                   title="Send this order to a printing vendor"
                 >
@@ -9642,16 +9441,7 @@ function Orders({
                   </span>
                   {isPartiallyDelivered && (
                     <span
-                      className="mono-pill"
-                      style={{
-                        fontSize: "0.68rem",
-                        fontWeight: 700,
-                        background: "rgba(245, 158, 11, 0.15)",
-                        color: "#b45309",
-                        border: "1px solid #fde68a",
-                        padding: "1px 6px",
-                        borderRadius: 9999,
-                      }}
+                      className="mono-pill rcvd-partial-pill"
                       title={`${rcvdItemsCount} of ${booksCount} book(s) received at office. ${booksCount - rcvdItemsCount} still pending from vendor.`}
                     >
                       {rcvdItemsCount}/{booksCount} Rcvd
@@ -9659,16 +9449,7 @@ function Orders({
                   )}
                   {isAllDelivered && (
                     <span
-                      className="mono-pill"
-                      style={{
-                        fontSize: "0.68rem",
-                        fontWeight: 700,
-                        background: "rgba(22, 163, 74, 0.12)",
-                        color: "#15803d",
-                        border: "1px solid #86efac",
-                        padding: "1px 6px",
-                        borderRadius: 9999,
-                      }}
+                      className="mono-pill rcvd-all-pill"
                       title={`All ${booksCount} book(s) received from vendor`}
                     >
                       ✓ {booksCount === 1 ? "1 Rcvd" : "All Rcvd"}
@@ -9952,24 +9733,10 @@ function Orders({
                           handleVendorPrint(o, !o.vendor_printed_at);
                         }}
                         disabled={printingBusyId === o.id}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          cursor: "pointer",
-                          background: o.vendor_printed_at ? "rgba(245, 158, 11, 0.12)" : "rgba(22, 163, 74, 0.12)",
-                          color: o.vendor_printed_at ? "#b45309" : "#15803d",
-                          border: o.vendor_printed_at ? "1px solid #fde68a" : "1px solid #86efac",
-                          transition: "all 0.15s ease",
-                          width: "fit-content",
-                        }}
+                        className={o.vendor_printed_at ? "unmark-print-btn" : "mark-printed-btn"}
                         title={o.vendor_printed_at ? "Click to unmark as printed" : "Click to mark as printed"}
                       >
-                        {o.vendor_printed_at ? <RotateCcw size={11} /> : <CheckCircle2 size={11} color="currentColor" />}
+                        {o.vendor_printed_at ? <RotateCcw size={10} /> : <CheckCircle2 size={10} color="currentColor" />}
                         {printingBusyId === o.id ? "Saving…" : o.vendor_printed_at ? "Unmark Printed" : "Mark as Printed"}
                       </button>
                     </div>
@@ -10056,21 +9823,7 @@ function Orders({
                           handleMarkDelivered(o);
                         }}
                         disabled={markingDeliveredId === o.id}
-                        className="btn compact"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          background: "#059669",
-                          color: "#fff",
-                          border: "none",
-                          cursor: "pointer",
-                          width: "fit-content",
-                        }}
+                        className="mark-delivered-btn"
                         title="Mark this parcel as Delivered to student"
                       >
                         <CheckCircle2 size={11} />
@@ -10101,42 +9854,21 @@ function Orders({
                           e.stopPropagation();
                           setDispatchOfficeOrder(o);
                         }}
-                        className="btn compact"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                          padding: "3px 10px",
-                          borderRadius: 9999,
-                          background: "#2563eb",
-                          color: "#fff",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
+                        className="send-campus-btn"
                         title="Mark printed order as dispatched to Bookstore Office"
                       >
                         <Building2 size={12} /> Send to Campus
                       </button>
                     ) : o.vendor_dispatched_at || ["SHIPPED", "DELIVERED"].includes(o.status) ? (
                       <span
-                        className="map-pin-pill campus-badge"
-                        style={{
-                          fontSize: "0.75rem",
-                          padding: "3px 8px",
-                          background: "rgba(37, 99, 235, 0.12)",
-                          color: "#1d4ed8",
-                          borderColor: "#93c5fd",
-                        }}
+                        className="mono-pill campus-received-pill"
                         title="Batch dispatched to Campus"
                       >
                         <Building2 size={12} /> Sent to Campus ✓
                       </span>
                     ) : (
                       <span
-                        className="map-pin-pill campus-badge"
-                        style={{ fontSize: "0.75rem", padding: "3px 8px" }}
+                        className="mono-pill campus-received-pill"
                         title="Deliver this batch to Campus"
                       >
                         <Building2 size={12} /> Send to Campus
@@ -10162,40 +9894,14 @@ function Orders({
                   <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
                     {o.vendor_printed_at ? (
                       <span
-                        className="mono-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          background: "rgba(22, 163, 74, 0.15)",
-                          color: "#15803d",
-                          border: "1px solid #86efac",
-                          width: "fit-content",
-                        }}
+                        className="mono-pill printed-status-pill"
                         title={`Printed on ${formatDateDMY(o.vendor_printed_at)}`}
                       >
                         <CheckCircle2 size={11} /> Printed
                       </span>
                     ) : (
                       <span
-                        className="mono-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "2px 8px",
-                          borderRadius: 9999,
-                          background: "rgba(245, 158, 11, 0.15)",
-                          color: "#b45309",
-                          border: "1px solid #fde68a",
-                          width: "fit-content",
-                        }}
+                        className="mono-pill print-queue-pill"
                         title="Pending print"
                       >
                         <Clock size={11} /> In Printing Queue
@@ -10209,21 +9915,7 @@ function Orders({
                           handleVendorPrint(o, !o.vendor_printed_at);
                         }}
                         disabled={printingBusyId === o.id}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.70rem",
-                          fontWeight: 600,
-                          padding: "1px 7px",
-                          borderRadius: 9999,
-                          cursor: "pointer",
-                          background: o.vendor_printed_at ? "rgba(245, 158, 11, 0.12)" : "rgba(22, 163, 74, 0.12)",
-                          color: o.vendor_printed_at ? "#b45309" : "#15803d",
-                          border: o.vendor_printed_at ? "1px solid #fde68a" : "1px solid #86efac",
-                          transition: "all 0.15s ease",
-                          width: "fit-content",
-                        }}
+                        className={o.vendor_printed_at ? "unmark-print-btn" : "mark-printed-btn"}
                         title={o.vendor_printed_at ? "Click to unmark as printed" : "Click to mark as printed"}
                       >
                         {o.vendor_printed_at ? <RotateCcw size={10} /> : <CheckCircle2 size={10} color="currentColor" />}
@@ -10270,40 +9962,14 @@ function Orders({
                   <div style={{ marginTop: 4 }}>
                     {isPartiallyDelivered ? (
                       <span
-                        className="mono-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.70rem",
-                          fontWeight: 700,
-                          padding: "2px 7px",
-                          borderRadius: 9999,
-                          background: "rgba(245, 158, 11, 0.15)",
-                          color: "#b45309",
-                          border: "1px solid #fde68a",
-                          width: "fit-content",
-                        }}
+                        className="mono-pill campus-partial-pill"
                         title={`Partially received in Campus: ${rcvdItemsCount} of ${booksCount} books arrived. ${booksCount - rcvdItemsCount} book(s) missing or misprinted.`}
                       >
                         <Building2 size={10} /> Partially Received in Campus ({rcvdItemsCount}/{booksCount})
                       </span>
                     ) : (
                       <span
-                        className="mono-pill"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: "0.70rem",
-                          fontWeight: 600,
-                          padding: "2px 7px",
-                          borderRadius: 9999,
-                          background: "rgba(37, 99, 235, 0.12)",
-                          color: "#1d4ed8",
-                          border: "1px solid #93c5fd",
-                          width: "fit-content",
-                        }}
+                        className="mono-pill campus-received-pill"
                         title={`Received in Campus from vendor on ${formatDateDMY(o.vendor_dispatched_at)}`}
                       >
                         <Building2 size={10} /> Received in Campus ✓
@@ -10488,21 +10154,7 @@ function Orders({
                             (!isOtherCityOrder(o) ? (
                               <button
                                 type="button"
-                                className="btn compact"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  fontSize: "0.72rem",
-                                  fontWeight: 600,
-                                  padding: "3px 9px",
-                                  borderRadius: 9999,
-                                  background: "#2563eb",
-                                  color: "#fff",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  whiteSpace: "nowrap",
-                                }}
+                                className="mark-shipped-btn"
                                 disabled={quickShippingId === o.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -10529,21 +10181,7 @@ function Orders({
                             ) : (
                               <button
                                 type="button"
-                                className="btn compact"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  fontSize: "0.72rem",
-                                  fontWeight: 600,
-                                  padding: "3px 9px",
-                                  borderRadius: 9999,
-                                  background: "#0284c7",
-                                  color: "#fff",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  whiteSpace: "nowrap",
-                                }}
+                                className="ship-courier-btn"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingCourierOrder(o);
@@ -10556,21 +10194,7 @@ function Orders({
                           {o.status === "SHIPPED" && (
                             <button
                               type="button"
-                              className="btn compact"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                fontSize: "0.72rem",
-                                fontWeight: 600,
-                                padding: "3px 9px",
-                                borderRadius: 9999,
-                                background: "#059669",
-                                color: "#fff",
-                                border: "none",
-                                cursor: "pointer",
-                                whiteSpace: "nowrap",
-                              }}
+                              className="mark-delivered-btn"
                               disabled={markingDeliveredId === o.id}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -13648,7 +13272,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           gap: 12,
           padding: "16px 20px",
           borderRadius: 8,
-          background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08))",
+          background: "var(--card)",
           border: "1px solid var(--border)",
         }}
       >
@@ -14429,7 +14053,7 @@ function VendorLedgerView({ user }: { user: User }) {
           gap: 12,
           padding: "14px 18px",
           borderRadius: 8,
-          background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08))",
+          background: "var(--card)",
           border: "1px solid var(--border)",
         }}
       >
