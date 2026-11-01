@@ -60,6 +60,7 @@ import {
   AlertCircle,
   PackageCheck,
   Zap,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { ShippingLabelModal } from "./shipping-label";
@@ -118,6 +119,8 @@ import {
   formatWhatsAppPhone,
   isOtherCityOrder,
   getStudentRefundWhatsAppUrl,
+  getReturnHoldWhatsAppUrl,
+  getReturnResoldWhatsAppUrl,
   getVendorPendingBooksWhatsAppMessage,
   getVendorPendingBooksWhatsAppUrl,
   isCampusOrder,
@@ -825,9 +828,9 @@ export function Portal({
             <Students user={user} />
           ) : section === "orders" || section === "payments" ? (
             record ? (
-              <OrderDetail id={record} user={user} />
+              <OrderDetail id={record} user={user} storeName={currentStoreName} />
             ) : (
-              <Orders base={base} payments={section === "payments"} user={user} />
+              <Orders base={base} payments={section === "payments"} user={user} storeName={currentStoreName} />
             )
           ) : (
             <Dashboard reportsOnly={section === "reports"} user={user} />
@@ -3916,14 +3919,172 @@ function ChangeDeliveryTypeModal({
   );
 }
 
+function ReturnResellHoldModal({
+  order,
+  item,
+  onClose,
+  onConfirm,
+}: {
+  order: any;
+  item: any;
+  onClose: () => void;
+  onConfirm: (refundAmount: number, notes: string) => Promise<void>;
+}) {
+  const isOther =
+    order?.delivery_type === "other" ||
+    (order?.city && !order.city.toLowerCase().includes("lahore") && !order.city.toLowerCase().includes("campus"));
+  const defaultDeliveryDeduction = isOther ? 200 : 0;
+  const defaultRestockDeduction = 50;
+
+  const bookPrice = ((item.unit_price || 0) * (item.quantity || 1)) / 100;
+  const [deliveryDeduct, setDeliveryDeduct] = useState<number>(defaultDeliveryDeduction);
+  const [restockDeduct, setRestockDeduct] = useState<number>(defaultRestockDeduction);
+  const [notes, setNotes] = useState<string>("Student ordered wrong book, returned clean copy for resale on hold");
+  const [submitting, setSubmitting] = useState(false);
+
+  const calculatedRefund = Math.max(0, bookPrice - deliveryDeduct - restockDeduct);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await onConfirm(calculatedRefund * 100, notes);
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
+      <DialogContent style={{ maxWidth: 480 }}>
+        <DialogHeader>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                background: "#fef3c7",
+                color: "#d97706",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <RotateCcw size={18} />
+            </div>
+            <div>
+              <DialogTitle style={{ fontSize: "1.05rem", margin: 0 }}>
+                Accept Book on Resell Hold
+              </DialogTitle>
+              <DialogDescription style={{ fontSize: "0.80rem", marginTop: 2 }}>
+                Order #{order.reference || order.id} · Student: {order.name} ({order.phone || "No phone"})
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 10 }}>
+          <div
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              fontSize: "0.85rem",
+            }}
+          >
+            <div style={{ fontWeight: 600, color: "var(--foreground)" }}>
+              📖 {item.code} - {item.title}
+            </div>
+            <div style={{ fontSize: "0.80rem", color: "var(--muted-foreground)", marginTop: 3 }}>
+              Quantity: {item.quantity || 1} · Item Total Paid: <strong>Rs. {bookPrice.toLocaleString()}</strong>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Delivery Fee Deduction (Rs.)">
+              <input
+                type="number"
+                min={0}
+                value={deliveryDeduct}
+                onChange={(e) => setDeliveryDeduct(Number(e.target.value) || 0)}
+                className="toolbar-search-input"
+                style={{ width: "100%", fontSize: "0.85rem", padding: "6px 8px" }}
+              />
+            </Field>
+            <Field label="Restocking Fee (Rs.)">
+              <input
+                type="number"
+                min={0}
+                value={restockDeduct}
+                onChange={(e) => setRestockDeduct(Number(e.target.value) || 0)}
+                className="toolbar-search-input"
+                style={{ width: "100%", fontSize: "0.85rem", padding: "6px 8px" }}
+              />
+            </Field>
+          </div>
+
+          <div
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              fontSize: "0.85rem",
+              color: "#166534",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>Hold Refund Amount (Upon Resale):</span>
+              <strong style={{ fontSize: "1.05rem" }}>Rs. {calculatedRefund.toLocaleString()}</strong>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: "0.76rem", color: "#15803d" }}>
+              ✓ Bookstore pays Rs. 0 now. Refund of Rs. {calculatedRefund.toLocaleString()} will be released only after this book resells to another student.
+            </p>
+          </div>
+
+          <Field label="Return Remarks / Reason">
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Student ordered wrong course code CS201 instead of CS301"
+              className="toolbar-search-input"
+              style={{ width: "100%", fontSize: "0.85rem", padding: "6px 8px" }}
+            />
+          </Field>
+
+          <div className="actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+            <button type="button" className="btn compact" disabled={submitting} onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn compact primary"
+              disabled={submitting}
+              style={{ background: "#d97706", borderColor: "#b45309", color: "#fff", borderRadius: 7 }}
+            >
+              {submitting ? "Processing…" : "📦 Confirm Return on Resell Hold"}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AdminOrderBooksPanel({
   o,
   user,
   onUpdated,
+  storeName,
 }: {
   o: any;
   user: User;
   onUpdated: () => Promise<void> | void;
+  storeName?: string;
 }) {
   const admin = user.role === "SUPER_ADMIN";
   const canUpdate = admin || user.permissions?.includes("orders.update");
@@ -3946,6 +4107,7 @@ function AdminOrderBooksPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
   const [changeDeliveryOpen, setChangeDeliveryOpen] = useState(false);
+  const [returningItem, setReturningItem] = useState<any | null>(null);
 
   const isCampus =
     o?.delivery_type === "campus" ||
@@ -4061,6 +4223,42 @@ function AdminOrderBooksPanel({
         received,
       });
       toast.success(received ? "All books marked received from vendor ✓" : "All books marked pending from vendor");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
+  const acceptReturnResellHold = async (itemId: string, refundAmount: number, notes: string) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "accept_item_return_resell_hold",
+        item_id: itemId,
+        refund_amount: refundAmount,
+        notes,
+      });
+      toast.success("Book received on Resell Hold in Campus Office Stock! Student refund on hold.");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
+  const markItemResold = async (itemId: string) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "mark_item_return_resold",
+        item_id: itemId,
+      });
+      toast.success("Book marked as Resold! Student refund is now ready to be released.");
       notifyOrdersUpdated();
       await onUpdated();
     } catch (err) {
@@ -4544,6 +4742,27 @@ function AdminOrderBooksPanel({
       )}
 
       {/* Table */}
+      {o?.has_resell_shelf_matches && (
+        <div
+          style={{
+            padding: "10px 14px",
+            marginBottom: 12,
+            borderRadius: 8,
+            background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+            border: "1.5px solid #a78bfa",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: "0.82rem",
+            color: "#5b21b6",
+          }}
+        >
+          <Sparkles size={16} color="#7c3aed" style={{ flexShrink: 0 }} />
+          <div>
+            <strong>Smart Auto-Match:</strong> One or more books in this order match copies currently held on the Return Resell Shelf! Click <strong>"⚡ Fulfill from Shelf"</strong> next to the matching book below to skip vendor printing and release the returning student's held refund.
+          </div>
+        </div>
+      )}
       {(isEditing ? itemsDraft : rawItems).length === 0 ? (
         <div
           style={{
@@ -4687,6 +4906,78 @@ function AdminOrderBooksPanel({
                     </td>
                     <td style={{ padding: "8px 10px", fontWeight: 500, color: isUnav ? "#991b1b" : undefined }}>
                       <div style={{ textDecoration: isUnav ? "line-through" : undefined }}>{it.title}</div>
+                      {it.resell_shelf_match && !it.in_office_stock && !isUnav && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+                            border: "1.5px solid #c4b5fd",
+                            fontSize: "0.74rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 8,
+                            boxShadow: "0 1px 2px rgba(124, 58, 237, 0.08)",
+                          }}
+                        >
+                          <div style={{ color: "#5b21b6", fontWeight: 600 }}>
+                            💡 <strong>Shelf Copy Available:</strong> Returned by <strong>{it.resell_shelf_match.match_student_name || "Student"}</strong> ({it.resell_shelf_match.match_order_reference}) • Held Refund: <strong>{money(it.resell_shelf_match.return_refund_amount)}</strong>
+                          </div>
+                          {canUpdate && (
+                            <button
+                              type="button"
+                              disabled={togglingItemId === it.id}
+                              onClick={async () => {
+                                if (
+                                  !window.confirm(
+                                    `Fulfill "${it.code}" from Return Office Shelf?\n\n• Uses shelf copy returned by ${it.resell_shelf_match.match_student_name} (${it.resell_shelf_match.match_order_reference})\n• Skips vendor printing (vendor print cost = Rs. 0)\n• Marks the returned book as RESOLD\n• Releases ${it.resell_shelf_match.match_student_name}'s held refund of ${money(it.resell_shelf_match.return_refund_amount)}`,
+                                  )
+                                )
+                                  return;
+                                try {
+                                  setTogglingItemId(it.id);
+                                  const res = await api(`manage/orders/${o.id}`, {
+                                    action: "fulfill_item_from_resell_shelf",
+                                    target_item_id: it.id,
+                                    source_order_id: it.resell_shelf_match.match_order_id,
+                                    source_item_id: it.resell_shelf_match.match_item_id,
+                                  });
+                                  if (res?.ok) {
+                                    toast.success(
+                                      `Fulfilled from Shelf! Student ${it.resell_shelf_match.match_student_name}'s held refund of ${money(it.resell_shelf_match.return_refund_amount)} is now RESOLD & ready for payout 🎉`,
+                                    );
+                                    await onUpdated?.();
+                                  }
+                                } catch (e: any) {
+                                  toast.error(e?.message || "Failed to fulfill from shelf");
+                                } finally {
+                                  setTogglingItemId(null);
+                                }
+                              }}
+                              style={{
+                                background: "#7c3aed",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: 5,
+                                padding: "4px 10px",
+                                fontWeight: 700,
+                                fontSize: "0.72rem",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                whiteSpace: "nowrap",
+                                boxShadow: "0 2px 4px rgba(124, 58, 237, 0.25)",
+                              }}
+                              title="Fulfill using return shelf copy & mark old student's book as resold"
+                            >
+                              <Sparkles size={11} /> Fulfill from Shelf
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {isUnav ? (
                         <span
                           className="mono-pill"
@@ -4856,6 +5147,105 @@ function AdminOrderBooksPanel({
                               </button>
                             )}
                           </div>
+                        ) : it.return_status === "HELD_FOR_RESELL" ? (
+                          <div style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                            <span
+                              className="mono-pill"
+                              style={{
+                                background: "#fef3c7",
+                                color: "#92400e",
+                                border: "1px solid #fde68a",
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                              }}
+                              title={`Returned by student. Held in Office Stock for resale. Refund: ${money(it.return_refund_amount || 0)}`}
+                            >
+                              🔄 RESELL HOLD: {money(it.return_refund_amount || 0)}
+                            </span>
+                            <div style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                              {canUpdate && (
+                                <button
+                                  type="button"
+                                  disabled={togglingItemId === it.id}
+                                  onClick={async () => {
+                                    if (!window.confirm(`Mark "${it.code} - ${it.title}" as Resold?\n\nThis will record that another student purchased this book, and the ${money(it.return_refund_amount || 0)} refund is ready to be released.`)) return;
+                                    await markItemResold(it.id);
+                                  }}
+                                  className="btn compact"
+                                  style={{
+                                    fontSize: "0.68rem",
+                                    padding: "2px 6px",
+                                    background: "#059669",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 4,
+                                    cursor: "pointer",
+                                  }}
+                                  title="Mark book as resold to release refund"
+                                >
+                                  ✨ Mark Resold
+                                </button>
+                              )}
+                              {o.phone && (
+                                <a
+                                  href={getReturnHoldWhatsAppUrl(o, it, it.return_refund_amount, it.return_notes, storeName)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 2,
+                                    fontSize: "0.68rem",
+                                    padding: "2px 5px",
+                                    borderRadius: 4,
+                                    background: "#25D366",
+                                    color: "#fff",
+                                    textDecoration: "none",
+                                  }}
+                                  title="Send WhatsApp confirmation to student that book is held for resale"
+                                >
+                                  <MessageCircle size={10} /> WA
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ) : it.return_status === "RESOLD" ? (
+                          <div style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                            <span
+                              className="mono-pill"
+                              style={{
+                                background: "#ecfdf5",
+                                color: "#065f46",
+                                border: "1px solid #a7f3d0",
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                              }}
+                              title="Book was resold! Payout ready."
+                            >
+                              ✅ RESOLD ({money(it.return_refund_amount || 0)})
+                            </span>
+                            {o.phone && (
+                              <a
+                                href={getReturnResoldWhatsAppUrl(o, it, it.return_refund_amount, "EasyPaisa", "", storeName)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 2,
+                                  fontSize: "0.68rem",
+                                  padding: "2px 5px",
+                                  borderRadius: 4,
+                                  background: "#25D366",
+                                  color: "#fff",
+                                  textDecoration: "none",
+                                }}
+                                title="Send WhatsApp notification that book was resold and payout is ready"
+                              >
+                                <MessageCircle size={10} /> Notify Payout
+                              </a>
+                            )}
+                          </div>
                         ) : it.in_office_stock ? (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                             <span
@@ -4871,7 +5261,29 @@ function AdminOrderBooksPanel({
                             >
                               📦 IN OFFICE STOCK
                             </span>
-                            {canUpdate && (
+                            {canUpdate && ["DELIVERED", "SHIPPED"].includes(o.status) && (
+                              <button
+                                type="button"
+                                onClick={() => setReturningItem(it)}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  fontSize: "0.68rem",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  background: "#fffbeb",
+                                  color: "#b45309",
+                                  border: "1px solid #fde68a",
+                                  cursor: "pointer",
+                                  fontWeight: 600,
+                                }}
+                                title="Student returned this delivered book. Accept on Resell Hold in Campus Office Stock (Rs. 0 advance cash)."
+                              >
+                                <RotateCcw size={10} /> Return on Hold
+                              </button>
+                            )}
+                            {canUpdate && !["DELIVERED", "SHIPPED"].includes(o.status) && (
                               <button
                                 type="button"
                                 disabled={togglingItemId === it.id}
@@ -4987,6 +5399,28 @@ function AdminOrderBooksPanel({
                                 >
                                   <XCircle size={10} /> Out of Stock
                                 </button>
+                                {["DELIVERED", "SHIPPED"].includes(o.status) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setReturningItem(it)}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 3,
+                                      fontSize: "0.68rem",
+                                      padding: "2px 6px",
+                                      borderRadius: 4,
+                                      background: "#fffbeb",
+                                      color: "#b45309",
+                                      border: "1px solid #fde68a",
+                                      cursor: "pointer",
+                                      fontWeight: 600,
+                                    }}
+                                    title="Student returned this delivered book. Accept on Resell Hold in Campus Office Stock (Rs. 0 advance cash)."
+                                  >
+                                    <RotateCcw size={10} /> Return on Hold
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -5281,6 +5715,17 @@ function AdminOrderBooksPanel({
         description={`Order total will update from ${money(o.total || 0)} to ${money(draftTotal)}. The books list, vendor fulfillment, and order history will auto-update.`}
         onConfirm={handleSave}
       />
+
+      {returningItem && (
+        <ReturnResellHoldModal
+          order={o}
+          item={returningItem}
+          onClose={() => setReturningItem(null)}
+          onConfirm={async (amt, notes) => {
+            await acceptReturnResellHold(returningItem.id, amt, notes);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -5290,10 +5735,12 @@ function StudentRefundManagementPanel({
   o,
   user,
   onUpdated,
+  storeName,
 }: {
   o: any;
   user: User;
   onUpdated: () => Promise<void> | void;
+  storeName?: string;
 }) {
   const isAdmin = user.role === "SUPER_ADMIN" || user.permissions?.includes("orders.update");
   if (!isAdmin || !o) return null;
@@ -5410,7 +5857,8 @@ function StudentRefundManagementPanel({
                 refundDue > 0 ? refundDue : refundAmount,
                 method || "JazzCash / EasyPaisa",
                 reference || "",
-                o.refund_note || ""
+                o.refund_note || "",
+                storeName || o?.store?.store_name
               )}
               target="_blank"
               rel="noopener noreferrer"
@@ -6249,11 +6697,13 @@ function OrderModalPopup({
   user,
   onClose,
   onDeleted,
+  storeName,
 }: {
   id: string;
   user: User;
   onClose: () => void;
   onDeleted: () => void;
+  storeName?: string;
 }) {
   const { data: o, error, loading, reload } = useData("manage/orders/" + id);
   const [note, setNote] = useState("");
@@ -6802,8 +7252,8 @@ function OrderModalPopup({
                         </div>
                       )}
 
-                      <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
-                      <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} />
+                      <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} storeName={storeName || o?.store?.store_name} />
+                      <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} storeName={storeName || o?.store?.store_name} />
                       <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
 
                       <div className="print-only">
@@ -7512,6 +7962,7 @@ const ORDER_WORKFLOW_TABS: WorkflowTab[] = [
   { id: "REJECTED", label: "Rejected", title: "Rejected Orders", hint: "Invalid slip / rejected", icon: X, statuses: ["REJECTED"], color: "rejected", tone: "red" },
   { id: "REFUND_REQUESTED", label: "Refunded", title: "Refund Requested / Processed", hint: "Settled balance", icon: RotateCcw, statuses: ["REFUND_REQUESTED"], color: "refunded", tone: "teal" },
   { id: "REFUNDS_DUE", label: "Refunds Pending", title: "Orders with pending student advance refund", hint: "Advance return due", icon: AlertCircle, statuses: ["REFUNDS_DUE"], urgent: true, color: "pending", tone: "orange" },
+  { id: "RESELL_HOLD", label: "Resell Holds", title: "Books returned on Resell Hold in Office Stock", hint: "Office stock awaiting resale", icon: RefreshCw, statuses: ["RESELL_HOLD"], urgent: true, color: "processing", tone: "purple" },
 ];
 
 const ORDER_DELIVERY_CHIPS = [
@@ -7745,16 +8196,19 @@ function Orders({
   base,
   payments = false,
   user,
+  storeName = "Campus Bookstore",
 }: {
   base: string;
   payments?: boolean;
   user?: User;
+  storeName?: string;
 }) {
   const isAdmin = user?.role === "SUPER_ADMIN";
   const isVendor = user?.role === "VENDOR";
   const canUpdate = isAdmin || isVendor || user?.permissions?.includes("orders.update");
 
   const [campus, setCampus] = useState("");
+  const [resellShelfTab, setResellShelfTab] = useState<"held" | "resold">("held");
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const param = new URLSearchParams(location.search).get("status");
@@ -8270,6 +8724,28 @@ function Orders({
     }
   };
 
+  const handleMarkResoldFromShelf = async (orderId: string, itemId: string, item: any) => {
+    const resellRef = window.prompt(
+      `Mark "${item.code || "Book"}" as RESOLD?\n\nIf this was resold in a new order, enter the new Order Reference (e.g. VU-0111-0009), or leave blank:`,
+      "",
+    );
+    if (resellRef === null) return;
+    try {
+      const res = await api(`manage/orders/${orderId}`, {
+        action: "mark_item_return_resold",
+        item_id: itemId,
+        resell_order_id: resellRef.trim() || undefined,
+      });
+      if (res?.ok) {
+        toast.success(`Book marked as RESOLD! Held refund of ${money(item.return_refund_amount)} is now ready for payout 🎉`);
+        notifyOrdersUpdated();
+        await reload();
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to mark item as resold");
+    }
+  };
+
   const isPaymentConfirmedTab = [
     "CONFIRMED",
     "PROCESSING",
@@ -8292,6 +8768,9 @@ function Orders({
     }
     if (tab.id === "REFUNDS_DUE") {
       return data.status_counts.REFUNDS_DUE || 0;
+    }
+    if (tab.id === "RESELL_HOLD") {
+      return data.status_counts.RESELL_HOLD || 0;
     }
     if (tab.id === "ALL") {
       return data.status_counts.ALL ?? data.total ?? 0;
@@ -8557,6 +9036,9 @@ function Orders({
                   setActiveTab(tab.id);
                   if (tab.id === "REFUNDS_DUE") {
                     setStatusList(["REFUNDS_DUE"]);
+                    setPrintedFilter("");
+                  } else if (tab.id === "RESELL_HOLD") {
+                    setStatusList(["RESELL_HOLD"]);
                     setPrintedFilter("");
                   } else if (tab.id === "PROCESSING") {
                     setStatusList(["PROCESSING"]);
@@ -9196,6 +9678,300 @@ function Orders({
           </div>
         );
       })()}
+      {activeTab === "RESELL_HOLD" && (
+        <div
+          style={{
+            marginBottom: 20,
+            padding: "16px 20px",
+            borderRadius: 12,
+            background: "linear-gradient(135deg, rgba(147, 51, 234, 0.05) 0%, rgba(124, 58, 237, 0.08) 100%)",
+            border: "1.5px solid #d8b4fe",
+          }}
+        >
+          {(() => {
+            const allItems = data?.resell_hold_items || [];
+            const activeHeld = allItems.filter((i: any) => i.return_status === "HELD_FOR_RESELL");
+            const resoldList = allItems.filter((i: any) => i.return_status === "RESOLD");
+            const currentList = resellShelfTab === "held" ? activeHeld : resoldList;
+
+            return (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: "1.2rem" }}>📦</span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#6b21a8" }}>
+                        Return Resell Shelf Ledger (Office Stock)
+                      </h3>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 12,
+                          background: "#9333ea",
+                          color: "#fff",
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {activeHeld.length} on shelf
+                      </span>
+                    </div>
+                    <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "#7e22ce" }}>
+                      Delivered books returned by students and held in campus office stock. Student refunds remain on hold until resold.
+                    </p>
+
+                    {/* Sub-tabs for Shelf Active vs Resold History */}
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => setResellShelfTab("held")}
+                        style={{
+                          padding: "5px 12px",
+                          borderRadius: 20,
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          border: resellShelfTab === "held" ? "1.5px solid #9333ea" : "1px solid #d8b4fe",
+                          background: resellShelfTab === "held" ? "#9333ea" : "#fff",
+                          color: resellShelfTab === "held" ? "#fff" : "#7e22ce",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        📦 Currently on Shelf ({activeHeld.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResellShelfTab("resold")}
+                        style={{
+                          padding: "5px 12px",
+                          borderRadius: 20,
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          border: resellShelfTab === "resold" ? "1.5px solid #16a34a" : "1px solid #cbd5e1",
+                          background: resellShelfTab === "resold" ? "#16a34a" : "#fff",
+                          color: resellShelfTab === "resold" ? "#fff" : "var(--foreground)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        ✨ Resold / Cleared History ({resoldList.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div style={{ padding: "6px 12px", borderRadius: 8, background: "#fff", border: "1px solid #d8b4fe", textAlign: "right" }}>
+                      <div style={{ fontSize: "0.68rem", color: "var(--muted-foreground)", textTransform: "uppercase", fontWeight: 700 }}>Total Held Refunds</div>
+                      <div style={{ fontSize: "1rem", fontWeight: 800, color: "#9333ea" }}>
+                        {money(activeHeld.reduce((s: number, i: any) => s + (Number(i.return_refund_amount) || 0), 0))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {currentList.length === 0 ? (
+                  <div style={{ padding: "20px", textAlign: "center", color: "var(--muted-foreground)", fontSize: "0.88rem", background: "#fff", borderRadius: 8, border: "1px dashed var(--border)" }}>
+                    {resellShelfTab === "held"
+                      ? "🎉 No returned books currently on Resell Hold in office stock. Shelf is clear!"
+                      : "No resold returned books yet."}
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {currentList.map((item: any) => {
+                      const isHeld = item.return_status === "HELD_FOR_RESELL";
+                      const holdMsgUrl = getReturnHoldWhatsAppUrl(
+                        { reference: item.order_reference, phone: item.student_phone, name: item.student_name },
+                        item,
+                        item.return_refund_amount,
+                        item.return_notes,
+                        storeName,
+                      );
+                      const resoldMsgUrl = getReturnResoldWhatsAppUrl(
+                        { reference: item.order_reference, phone: item.student_phone, name: item.student_name },
+                        item,
+                        item.return_refund_amount,
+                        "EasyPaisa",
+                        "",
+                        storeName,
+                      );
+
+                      return (
+                        <div
+                          key={item.item_id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 12,
+                            padding: "12px 16px",
+                            background: "#ffffff",
+                            borderRadius: 10,
+                            border: isHeld ? "1.5px solid #d8b4fe" : "1px solid #bbf7d0",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 260 }}>
+                            <span
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 6,
+                                background: isHeld ? "#f3e8ff" : "#dcfce7",
+                                color: isHeld ? "#7e22ce" : "#15803d",
+                                fontWeight: 800,
+                                fontSize: "0.85rem",
+                                letterSpacing: "0.5px",
+                              }}
+                            >
+                              {item.code || "BOOK"}
+                            </span>
+                            <div>
+                              <strong style={{ fontSize: "0.88rem", color: "var(--foreground)", display: "block" }}>
+                                {item.title || "Book"}
+                              </strong>
+                              <small style={{ fontSize: "0.74rem", color: "var(--muted-foreground)" }}>
+                                Returned by: <strong>{item.student_name || "Student"}</strong> ({item.student_phone || "No phone"}) • Order:{" "}
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveOrderId(item.order_id)}
+                                  style={{
+                                    color: "#2563eb",
+                                    background: "none",
+                                    border: "none",
+                                    padding: 0,
+                                    textDecoration: "underline",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  {item.order_reference}
+                                </button>
+                                {item.return_notes && ` • Note: ${item.return_notes}`}
+                                {!isHeld && item.return_resold_at && (
+                                  <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                                    {" "}• Resold: {new Date(item.return_resold_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </small>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                            <div>
+                              <div style={{ fontSize: "0.68rem", color: "var(--muted-foreground)", textTransform: "uppercase", fontWeight: 700 }}>
+                                {isHeld ? "Held Refund" : "Queued Refund"}
+                              </div>
+                              <div style={{ fontSize: "0.95rem", fontWeight: 800, color: isHeld ? "#9333ea" : "#16a34a" }}>
+                                {money(item.return_refund_amount || 0)}
+                              </div>
+                            </div>
+
+                            <div>
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  padding: "3px 8px",
+                                  borderRadius: 9999,
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  background: isHeld ? "rgba(147, 51, 234, 0.12)" : "rgba(22, 163, 74, 0.12)",
+                                  color: isHeld ? "#7e22ce" : "#15803d",
+                                  border: isHeld ? "1px solid #d8b4fe" : "1px solid #86efac",
+                                }}
+                              >
+                                {isHeld ? "🔄 On Shelf (Held)" : "✨ Resold (Payout Ready)"}
+                              </span>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              {item.student_phone && (
+                                <a
+                                  href={isHeld ? holdMsgUrl : resoldMsgUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn compact"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: "0.72rem",
+                                    padding: "4px 8px",
+                                    background: "#25D366",
+                                    borderColor: "#25D366",
+                                    color: "#fff",
+                                    textDecoration: "none",
+                                    fontWeight: 700,
+                                    borderRadius: 6,
+                                  }}
+                                  title="Send WhatsApp update to student"
+                                >
+                                  <MessageCircle size={12} /> WhatsApp
+                                </a>
+                              )}
+
+                              {isHeld ? (
+                                <button
+                                  type="button"
+                                  className="btn compact"
+                                  onClick={() => handleMarkResoldFromShelf(item.order_id, item.item_id, item)}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: "0.72rem",
+                                    padding: "4px 10px",
+                                    background: "#16a34a",
+                                    borderColor: "#16a34a",
+                                    color: "#fff",
+                                    fontWeight: 700,
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                  }}
+                                  title="Mark this book as resold to release student's held refund"
+                                >
+                                  <Sparkles size={12} /> Mark Resold
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn compact"
+                                  onClick={() => setActiveOrderId(item.order_id)}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: "0.72rem",
+                                    padding: "4px 10px",
+                                    background: "#2563eb",
+                                    borderColor: "#2563eb",
+                                    color: "#fff",
+                                    fontWeight: 700,
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                  }}
+                                  title="Open order details to pay student refund"
+                                >
+                                  Open Order & Pay Refund →
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
       <Result loading={loading} error={error}>
         <DataTable
           headers={headers}
@@ -9341,7 +10117,7 @@ function Orders({
                         </button>
                         {o.phone && (
                           <a
-                            href={getWhatsAppUrl(o)}
+                            href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -9653,7 +10429,25 @@ function Orders({
                       ))}
                     </div>
                   )}
-                  {!isOther && vIsAllRcvd && (
+                  {!isOther && !o.vendor_dispatched_at && o.vendor_printed_at && !vIsAllRcvd && (
+                    <span
+                      className="mono-pill"
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 600,
+                        background: "rgba(99, 102, 241, 0.10)",
+                        color: "#4f46e5",
+                        border: "1px solid #c7d2fe",
+                        padding: "1px 6px",
+                        width: "fit-content",
+                        borderRadius: 9999,
+                      }}
+                      title="Books printed, ready to be dispatched to campus"
+                    >
+                      🖨️ Printed (Ready to Send)
+                    </span>
+                  )}
+                  {!isOther && vIsAllRcvd && (o.vendor_dispatched_at || o.status === "SHIPPED" || o.status === "DELIVERED") && (
                     <span
                       className="mono-pill"
                       style={{
@@ -9776,7 +10570,7 @@ function Orders({
                         </button>
                         {o.phone && (
                           <a
-                            href={getWhatsAppUrl(o)}
+                            href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -9989,7 +10783,7 @@ function Orders({
                     <p style={{ margin: "2px 0" }}>
                       {o.phone ? (
                         <a
-                          href={getWhatsAppUrl(o)}
+                          href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
@@ -10077,7 +10871,7 @@ function Orders({
                     <p style={{ margin: "2px 0" }}>
                       {o.phone ? (
                         <a
-                          href={getWhatsAppUrl(o)}
+                          href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
@@ -10129,6 +10923,51 @@ function Orders({
                         Refund Due: {money(o.refund_due)}
                       </span>
                     )}
+                    {(() => {
+                      const heldItems = (o.items || []).filter((it: any) => it.return_status === "HELD_FOR_RESELL");
+                      if (heldItems.length > 0) {
+                        const totalHold = heldItems.reduce((s: number, it: any) => s + (Number(it.return_refund_amount) || 0), 0);
+                        return (
+                          <span
+                            className="mono-pill"
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              background: "#fef3c7",
+                              color: "#92400e",
+                              border: "1px solid #fde68a",
+                              padding: "1px 5px",
+                              width: "fit-content",
+                            }}
+                            title={`Book returned by student. Placed on Resell Hold in Office Stock. Refund on Hold: ${money(totalHold)}`}
+                          >
+                            🔄 Resell Hold: {money(totalHold)}
+                          </span>
+                        );
+                      }
+                      const resoldItems = (o.items || []).filter((it: any) => it.return_status === "RESOLD");
+                      if (resoldItems.length > 0) {
+                        const totalResold = resoldItems.reduce((s: number, it: any) => s + (Number(it.return_refund_amount) || 0), 0);
+                        return (
+                          <span
+                            className="mono-pill"
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              background: "#ecfdf5",
+                              color: "#065f46",
+                              border: "1px solid #a7f3d0",
+                              padding: "1px 5px",
+                              width: "fit-content",
+                            }}
+                            title={`Returned book resold to another student! Payout ready: ${money(totalResold)}`}
+                          >
+                            ✨ Resold: {money(totalResold)}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>,
                   statusCell,
                   <Status value={o.payment_status} />,
@@ -10294,6 +11133,7 @@ function Orders({
           user={user}
           onClose={() => setActiveOrderId(null)}
           onDeleted={reload}
+          storeName={storeName}
         />
       )}
 
@@ -10382,12 +11222,13 @@ function Orders({
           onSaved={reload}
           isAdmin={isAdmin}
           isVendor={isVendor}
+          storeName={storeName}
         />
       )}
     </>
   );
 }
-function OrderDetail({ id, user }: { id: string; user: User }) {
+function OrderDetail({ id, user, storeName = "Campus Bookstore" }: { id: string; user: User; storeName?: string }) {
   const { data: o, error, loading, reload } = useData("manage/orders/" + id),
     [note, setNote] = useState(""),
     [next, setNext] = useState(""),
@@ -10824,8 +11665,8 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                   <OrderReceipt o={o} />
                 </div>
                 <div className="stack no-print">
-                  <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} />
-                  <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} />
+                  <AdminOrderBooksPanel o={o} user={user} onUpdated={reload} storeName={storeName || o?.store?.store_name} />
+                  <StudentRefundManagementPanel o={o} user={user} onUpdated={reload} storeName={storeName || o?.store?.store_name} />
                   <SuperAdminDueManagementPanel o={o} user={user} onUpdated={reload} />
                   <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px", flexWrap: "wrap" }}>
                     <div>
@@ -10845,7 +11686,7 @@ function OrderDetail({ id, user }: { id: string; user: User }) {
                       <ReceiptButtons order={o} />
                       {o.phone && (
                         <a
-                          href={getWhatsAppUrl(o)}
+                          href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn compact"

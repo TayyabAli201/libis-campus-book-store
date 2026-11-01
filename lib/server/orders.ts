@@ -523,6 +523,29 @@ export async function getOrder(
 
     const printableItems = items.filter((it: any) => !it.is_unavailable && !it.in_office_stock);
     const officeItems = items.filter((it: any) => Boolean(it.in_office_stock));
+
+    // Smart Auto-Match: Check if any unfulfilled item in this order has a matching book on Resell Hold in Office Shelf!
+    if (printableItems.length > 0) {
+      const heldCopies = await all<any>(
+        `SELECT 
+          oi.id AS match_item_id, oi.order_id AS match_order_id, oi.code, oi.title,
+          oi.return_refund_amount, oi.return_held_at,
+          o.reference AS match_order_reference, o.name AS match_student_name, o.phone AS match_student_phone
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE oi.return_status = 'HELD_FOR_RESELL' 
+          AND oi.in_office_stock = 1 
+          AND oi.order_id != ?`,
+        o.id,
+      );
+      for (const pit of printableItems) {
+        const matchingCopy = heldCopies.find((c: any) => c.code === pit.code);
+        if (matchingCopy) {
+          (pit as any).resell_shelf_match = matchingCopy;
+        }
+      }
+      o.has_resell_shelf_matches = printableItems.some((pit: any) => Boolean((pit as any).resell_shelf_match));
+    }
     const orderPrintPages = printableItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0);
     const orderPrintBooks = printableItems.reduce((s: number, it: any) => s + (it.quantity || 1), 0);
     const officePages = officeItems.reduce((s: number, it: any) => s + (Number(it.pages) || 0) * (it.quantity || 1), 0);
@@ -612,6 +635,10 @@ export async function listOrders(
   }
   if (status === "REFUNDS_DUE") {
     filters.push("(o.refund_due > 0 AND o.refund_status = 'REFUND_PENDING')");
+  } else if (status === "RESELL_HOLD") {
+    filters.push(
+      "EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.return_status = 'HELD_FOR_RESELL')",
+    );
   } else if (status && status !== "all") {
     const statuses = status
       .split(",")
@@ -848,6 +875,12 @@ export async function listOrders(
   );
   status_counts["REFUNDS_DUE"] = refundsDueRow?.cnt || 0;
 
+  const resellHoldRow = await one<{ cnt: number }>(
+    `SELECT COUNT(DISTINCT o.id) AS cnt FROM orders o WHERE ${tabWhere} AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.return_status = 'HELD_FOR_RESELL')`,
+    ...tabArgs,
+  );
+  status_counts["RESELL_HOLD"] = resellHoldRow?.cnt || 0;
+
   let vendor_overview: any = null;
   if (u.role === "VENDOR") {
     const vendorId = u.vendor_id || u.id;
@@ -966,6 +999,20 @@ export async function listOrders(
     };
   }
 
+  let resell_hold_items: any[] = [];
+  if (u.role === "SUPER_ADMIN") {
+    resell_hold_items = await all<any>(
+      `SELECT 
+        oi.id AS item_id, oi.order_id, oi.book_id, oi.code, oi.title, oi.pages, oi.quantity, oi.unit_price,
+        oi.return_status, oi.return_held_at, oi.return_refund_amount, oi.return_notes, oi.return_resold_at,
+        o.reference AS order_reference, o.name AS student_name, o.phone AS student_phone, o.created_at AS order_created_at
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      WHERE oi.return_status IN ('HELD_FOR_RESELL', 'RESOLD')
+      ORDER BY CASE WHEN oi.return_status = 'HELD_FOR_RESELL' THEN 0 ELSE 1 END, oi.return_held_at DESC`,
+    );
+  }
+
   return {
     rows,
     total: total?.n || 0,
@@ -973,6 +1020,7 @@ export async function listOrders(
     page,
     pageSize,
     status_counts,
+    resell_hold_items,
     overview: {
       total_orders: Number(ordersSummary?.total_orders || 0),
       total_books: Number(itemsSummary?.total_books || 0),
@@ -1373,11 +1421,17 @@ export async function changeStatus(
   if (["SHIPPED", "DELIVERED"].includes(status)) {
     if (!newVendorPrintedAt) newVendorPrintedAt = at;
     if (!isOtherCityOrder(o) && !newVendorDispatchedAt) newVendorDispatchedAt = at;
+    statements.push(
+      stmt(
+        "UPDATE order_items SET received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+        o.id,
+      ),
+    );
   }
   if (status === "DELIVERED") {
     statements.push(
       stmt(
-        "UPDATE order_items SET delivered_to_student=1, delivered_to_student_at=COALESCE(delivered_to_student_at, ?), received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+        "UPDATE order_items SET delivered_to_student=1, delivered_to_student_at=COALESCE(delivered_to_student_at, ?) WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
         at,
         o.id,
       ),
@@ -1484,6 +1538,10 @@ export async function setCourierTracking(
       o.id,
     ),
     stmt(
+      "UPDATE order_items SET received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+      o.id,
+    ),
+    stmt(
       "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
       uid(),
       o.id,
@@ -1509,6 +1567,15 @@ export async function setCourierTracking(
       req,
     ),
   ];
+  if (nextStatus === "DELIVERED") {
+    statements.push(
+      stmt(
+        "UPDATE order_items SET delivered_to_student=1, delivered_to_student_at=COALESCE(delivered_to_student_at, ?) WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+        at,
+        o.id,
+      ),
+    );
+  }
   await batch(statements);
   return {
     ok: true,
@@ -1843,9 +1910,6 @@ export async function vendorPrint(
       req,
     ),
   ];
-  if (isPrinted) {
-    statements.push(stmt("UPDATE order_items SET received_from_vendor=1 WHERE order_id=?", o.id));
-  }
   await batch(statements);
   return { ok: true, vendor_printed_at: printTime };
 }
@@ -1874,7 +1938,7 @@ export async function vendorDispatchOffice(
       o.id,
     ),
     stmt(
-      "UPDATE order_items SET received_from_vendor=1 WHERE order_id=?",
+      "UPDATE order_items SET received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
       o.id,
     ),
     stmt(
@@ -1993,9 +2057,6 @@ export async function batchVendorPrint(
     if (u.role === "VENDOR" && o.vendor_id !== (u.vendor_id || u.id)) {
       continue;
     }
-    if (isPrinted) {
-      statements.push(stmt("UPDATE order_items SET received_from_vendor=1 WHERE order_id=?", o.id));
-    }
     statements.push(
       stmt("UPDATE orders SET vendor_printed_at=?, version=version+1 WHERE id=?", printTime, o.id),
       stmt(
@@ -2075,7 +2136,7 @@ export async function batchVendorDispatchOffice(
         o.id,
       ),
       stmt(
-        "UPDATE order_items SET received_from_vendor=1 WHERE order_id=?",
+        "UPDATE order_items SET received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
         o.id,
       ),
       stmt(
@@ -2411,6 +2472,21 @@ export async function batchChangeStatus(
       if (["SHIPPED", "DELIVERED"].includes(toStatus)) {
         if (!newVendorPrintedAt) newVendorPrintedAt = at;
         if (!isOtherCityOrder(ord) && !newVendorDispatchedAt) newVendorDispatchedAt = at;
+        statements.push(
+          stmt(
+            "UPDATE order_items SET received_from_vendor=1 WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+            ord.id,
+          ),
+        );
+      }
+      if (toStatus === "DELIVERED") {
+        statements.push(
+          stmt(
+            "UPDATE order_items SET delivered_to_student=1, delivered_to_student_at=COALESCE(delivered_to_student_at, ?) WHERE order_id=? AND (is_unavailable IS NULL OR is_unavailable=0)",
+            at,
+            ord.id,
+          ),
+        );
       }
 
       statements.push(
@@ -3123,5 +3199,259 @@ export async function handoverAvailableItemsToStudent(
     handed_count: availableUnhanded.length,
     remaining_pending: remainingPending.length,
     all_completed: allCompleted,
+  };
+}
+
+export async function acceptItemReturnResellHold(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+  refundAmount: number,
+  notes = "",
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Only Super Admin can process returned books on resell hold.");
+  }
+  const cleanRefundAmount = Math.max(0, Math.round(Number(refundAmount) || 0));
+
+  const o = await one<any>("SELECT * FROM orders WHERE id=?", orderId);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  if (!["DELIVERED", "SHIPPED"].includes(o.status)) {
+    throw new AppError(400, "Can only accept returns on hold for delivered or shipped orders.");
+  }
+
+  const it = await one<any>(
+    "SELECT * FROM order_items WHERE id=? AND order_id=?",
+    itemId,
+    orderId,
+  );
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  if (it.return_status === "HELD_FOR_RESELL") {
+    throw new AppError(400, "This book is already held for resale in campus stock.");
+  }
+
+  const at = now();
+  const histNote = `Book returned by student on Resell Hold: ${it.code} (${it.title}). Placed in Campus Office Stock. ${money(cleanRefundAmount)} refund will be released to student upon resale.${notes ? ` Note: ${notes}` : ""}`;
+
+  const statements: any[] = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", o.id, o.version),
+    stmt(
+      "UPDATE order_items SET return_status='HELD_FOR_RESELL', return_held_at=?, return_refund_amount=?, return_notes=?, in_office_stock=1, office_stock_at=? WHERE id=? AND order_id=?",
+      at,
+      cleanRefundAmount,
+      notes || null,
+      at,
+      itemId,
+      orderId,
+    ),
+    stmt(
+      "UPDATE orders SET version=version+1, updated_at=? WHERE id=?",
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      o.status,
+      histNote,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_RETURN_RESELL_HOLD",
+      itemId,
+      { return_status: it.return_status },
+      { return_status: "HELD_FOR_RESELL", order_id: orderId, code: it.code, refund_amount: cleanRefundAmount },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return {
+    ok: true,
+    itemId,
+    return_status: "HELD_FOR_RESELL",
+    return_held_at: at,
+    return_refund_amount: cleanRefundAmount,
+    return_notes: notes,
+    in_office_stock: 1,
+  };
+}
+
+export async function markItemReturnResold(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+  resellOrderId?: string,
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Only Super Admin can mark returned books as resold.");
+  }
+
+  const o = await one<any>("SELECT * FROM orders WHERE id=?", orderId);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  const it = await one<any>(
+    "SELECT * FROM order_items WHERE id=? AND order_id=?",
+    itemId,
+    orderId,
+  );
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  if (it.return_status !== "HELD_FOR_RESELL") {
+    throw new AppError(400, "This book is not currently held for resale.");
+  }
+
+  const at = now();
+  const refundAmt = Math.round(Number(it.return_refund_amount) || 0);
+  const histNote = `Returned book resold! ${it.code} (${it.title})${resellOrderId ? ` in Order #${resellOrderId}` : ""}. Student refund of ${money(refundAmt)} is now queued to Refunds Pending for release.`;
+
+  const statements: any[] = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", o.id, o.version),
+    stmt(
+      "UPDATE order_items SET return_status='RESOLD', return_resold_at=?, in_office_stock=0 WHERE id=? AND order_id=?",
+      at,
+      itemId,
+      orderId,
+    ),
+    stmt(
+      "UPDATE orders SET refund_due=COALESCE(refund_due, 0) + ?, refund_status='REFUND_PENDING', version=version+1, updated_at=? WHERE id=?",
+      refundAmt,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      o.status,
+      histNote,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_RETURN_RESOLD",
+      itemId,
+      { return_status: "HELD_FOR_RESELL" },
+      { return_status: "RESOLD", order_id: orderId, code: it.code, refund_due_added: refundAmt },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return {
+    ok: true,
+    itemId,
+    return_status: "RESOLD",
+    return_resold_at: at,
+  };
+}
+
+export async function getResellHoldItems(req: Request, u: User) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.manage")) {
+    throw new AppError(403, "Access denied.");
+  }
+  const rows = await all<any>(
+    `SELECT 
+      oi.id AS item_id, oi.order_id, oi.book_id, oi.code, oi.title, oi.pages, oi.quantity, oi.unit_price,
+      oi.return_status, oi.return_held_at, oi.return_refund_amount, oi.return_notes, oi.return_resold_at,
+      o.reference AS order_reference, o.name AS student_name, o.phone AS student_phone, o.created_at AS order_created_at
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE oi.return_status IN ('HELD_FOR_RESELL', 'RESOLD')
+    ORDER BY CASE WHEN oi.return_status = 'HELD_FOR_RESELL' THEN 0 ELSE 1 END, oi.return_held_at DESC`,
+  );
+  return rows;
+}
+
+export async function fulfillItemFromResellShelf(
+  req: Request,
+  u: User,
+  targetOrderId: string,
+  targetItemId: string,
+  sourceOrderId: string,
+  sourceItemId: string,
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Only Super Admin can fulfill from resell shelf.");
+  }
+  const targetOrder = await getOrder(req, targetOrderId, u);
+  const sourceOrder = await getOrder(req, sourceOrderId, u);
+  const targetItem = targetOrder.items.find((it: any) => it.id === targetItemId);
+  const sourceItem = sourceOrder.items.find((it: any) => it.id === sourceItemId);
+  if (!targetItem) throw new AppError(404, "Target item not found in order.");
+  if (!sourceItem) throw new AppError(404, "Source item on resell shelf not found.");
+  if (sourceItem.return_status !== "HELD_FOR_RESELL") {
+    throw new AppError(400, "Source item is not currently on resell hold.");
+  }
+  if (targetItem.in_office_stock) {
+    throw new AppError(400, "Target item is already marked as in office stock.");
+  }
+
+  const at = now();
+  const sourceRefundAmt = Math.round(Number(sourceItem.return_refund_amount) || 0);
+  const stmts = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", sourceOrder.id, sourceOrder.version),
+    stmt(
+      "UPDATE order_items SET in_office_stock = 1, office_stock_at = ? WHERE id = ?",
+      at,
+      targetItemId,
+    ),
+    stmt(
+      "UPDATE order_items SET return_status = 'RESOLD', return_resold_at = ?, in_office_stock = 0 WHERE id = ?",
+      at,
+      sourceItemId,
+    ),
+    stmt(
+      "UPDATE orders SET refund_due = COALESCE(refund_due, 0) + ?, refund_status = 'REFUND_PENDING', version = version + 1, updated_at = ? WHERE id = ?",
+      sourceRefundAmt,
+      at,
+      sourceOrderId,
+    ),
+    stmt(
+      "INSERT INTO order_history (id, order_id, status, note, actor, created_at, internal) VALUES (?, ?, ?, ?, ?, ?, 1)",
+      uid(),
+      targetOrderId,
+      targetOrder.status,
+      `Fulfilled [${targetItem.code || "Book"}] from Office Shelf (Return Resell copy from ${sourceOrder.reference} - ${sourceOrder.name}). Vendor print skipped.`,
+      u.email,
+      at,
+    ),
+    stmt(
+      "INSERT INTO order_history (id, order_id, status, note, actor, created_at, internal) VALUES (?, ?, ?, ?, ?, ?, 1)",
+      uid(),
+      sourceOrderId,
+      sourceOrder.status,
+      `Returned book [${sourceItem.code || "Book"}] has been RESOLD to order ${targetOrder.reference}. Student refund of ${money(sourceRefundAmt)} has been queued to Refunds Pending for payout.`,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "FULFILL_FROM_RESELL_SHELF",
+      "order_items",
+      targetItemId,
+      `Fulfilled ${targetItem.code} in ${targetOrder.reference} from shelf copy in ${sourceOrder.reference} (resold)`,
+    ),
+  ];
+
+  await batch(stmts);
+  return {
+    ok: true,
+    target_order_id: targetOrderId,
+    source_order_id: sourceOrderId,
+    target_item_id: targetItemId,
+    source_item_id: sourceItemId,
+    source_refund_amount: sourceItem.return_refund_amount || 0,
+    source_student_name: sourceOrder.name,
+    source_student_phone: sourceOrder.phone,
+    source_reference: sourceOrder.reference,
   };
 }

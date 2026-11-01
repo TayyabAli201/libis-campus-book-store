@@ -30,6 +30,7 @@ interface QuickTrackingModalProps {
   onSaved: () => void;
   isAdmin?: boolean;
   isVendor?: boolean;
+  storeName?: string;
 }
 
 interface OrderRowState {
@@ -58,6 +59,7 @@ export function QuickTrackingModal({
   onSaved,
   isAdmin = true,
   isVendor = false,
+  storeName,
 }: QuickTrackingModalProps) {
   const [mounted, setMounted] = useState(false);
   const [filterMode, setFilterMode] = useState<"missing" | "all">("missing");
@@ -258,7 +260,8 @@ export function QuickTrackingModal({
     if (isPakPost) {
       msg += " Track online at: https://ep.gov.pk/";
     }
-    msg += "\n\nThank you for choosing Campus Bookstore!";
+    const sName = (storeName || order?.store?.store_name || "Campus Bookstore").trim();
+    msg += `\n\nThank you for choosing ${sName}!`;
     return msg;
   };
 

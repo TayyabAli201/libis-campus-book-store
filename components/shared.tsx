@@ -48,7 +48,8 @@ export async function api(
   method = "POST",
   headers: Record<string, string> = {},
 ) {
-  const r = await fetch("/api/" + path, {
+  const cleanPath = path.replace(/^\/+/, "");
+  const r = await fetch("/api/" + cleanPath, {
     method: body === undefined ? "GET" : method,
     headers: {
       "Content-Type": "application/json",

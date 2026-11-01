@@ -150,14 +150,28 @@ export function extractOrderCoordinates(o: any): { lat: string; lng: string } | 
   return null;
 }
 
+export function resolveStoreName(o?: any, fallback?: string): string {
+  if (fallback && fallback.trim()) return fallback.trim();
+  if (o?.store?.store_name && o.store.store_name.trim()) return o.store.store_name.trim();
+  if (o?.store_name && typeof o.store_name === "string" && o.store_name.trim()) return o.store_name.trim();
+  try {
+    if (o?.store_snapshot) {
+      const snap = typeof o.store_snapshot === "string" ? JSON.parse(o.store_snapshot) : o.store_snapshot;
+      if (snap?.store_name && snap.store_name.trim()) return snap.store_name.trim();
+    }
+  } catch {}
+  return "Campus Bookstore";
+}
+
 export function isOtherCityOrder(o: any): boolean {
   if (!o) return false;
   return !isCampusOrder(o) && !isLahoreOrder(o);
 }
 
-export function getOrderWhatsAppMessage(o: any): string {
+export function getOrderWhatsAppMessage(o: any, storeName?: string): string {
   const studentName = (o?.name || "Student").trim();
   const status = (o?.status || "").toUpperCase();
+  const sName = resolveStoreName(o, storeName);
 
   const isCampus = isCampusOrder(o);
   const isLahore = isLahoreOrder(o);
@@ -214,13 +228,13 @@ export function getOrderWhatsAppMessage(o: any): string {
 
   // Fallback for other statuses
   if (status === "PAYMENT_PENDING") {
-    return `Salam ${studentName}, we have received your order (${o?.reference || "Book Store"}). We are currently verifying your payment.`;
+    return `Salam ${studentName}, we have received your order (${o?.reference || sName}). We are currently verifying your payment.`;
   }
   if (status === "READY") {
-    return `Salam ${studentName}, your order (${o?.reference || "Book Store"}) is ready for dispatch and will be shipped soon.`;
+    return `Salam ${studentName}, your order (${o?.reference || sName}) is ready for dispatch and will be shipped soon.`;
   }
 
-  return `Salam ${studentName}, regarding your order (${o?.reference || "Book Store"}).`;
+  return `Salam ${studentName}, regarding your order (${o?.reference || sName}).`;
 }
 
 export function formatWhatsAppPhone(phone: string): string {
@@ -228,19 +242,20 @@ export function formatWhatsAppPhone(phone: string): string {
   return (phone || "").replace(/[^0-9]/g, "");
 }
 
-export function getWhatsAppUrl(o: any): string {
+export function getWhatsAppUrl(o: any, storeName?: string): string {
   const phone = formatWhatsAppPhone(o?.phone || "");
-  const message = getOrderWhatsAppMessage(o);
+  const message = getOrderWhatsAppMessage(o, storeName);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
-export function getVendorWhatsAppMessage(o: any, v?: any): string {
+export function getVendorWhatsAppMessage(o: any, v?: any, storeName?: string): string {
   const vendorName = (v?.name || "Vendor").trim();
   const ref = o?.reference || "Order";
+  const sName = resolveStoreName(o, storeName);
   const isOther = isOtherCityOrder(o);
   const destination = isOther
     ? `Other City (Courier to Student):\nRecipient: ${o?.name || "Student"}\nPhone: ${o?.phone || ""}\nAddress: ${o?.address || ""}, ${o?.city || ""}`
-    : `Lahore / Campus (Deliver batch to Bookstore Office)`;
+    : `Lahore / Campus (Deliver batch to ${sName} Office)`;
 
   let itemsStr = "";
   if (Array.isArray(o?.items) && o.items.length > 0) {
@@ -257,12 +272,12 @@ export function getVendorWhatsAppMessage(o: any, v?: any): string {
 
   const notesStr = o?.vendor_notes ? `Admin Instructions: ${o.vendor_notes}\n\n` : "";
 
-  return `Salam ${vendorName}, new printing order assigned:\n\nOrder Ref: ${ref}\nTotal Books: ${o?.total_books || o?.items?.length || 1}\n\n${itemsStr}${notesStr}${destination}\n\nPlease check your vendor portal to print and update status.\nThank you!`;
+  return `Hello ${vendorName}, new printing order assigned:\n\nOrder Ref: ${ref}\nTotal Books: ${o?.total_books || o?.items?.length || 1}\n\n${itemsStr}${notesStr}${destination}\n\nPlease check your vendor portal to print and update status.\nThank you!`;
 }
 
-export function getVendorWhatsAppUrl(o: any, v: any): string {
+export function getVendorWhatsAppUrl(o: any, v: any, storeName?: string): string {
   const phone = formatWhatsAppPhone(v?.phone || "");
-  const message = getVendorWhatsAppMessage(o, v);
+  const message = getVendorWhatsAppMessage(o, v, storeName);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 export const permissions = [
@@ -543,23 +558,25 @@ export function getStudentRefundWhatsAppMessage(
   method = "JazzCash",
   reference = "",
   note = "",
+  storeName?: string,
 ): string {
   const studentName = (o?.name || "Student").trim();
   const ref = o?.reference || o?.id || "Order";
   const amount = refundAmount !== undefined ? refundAmount : Number(o?.refund_amount || o?.refund_due || 0);
   const formattedAmount = money(amount);
   const methodStr = method ? ` via ${method}` : "";
-  const refStr = reference ? ` (Ref: ${reference})` : "";
+  const refStr = reference ? ` (Transaction ID: ${reference})` : "";
   const noteStr = note ? `\nNote: ${note}` : "";
+  const sName = resolveStoreName(o, storeName);
 
   return `Assalam-o-Alaikum ${studentName}!
 
-Regarding your Order #${ref} at Campus Bookstore:
+Regarding your Order #${ref} at ${sName}:
 An advance refund of ${formattedAmount} has been processed for you${methodStr}${refStr}.${noteStr}
 
 Your remaining order items are being fulfilled as scheduled.
 Thank you for your patience!
-- Campus Bookstore Operations`;
+${sName} Operations`;
 }
 
 export function getStudentRefundWhatsAppUrl(
@@ -568,9 +585,91 @@ export function getStudentRefundWhatsAppUrl(
   method = "JazzCash",
   reference = "",
   note = "",
+  storeName?: string,
 ): string {
   const phone = formatWhatsAppPhone(o?.phone || "");
-  const message = getStudentRefundWhatsAppMessage(o, refundAmount, method, reference, note);
+  const message = getStudentRefundWhatsAppMessage(o, refundAmount, method, reference, note, storeName);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+export function getReturnHoldWhatsAppMessage(
+  o: any,
+  item: any,
+  refundAmount?: number,
+  notes = "",
+  storeName?: string,
+): string {
+  const studentName = (o?.name || "Student").trim();
+  const ref = o?.reference || o?.id || "Order";
+  const bookCode = item?.code || "Book";
+  const bookTitle = item?.title ? ` - ${item.title}` : "";
+  const amount = refundAmount !== undefined ? refundAmount : Number(item?.return_refund_amount || 0);
+  const formattedAmount = money(amount);
+  const noteStr = notes ? `\nNote: ${notes}` : "";
+  const sName = resolveStoreName(o, storeName);
+
+  return `Assalam-o-Alaikum ${studentName}!
+
+Regarding your Order #${ref} at ${sName}:
+Your returned book *${bookCode}${bookTitle}* has been received at our office and placed on Resell Hold.${noteStr}
+
+📌 Resale Policy:
+Because custom printing costs have already been incurred, your refund balance of *${formattedAmount}* is held securely. As soon as this book is purchased by another student, your refund will be released to your JazzCash / EasyPaisa / Bank account or credited to your store account.
+
+Thank you for your cooperation!
+${sName} Operations`;
+}
+
+export function getReturnHoldWhatsAppUrl(
+  o: any,
+  item: any,
+  refundAmount?: number,
+  notes = "",
+  storeName?: string,
+): string {
+  const phone = formatWhatsAppPhone(o?.phone || "");
+  const message = getReturnHoldWhatsAppMessage(o, item, refundAmount, notes, storeName);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+export function getReturnResoldWhatsAppMessage(
+  o: any,
+  item: any,
+  refundAmount?: number,
+  method = "EasyPaisa",
+  reference = "",
+  storeName?: string,
+): string {
+  const studentName = (o?.name || "Student").trim();
+  const ref = o?.reference || o?.id || "Order";
+  const bookCode = item?.code || "Book";
+  const amount = refundAmount !== undefined ? refundAmount : Number(item?.return_refund_amount || 0);
+  const formattedAmount = money(amount);
+  const methodStr = method ? ` via ${method}` : "";
+  const refStr = reference ? ` (Transaction ID: ${reference})` : "";
+  const sName = resolveStoreName(o, storeName);
+
+  return `Dear ${studentName},
+
+Great news regarding your Order #${ref} at ${sName}:
+Your returned book *${bookCode}* has been successfully resold to another student! 🎉
+
+Your held refund balance of *${formattedAmount}* has now been released and transferred to you${methodStr}${refStr}.
+
+Thank you for choosing ${sName}!
+${sName} Operations`;
+}
+
+export function getReturnResoldWhatsAppUrl(
+  o: any,
+  item: any,
+  refundAmount?: number,
+  method = "EasyPaisa",
+  reference = "",
+  storeName?: string,
+): string {
+  const phone = formatWhatsAppPhone(o?.phone || "");
+  const message = getReturnResoldWhatsAppMessage(o, item, refundAmount, method, reference, storeName);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
@@ -584,18 +683,21 @@ export function getVendorPendingBooksWhatsAppMessage(
     printingQty?: number;
     orders?: string[];
   }>,
+  storeName?: string,
 ): string {
   const name = (vendorName || "Vendor").trim();
   const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const sName = (storeName || "Campus Bookstore").trim();
 
   if (!pendingList || pendingList.length === 0) {
     return `Assalam-o-Alaikum ${name}!
 
-*Pending Books Checklist — Campus Bookstore (${dateStr}):*
+*Pending Books Checklist — ${sName} (${dateStr}):*
 
-✅ All pending books for Campus have been received at Bookstore Office. Koi pending book baqi nahi hai.
+✅ All pending books for Campus have been received at our office. No pending books remaining.
 
-Shukriya — Campus Bookstore Office`;
+Thank you!
+${sName} Operations`;
   }
 
   const totalCopies = pendingList.reduce((sum, it) => sum + (Number(it.totalQty) || 0), 0);
@@ -634,21 +736,23 @@ Shukriya — Campus Bookstore Office`;
 
   return `Assalam-o-Alaikum ${name}!
 
-*Pending Books Checklist — Campus Bookstore (${dateStr}):*
+*Pending Books Checklist — ${sName} (${dateStr}):*
 
 ${body}
 
 *Total Pending to Deliver:* ${totalCopies} books
-Baraye meharbani yeh books jald print kar ke Campus deliver karwayen.
-Shukriya — Campus Bookstore Operations`;
+Please print and deliver these books at your earliest convenience.
+Thank you!
+${sName} Operations`;
 }
 
 export function getVendorPendingBooksWhatsAppUrl(
   vendorPhone: string,
   vendorName: string,
   pendingList: any[],
+  storeName?: string,
 ): string {
   const phone = formatWhatsAppPhone(vendorPhone || "");
-  const message = getVendorPendingBooksWhatsAppMessage(vendorName, pendingList);
+  const message = getVendorPendingBooksWhatsAppMessage(vendorName, pendingList, storeName);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }

@@ -119,7 +119,8 @@ function whatsapp(s?: StoreSettings) {
   let num = s?.whatsapp || "03034049973";
   let n = num.replace(/[^0-9]/g, "");
   if (n.startsWith("0")) n = "92" + n.slice(1);
-  return `https://wa.me/${n}?text=${encodeURIComponent("Hello, I need assistance regarding my Campus Bookstore order.")}`;
+  const storeName = s?.store_name || "Campus Bookstore";
+  return `https://wa.me/${n}?text=${encodeURIComponent(`Hello, I need assistance regarding my ${storeName} order.`)}`;
 }
 export function Store({
   mode = "home",
@@ -2197,6 +2198,7 @@ function Checkout({ data }: { data: Catalog }) {
 
               {/* Order Books Summary Strip in Payment Step */}
               <div
+                className="checkout-payment-books-strip"
                 style={{
                   display: "flex",
                   alignItems: "center",

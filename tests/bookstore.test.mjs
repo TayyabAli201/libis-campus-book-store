@@ -72,6 +72,9 @@ const {
   toggleItemOfficeStock,
   toggleOrderItemStudentDelivered,
   handoverAvailableItemsToStudent,
+  acceptItemReturnResellHold,
+  markItemReturnResold,
+  batchChangeStatus,
 } = await import("../lib/server/orders.ts");
 const {
   listVendors,
@@ -93,6 +96,8 @@ const {
   isOtherCityOrder,
   getStudentRefundWhatsAppMessage,
   getStudentRefundWhatsAppUrl,
+  getReturnHoldWhatsAppMessage,
+  getReturnResoldWhatsAppMessage,
   getVendorPendingBooksWhatsAppMessage,
   getVendorPendingBooksWhatsAppUrl,
   extractOrderCoordinates,
@@ -149,6 +154,7 @@ function database(t) {
     "0013_item_unavailable_workflow.sql",
     "0014_item_office_stock.sql",
     "0015_student_partial_handover.sql",
+    "0016_return_resell_workflow.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -3973,4 +3979,230 @@ test("Overpayment and Student Change Return Workflow: Student overpays (e.g. 500
   assert.equal(settledOrder.refund_due, 0);
   assert.equal(settledOrder.refund_amount, changeToReturn);
   assert.equal(settledOrder.refund_status, "REFUNDED");
+});
+
+test("Post-Delivery Return on Resell Hold workflow: student returns book, book placed on Resell Hold in office stock, vendor ledger untouched, zero upfront bookstore cash, and resold release flow", async (t) => {
+  const sqlite = database(t);
+  const adminUser = { id: "admin", email: "qa@example.invalid", role: "SUPER_ADMIN" };
+
+  // 1. Create a book
+  const book = await saveBook(bookInput("RH101", { title: "Resell Hold Test Book", pages: 100, category: "B" }), adminUser);
+
+  // 2. Place & confirm an order
+  const placed = await order(sqlite, book.id, 1);
+  const initialOrder = await getOrder(request, placed.id, adminUser);
+  await decidePayment(request, adminUser, placed.id, "approve", "Approved", initialOrder.version, initialOrder.total);
+
+  // 3. Mark delivered
+  const approvedOrder = await getOrder(request, placed.id, adminUser);
+  await changeStatus(request, adminUser, placed.id, "PROCESSING", "Processing", approvedOrder.version);
+  const processingOrder = await getOrder(request, placed.id, adminUser);
+  await changeStatus(request, adminUser, placed.id, "SHIPPED", "Dispatched to student", processingOrder.version);
+  const shippedOrder = await getOrder(request, placed.id, adminUser);
+  await changeStatus(request, adminUser, placed.id, "DELIVERED", "Delivered to student", shippedOrder.version);
+
+  const deliveredOrder = await getOrder(request, placed.id, adminUser);
+  assert.equal(deliveredOrder.status, "DELIVERED");
+  const item = deliveredOrder.items[0];
+  assert.equal(item.code, "RH101");
+
+  // 4. Student returns book. Admin accepts on Resell Hold.
+  const holdRefund = 13000;
+  const holdRes = await acceptItemReturnResellHold(
+    request,
+    adminUser,
+    placed.id,
+    item.id,
+    holdRefund,
+    "Student ordered wrong book, returned clean copy for resale on hold",
+  );
+
+  assert.equal(holdRes.ok, true);
+  assert.equal(holdRes.return_status, "HELD_FOR_RESELL");
+  assert.equal(holdRes.return_refund_amount, holdRefund);
+  assert.equal(holdRes.in_office_stock, 1);
+
+  // 5. Verify order item in DB
+  const heldOrder = await getOrder(request, placed.id, adminUser);
+  const heldItem = heldOrder.items[0];
+  assert.equal(heldItem.return_status, "HELD_FOR_RESELL");
+  assert.equal(heldItem.return_refund_amount, holdRefund);
+  assert.equal(heldItem.in_office_stock, 1);
+
+  // 6. Next student orders this same book or admin marks it resold
+  const resoldRes = await markItemReturnResold(request, adminUser, placed.id, item.id, "VU-9999");
+  assert.equal(resoldRes.ok, true);
+  assert.equal(resoldRes.return_status, "RESOLD");
+
+  // 7. Verify resold state: physical shelf stock is cleared (in_office_stock = 0),
+  // and held student refund is automatically transferred to order refund_due in REFUNDS_DUE queue!
+  const finalOrder = await getOrder(request, placed.id, adminUser);
+  const finalItem = finalOrder.items[0];
+  assert.equal(finalItem.return_status, "RESOLD");
+  assert.ok(finalItem.return_resold_at);
+  assert.equal(finalItem.in_office_stock, 0); // Cleared from office stock!
+  assert.equal(finalOrder.refund_due, holdRefund);
+  assert.equal(finalOrder.refund_status, "REFUND_PENDING");
+
+  // Verify order appears in REFUNDS_DUE queue so admin can pay student
+  const refundDueList = await listOrders(adminUser, "", "REFUNDS_DUE");
+  assert.ok(refundDueList.rows.some((o) => o.id === placed.id));
+
+  // 8. Super Admin pays the student refund via EasyPaisa
+  const refundSettled = await recordStudentRefund(
+    request,
+    adminUser,
+    placed.id,
+    holdRefund,
+    "EasyPaisa",
+    "TID-RESELL-001",
+    "Refund released after book was resold to VU-9999",
+  );
+  assert.equal(refundSettled.ok, true);
+  assert.equal(refundSettled.refund_due, 0);
+  assert.equal(refundSettled.refund_status, "REFUNDED");
+
+  // Verify cleared from REFUNDS_DUE queue
+  const afterSettledList = await listOrders(adminUser, "", "REFUNDS_DUE");
+  assert.ok(!afterSettledList.rows.some((o) => o.id === placed.id));
+
+  // 9. Verify dynamic store name in WhatsApp messages
+  const customStoreName = "LIBIS Campus Book Store";
+  const customOrder = { ...finalOrder, store_name: customStoreName, store: { store_name: customStoreName } };
+
+  const holdWaMsg = getReturnHoldWhatsAppMessage(customOrder, finalItem, holdRefund, "Note", customStoreName);
+  assert.ok(holdWaMsg.includes("LIBIS Campus Book Store"));
+  assert.ok(holdWaMsg.includes("LIBIS Campus Book Store Operations"));
+  assert.equal(holdWaMsg.includes("Campus Bookstore"), false);
+
+  const resoldWaMsg = getReturnResoldWhatsAppMessage(customOrder, finalItem, holdRefund, "EasyPaisa", "TX123", customStoreName);
+  assert.ok(resoldWaMsg.includes("LIBIS Campus Book Store"));
+  assert.ok(resoldWaMsg.includes("LIBIS Campus Book Store Operations"));
+  assert.equal(resoldWaMsg.includes("Campus Bookstore"), false);
+
+  const studentRefundWaMsg = getStudentRefundWhatsAppMessage(customOrder, holdRefund, "EasyPaisa", "TX123", "Cleared", customStoreName);
+  assert.ok(studentRefundWaMsg.includes("LIBIS Campus Book Store"));
+  assert.ok(studentRefundWaMsg.includes("LIBIS Campus Book Store Operations"));
+  assert.equal(studentRefundWaMsg.includes("Campus Bookstore"), false);
+});
+
+test("Vendor print vs dispatch vs admin mark all shipped lifecycle & book received synchronization", async (t) => {
+  const sqlite = database(t);
+  const adminUser = { ...admin, permissions: ["orders.update", "orders.manage"] };
+  const guest = "d".repeat(64);
+  const testReq = new Request("http://127.0.0.1:5173/api/checkout", {
+    headers: { cookie: "cbs_guest=" + guest },
+  });
+
+  // 1. Create books and vendor
+  const { id: b1Id } = await saveBook(bookInput("SYNC101", { title: "Sync Book 1", pages: 120, active: true }), admin, testReq);
+  const { id: b2Id } = await saveBook(bookInput("SYNC102", { title: "Sync Book 2", pages: 160, active: true }), admin, testReq);
+
+  const vRes = await createVendor(testReq, adminUser, {
+    name: "Sync Test Vendor",
+    phone: "03211234567",
+    email: "syncvendor@example.com",
+    password: "VendorPassword123!",
+    perPageRate: 1.5,
+    bindingRate: 40,
+    active: true,
+  });
+  const vendorUser = {
+    id: vRes.vendor.id,
+    email: "syncvendor@example.com",
+    role: "VENDOR",
+    vendor_id: vRes.vendor.id,
+    permissions: [],
+  };
+
+  // Helper to place, confirm payment, and assign to vendor
+  const placeOrder = async (name, items) => {
+    const q = await quote(testReq, {
+      name,
+      phone: "03001234567",
+      address: "Campus Pick",
+      city: "Lahore",
+      delivery_type: "campus",
+      campus_id: null,
+      items,
+    });
+    const slip = crypto.randomUUID();
+    sqlite
+      .prepare(
+        "INSERT INTO payment_slips(id,owner,object_key,mime,size,digest,ocr_status,detected_amount,ocr_message,created_at) VALUES(?,?,?,'image/png',10,?,'AMOUNT_MATCHED',?,'QA','2026-01-01')",
+      )
+      .run(slip, hash(guest), "proof/" + slip, slip, q.total);
+    const placed = await submitOrder(testReq, q.id, slip);
+    const currentOrder = await getOrder(testReq, placed.id, adminUser);
+    await decidePayment(testReq, adminUser, placed.id, "approve", "Approved", currentOrder.version);
+    await assignOrderToVendor(testReq, adminUser, placed.id, vRes.vendor.id);
+    return placed.id;
+  };
+
+  const o1Id = await placeOrder("Student One", [
+    { id: b1Id, code: "SYNC101", quantity: 1 },
+    { id: b2Id, code: "SYNC102", quantity: 1 },
+  ]);
+
+  const o2Id = await placeOrder("Student Two", [
+    { id: b1Id, code: "SYNC101", quantity: 1 },
+    { id: b2Id, code: "SYNC102", quantity: 1 },
+  ]);
+
+  // Verify initial state: both orders are in PROCESSING, items NOT received from vendor (0)
+  const o1Initial = await getOrder(testReq, o1Id, adminUser);
+  assert.equal(o1Initial.status, "PROCESSING");
+  assert.equal(o1Initial.items.every(i => i.received_from_vendor === 0), true);
+
+  // STEP 1: Vendor marks Order 1 as Printed
+  const printRes = await vendorPrint(testReq, vendorUser, o1Id, true);
+  assert.equal(printRes.ok, true);
+  assert.ok(printRes.vendor_printed_at);
+
+  // CRITICAL CHECK: Marking printed must NOT mark books as received! They are still at vendor press!
+  const o1Printed = await getOrder(testReq, o1Id, adminUser);
+  assert.equal(o1Printed.status, "PROCESSING");
+  assert.ok(o1Printed.vendor_printed_at);
+  assert.equal(o1Printed.vendor_dispatched_at, null);
+  assert.equal(o1Printed.items.every(i => i.received_from_vendor === 0), true, "Books must stay unreceived after vendor print");
+
+  // STEP 2: Vendor clicks "Send to Campus" for Order 1
+  const dispatchRes = await vendorDispatchOffice(testReq, vendorUser, o1Id, "Sent with boy");
+  assert.equal(dispatchRes.ok, true);
+  assert.equal(dispatchRes.status, "SHIPPED");
+
+  // CRITICAL CHECK: Sending to campus moves order to SHIPPED and marks all books as received in campus!
+  const o1Dispatched = await getOrder(testReq, o1Id, adminUser);
+  assert.equal(o1Dispatched.status, "SHIPPED");
+  assert.ok(o1Dispatched.vendor_dispatched_at);
+  assert.equal(o1Dispatched.items.every(i => i.received_from_vendor === 1), true, "All books marked received when dispatched to campus");
+
+  // STEP 3: Admin uses "Mark All Shipped" (batchChangeStatus) on Order 2
+  const o2Before = await getOrder(testReq, o2Id, adminUser);
+  assert.equal(o2Before.items.every(i => i.received_from_vendor === 0), true);
+
+  const batchStatusRes = await batchChangeStatus(testReq, adminUser, {
+    fromStatus: "PROCESSING",
+    toStatus: "SHIPPED",
+    orderIds: [o2Id],
+  });
+  assert.equal(batchStatusRes.status, "SHIPPED");
+  assert.equal(batchStatusRes.count, 1);
+
+  // CRITICAL CHECK: When admin marks all shipped, all books in Order 2 are automatically marked received!
+  const o2Shipped = await getOrder(testReq, o2Id, adminUser);
+  assert.equal(o2Shipped.status, "SHIPPED");
+  assert.equal(o2Shipped.items.every(i => i.received_from_vendor === 1), true, "All books auto-marked received when admin marks Shipped");
+
+  // STEP 4: Admin finds SYNC102 is missing/misprinted in Order 2 and unchecks it
+  const missingItem = o2Shipped.items.find(i => i.code === "SYNC102");
+  const toggleRes = await toggleOrderItemReceived(testReq, adminUser, o2Id, missingItem.id, false);
+  assert.equal(toggleRes.ok, true);
+  assert.equal(toggleRes.received_from_vendor, 0);
+
+  const o2AfterShortage = await getOrder(testReq, o2Id, adminUser);
+  const sync101 = o2AfterShortage.items.find(i => i.code === "SYNC101");
+  const sync102 = o2AfterShortage.items.find(i => i.code === "SYNC102");
+  assert.equal(sync101.received_from_vendor, 1);
+  assert.equal(sync102.received_from_vendor, 0, "Missing book correctly kept at received_from_vendor = 0");
 });

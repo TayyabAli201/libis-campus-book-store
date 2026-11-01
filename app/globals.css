@@ -515,3 +515,10 @@ nav {
     scroll-behavior: auto !important;
   }
 }
+
+
+@media (max-width: 800px) {
+  .checkout-payment-books-strip {
+    display: none !important;
+  }
+}

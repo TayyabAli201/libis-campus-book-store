@@ -63,6 +63,10 @@ import {
   toggleOrderItemStudentDelivered,
   handoverAvailableItemsToStudent,
   recordStudentRefund,
+  acceptItemReturnResellHold,
+  markItemReturnResold,
+  getResellHoldItems,
+  fulfillItemFromResellShelf,
   changeDeliveryType,
 } from "@/lib/server/orders";
 import {
@@ -621,6 +625,10 @@ async function handle(req: Request) {
         await admin(req);
         return ok({ count: await pendingOrderCount() });
       }
+      if (method === "GET" && id === "resell-holds") {
+        const u = await user(req, "orders.read");
+        return ok({ items: await getResellHoldItems(req, u) });
+      }
       const u = await user(
         req,
         method === "GET" ? "orders.read" : "orders.update",
@@ -766,9 +774,17 @@ async function handle(req: Request) {
               "toggle_item_student_delivered",
               "handover_available_items_to_student",
               "record_refund",
+              "accept_item_return_resell_hold",
+              "mark_item_return_resold",
+              "fulfill_item_from_resell_shelf",
               "change_delivery_type",
             ]),
             item_id: z.string().trim().optional(),
+            target_item_id: z.string().trim().optional(),
+            source_order_id: z.string().trim().optional(),
+            source_item_id: z.string().trim().optional(),
+            refund_amount: z.number().optional(),
+            resell_order_id: z.string().trim().optional(),
             received: z.boolean().optional(),
             delivered: z.boolean().optional(),
             unavailable: z.boolean().optional(),
@@ -914,6 +930,29 @@ async function handle(req: Request) {
         if (b.action === "record_refund") {
           if (!b.amount || b.amount <= 0) throw new AppError(400, "Valid refund amount is required.");
           return ok(await recordStudentRefund(req, u, id, b.amount, b.method || "JazzCash", b.reference || "", b.note || ""));
+        }
+        if (b.action === "accept_item_return_resell_hold") {
+          if (!b.item_id) throw new AppError(400, "Item ID is required.");
+          return ok(await acceptItemReturnResellHold(req, u, id, b.item_id, b.refund_amount ?? 0, b.notes));
+        }
+        if (b.action === "mark_item_return_resold") {
+          if (!b.item_id) throw new AppError(400, "Item ID is required.");
+          return ok(await markItemReturnResold(req, u, id, b.item_id, b.resell_order_id));
+        }
+        if (b.action === "fulfill_item_from_resell_shelf") {
+          if (!b.target_item_id || !b.source_order_id || !b.source_item_id) {
+            throw new AppError(400, "Target item, source order, and source item IDs are required.");
+          }
+          return ok(
+            await fulfillItemFromResellShelf(
+              req,
+              u,
+              id,
+              b.target_item_id,
+              b.source_order_id,
+              b.source_item_id,
+            ),
+          );
         }
         if (b.action === "record_due_payment") {
           if (u.role !== "SUPER_ADMIN")

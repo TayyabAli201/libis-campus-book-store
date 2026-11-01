@@ -18,6 +18,7 @@ export const migrations = [
   "0013_item_unavailable_workflow.sql",
   "0014_item_office_stock.sql",
   "0015_student_partial_handover.sql",
+  "0016_return_resell_workflow.sql",
 ];
 export async function migrateTurso(client, log = console.log) {
   await client.execute(
