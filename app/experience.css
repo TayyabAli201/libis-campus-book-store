@@ -3086,25 +3086,39 @@ a.map-pin-pill.other-badge:hover {
   color: #000000;
 }
 
-/* Vendor Badge (e.g. Ahmed Printing) - Clean Slate */
+/* Vendor Badge (e.g. Ahmed Printing) - Option 1: Frosted Electric Violet Glass (2026) */
 .vendor-badge-pill {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
-  font-size: 0.72rem !important;
-  font-weight: 600 !important;
+  font-size: 0.70rem !important;
+  font-weight: 520 !important;
   padding: 2px 7px !important;
   border-radius: 6px !important;
-  background: #f8fafc !important;
-  color: #334155 !important;
-  border: 1px solid #cbd5e1 !important;
-  margin-top: 2px !important;
+  background: rgba(139, 92, 246, 0.12) !important;
+  color: #6d28d9 !important;
+  border: 1px solid rgba(139, 92, 246, 0.38) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  width: fit-content !important;
+  line-height: 1.3 !important;
+  margin-top: 1px !important;
+  transition: all 0.16s ease !important;
+}
+
+.vendor-badge-pill svg {
+  color: #8b5cf6 !important;
 }
 
 .dark .vendor-badge-pill {
-  background: #1e293b !important;
-  color: #cbd5e1 !important;
-  border-color: #334155 !important;
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(192, 132, 252, 0.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .vendor-badge-pill svg {
+  color: #c084fc !important;
 }
 
 /* Received Book Badges */
@@ -3179,232 +3193,273 @@ a.map-pin-pill.other-badge:hover {
   border-color: rgba(147, 51, 234, 0.3) !important;
 }
 
-/* Solid Action Buttons - Clean 2026 Solid Matte Colors (No Black) */
+/* Action Buttons - Style 6A (Frosted Mica Glass Idle -> Dynamic Solid Hover) */
 .ship-courier-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
+  height: 27px !important;
   font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  padding: 4px 10px !important;
-  border-radius: 7px !important;
-  background: #0284c7 !important;
-  color: #ffffff !important;
-  border: 1px solid #0369a1 !important;
+  font-weight: 520 !important;
+  padding: 0 9px !important;
+  border-radius: 6px !important;
+  background: rgba(2, 132, 199, 0.11) !important;
+  color: #0369a1 !important;
+  border: 1px solid rgba(2, 132, 199, 0.38) !important;
   cursor: pointer !important;
-  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.15) !important;
-  transition: all 0.16s ease !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
 }
 .ship-courier-btn:hover {
-  background: #0369a1 !important;
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0369a1 !important;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.35) !important;
   transform: translateY(-1px) !important;
 }
 .dark .ship-courier-btn {
-  background: #0284c7 !important;
-  border-color: #38bdf8 !important;
+  background: rgba(14, 165, 233, 0.16) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
 }
 .dark .ship-courier-btn:hover {
-  background: #0369a1 !important;
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 3px 12px rgba(2, 132, 199, 0.4) !important;
 }
 
 .mark-delivered-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
+  height: 27px !important;
   font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  padding: 4px 10px !important;
-  border-radius: 7px !important;
-  background: #047857 !important;
-  color: #ffffff !important;
-  border: 1px solid #047857 !important;
+  font-weight: 520 !important;
+  padding: 0 9px !important;
+  border-radius: 6px !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #065f46 !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
   cursor: pointer !important;
-  box-shadow: 0 1px 2px rgba(4, 120, 87, 0.12) !important;
-  transition: all 0.16s ease !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
 }
 .mark-delivered-btn:hover {
-  background: #065f46 !important;
-  transform: translateY(-1px) !important;
-}
-
-.mark-shipped-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  padding: 4px 10px !important;
-  border-radius: 7px !important;
-  background: #2563eb !important;
+  background: #059669 !important;
   color: #ffffff !important;
-  border: 1px solid #1d4ed8 !important;
-  cursor: pointer !important;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15) !important;
-  transition: all 0.16s ease !important;
-}
-.mark-shipped-btn:hover {
-  background: #1d4ed8 !important;
+  border-color: #047857 !important;
+  box-shadow: 0 3px 8px rgba(5, 150, 105, 0.35) !important;
   transform: translateY(-1px) !important;
 }
-.dark .mark-shipped-btn {
-  background: #2563eb !important;
-  border-color: #3b82f6 !important;
+.dark .mark-delivered-btn {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(52, 211, 153, 0.45) !important;
 }
-.dark .mark-shipped-btn:hover {
-  background: #1d4ed8 !important;
+.dark .mark-delivered-btn:hover {
+  background: #059669 !important;
+  color: #ffffff !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 3px 12px rgba(5, 150, 105, 0.4) !important;
 }
 
 .send-campus-btn {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 5px !important;
-  font-size: 0.74rem !important;
-  font-weight: 600 !important;
-  padding: 4px 10px !important;
-  border-radius: 7px !important;
-  background: #2563eb !important;
-  color: #ffffff !important;
-  border: 1px solid #1d4ed8 !important;
+  gap: 4px !important;
+  height: 27px !important;
+  font-size: 0.72rem !important;
+  font-weight: 520 !important;
+  padding: 0 9px !important;
+  border-radius: 6px !important;
+  background: rgba(37, 99, 235, 0.11) !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.38) !important;
   cursor: pointer !important;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15) !important;
-  transition: all 0.16s ease !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
   white-space: nowrap !important;
 }
 .send-campus-btn:hover {
-  background: #1d4ed8 !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35) !important;
   transform: translateY(-1px) !important;
 }
 .dark .send-campus-btn {
-  background: #2563eb !important;
-  border-color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.16) !important;
+  color: #93c5fd !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
 }
 .dark .send-campus-btn:hover {
-  background: #1d4ed8 !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.4) !important;
 }
 
 .mark-printed-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
+  height: 27px !important;
   font-size: 0.70rem !important;
-  font-weight: 600 !important;
-  padding: 2px 8px !important;
+  font-weight: 520 !important;
+  padding: 0 8px !important;
   border-radius: 6px !important;
   cursor: pointer !important;
-  background: #059669 !important;
-  color: #ffffff !important;
-  border: 1px solid #047857 !important;
-  box-shadow: 0 1px 2px rgba(5, 150, 105, 0.15) !important;
-  transition: all 0.16s ease !important;
+  background: rgba(13, 148, 136, 0.11) !important;
+  color: #0f766e !important;
+  border: 1px solid rgba(13, 148, 136, 0.38) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
 }
 .mark-printed-btn:hover {
-  background: #047857 !important;
+  background: #0d9488 !important;
+  color: #ffffff !important;
+  border-color: #0f766e !important;
+  box-shadow: 0 3px 8px rgba(13, 148, 136, 0.35) !important;
   transform: translateY(-1px) !important;
 }
 .dark .mark-printed-btn {
-  background: #059669 !important;
-  border-color: #10b981 !important;
+  background: rgba(20, 184, 166, 0.16) !important;
+  color: #5eead4 !important;
+  border-color: rgba(45, 212, 191, 0.45) !important;
+}
+.dark .mark-printed-btn:hover {
+  background: #0d9488 !important;
+  color: #ffffff !important;
+  border-color: #14b8a6 !important;
 }
 
 .unmark-print-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
+  height: 27px !important;
   font-size: 0.70rem !important;
-  font-weight: 600 !important;
-  padding: 2px 8px !important;
+  font-weight: 520 !important;
+  padding: 0 8px !important;
   border-radius: 6px !important;
   cursor: pointer !important;
-  background: var(--muted, #f1f5f9) !important;
-  color: var(--foreground, #334155) !important;
-  border: 1px solid var(--border, #cbd5e1) !important;
-  transition: all 0.16s ease !important;
+  background: rgba(100, 116, 139, 0.1) !important;
+  color: #475569 !important;
+  border: 1px solid rgba(100, 116, 139, 0.3) !important;
+  backdrop-filter: blur(12px) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
 }
 .unmark-print-btn:hover {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
+  background: #475569 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+  transform: translateY(-1px) !important;
 }
 .dark .unmark-print-btn {
-  background: #1e293b !important;
+  background: rgba(148, 163, 184, 0.15) !important;
   color: #cbd5e1 !important;
-  border-color: #334155 !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
 }
 .dark .unmark-print-btn:hover {
   background: #334155 !important;
   color: #ffffff !important;
 }
 
-/* Other City External Courier Tracking Buttons & Badges - Clean Solid Matte */
+/* Other City External Courier Tracking Buttons & Badges - Clean Frosted Mica */
 .courier-add-tracking-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #1e40af;
-  border: 1px dashed #94a3b8;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  text-decoration: none;
-  line-height: 1.2;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 27px !important;
+  font-size: 0.72rem !important;
+  font-weight: 520 !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  background: rgba(2, 132, 199, 0.11) !important;
+  color: #0369a1 !important;
+  border: 1px solid rgba(2, 132, 199, 0.38) !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-decoration: none !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
 }
 
 .courier-add-tracking-btn:hover {
-  background: #1e40af;
-  color: #ffffff;
-  border-style: solid;
-  border-color: #1e40af;
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0369a1 !important;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.35) !important;
+  transform: translateY(-1px) !important;
 }
 
 .dark .courier-add-tracking-btn,
 :is(.dark *) .courier-add-tracking-btn {
-  background: #172554;
-  color: #93c5fd;
-  border-color: #3b82f6;
+  background: rgba(14, 165, 233, 0.16) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
 }
 
 .dark .courier-add-tracking-btn:hover,
 :is(.dark *) .courier-add-tracking-btn:hover {
-  background: #3b82f6;
-  color: #ffffff;
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 3px 12px rgba(2, 132, 199, 0.4) !important;
 }
 
 .courier-tracking-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  line-height: 1.2;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 27px !important;
+  font-size: 0.72rem !important;
+  font-weight: 520 !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #065f46 !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
 }
 
 .courier-tracking-pill:hover {
-  background: #166534;
-  color: #ffffff;
-  border-color: #166534;
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #15803d !important;
+  box-shadow: 0 3px 8px rgba(22, 163, 74, 0.35) !important;
+  transform: translateY(-1px) !important;
 }
 
 .dark .courier-tracking-pill,
 :is(.dark *) .courier-tracking-pill {
-  background: #052e16;
-  color: #86efac;
-  border-color: #14532d;
+  background: rgba(34, 197, 94, 0.16) !important;
+  color: #86efac !important;
+  border-color: rgba(74, 222, 128, 0.45) !important;
 }
 
 .dark .courier-tracking-pill:hover,
 :is(.dark *) .courier-tracking-pill:hover {
-  background: #16a34a;
-  color: #ffffff;
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 3px 12px rgba(22, 163, 74, 0.4) !important;
 }
 
 .quick-courier-pill {
@@ -6606,15 +6661,15 @@ footer {
 }
 
 /* ==========================================================================
-   Table Action Buttons (View order / Review payment) - Modern Solid Matte (2026)
+   Table Action Buttons (View order / Review payment / Delete) - Style 6A (Frosted Mica Glass + Dynamic Solid Shift)
    ========================================================================== */
 .table-action-btn,
 .view-order-btn {
-  height: 30px !important;
+  height: 29px !important;
   padding: 0 11px !important;
   border-radius: 7px !important;
-  font-size: 0.77rem !important;
-  font-weight: 600 !important;
+  font-size: 0.74rem !important;
+  font-weight: 520 !important;
   letter-spacing: -0.01ch !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -6624,11 +6679,12 @@ footer {
   cursor: pointer !important;
   text-decoration: none !important;
   line-height: 1 !important;
-  background: var(--card, #ffffff) !important;
-  border: 1px solid var(--border, #cbd5e1) !important;
-  color: var(--foreground, #0f172a) !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-  transition: all 0.16s ease !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: rgba(37, 99, 235, 0.11) !important;
+  border: 1px solid rgba(37, 99, 235, 0.38) !important;
+  color: #1d4ed8 !important;
 }
 
 .table-action-btn .table-action-shimmer {
@@ -6640,14 +6696,15 @@ footer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted-foreground, #64748b);
-  transition: color 0.16s ease;
+  color: inherit;
+  transition: color 0.18s ease;
 }
 
 .table-action-btn .table-action-icon svg,
 .view-order-btn .view-order-icon svg {
   width: 12px;
   height: 12px;
+  color: inherit;
 }
 
 .table-action-btn .table-action-label {
@@ -6656,46 +6713,47 @@ footer {
 
 .table-action-btn:hover,
 .view-order-btn:hover {
-  background: var(--muted, #f1f5f9) !important;
-  border-color: #94a3b8 !important;
-  color: #0f172a !important;
+  background: #2563eb !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35) !important;
 }
 
+.table-action-btn:hover .table-action-icon,
 .table-action-btn:hover .table-action-icon svg,
+.view-order-btn:hover .view-order-icon,
 .view-order-btn:hover .view-order-icon svg {
-  color: #0f172a;
+  color: #ffffff !important;
 }
 
 .dark .table-action-btn,
 .dark .view-order-btn {
-  background: #1e293b !important;
-  border-color: #334155 !important;
-  color: #f8fafc !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  background: rgba(59, 130, 246, 0.16) !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
+  color: #93c5fd !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
 .dark .table-action-btn:hover,
 .dark .view-order-btn:hover {
-  background: #334155 !important;
-  border-color: #475569 !important;
+  background: #2563eb !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.4) !important;
+}
+
+.dark .table-action-btn:hover .table-action-icon,
+.dark .table-action-btn:hover .table-action-icon svg,
+.dark .view-order-btn:hover .view-order-icon,
+.dark .view-order-btn:hover .view-order-icon svg {
   color: #ffffff !important;
 }
 
-.dark .table-action-btn .table-action-icon svg,
-.dark .view-order-btn .view-order-icon svg {
-  color: #94a3b8;
-}
-.dark .table-action-btn:hover .table-action-icon svg,
-.dark .view-order-btn:hover .view-order-icon svg {
-  color: #ffffff;
-}
-
-/* Payment Review Variant - Subtle Solid Amber */
+/* Payment Review Variant - Frosted Amber Mica -> Solid Amber on Hover */
 .table-action-btn.payment {
-  background: #fffbeb !important;
-  border-color: #fde68a !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
   color: #92400e !important;
 }
 
@@ -6704,55 +6762,133 @@ footer {
 }
 
 .table-action-btn.payment:hover {
-  background: #fef3c7 !important;
-  border-color: #f59e0b !important;
-  color: #78350f !important;
+  background: #d97706 !important;
+  border-color: #b45309 !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 8px rgba(217, 119, 6, 0.35) !important;
+}
+
+.table-action-btn.payment:hover .table-action-icon svg {
+  color: #ffffff !important;
 }
 
 .dark .table-action-btn.payment {
-  background: rgba(245, 158, 11, 0.12) !important;
-  border-color: rgba(245, 158, 11, 0.3) !important;
+  background: rgba(245, 158, 11, 0.18) !important;
+  border-color: rgba(251, 191, 36, 0.45) !important;
   color: #fde68a !important;
 }
 
 .dark .table-action-btn.payment:hover {
-  background: rgba(245, 158, 11, 0.22) !important;
-  border-color: rgba(245, 158, 11, 0.5) !important;
+  background: #d97706 !important;
+  border-color: #f59e0b !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 12px rgba(217, 119, 6, 0.45) !important;
+}
+
+.dark .table-action-btn.payment:hover .table-action-icon svg {
   color: #ffffff !important;
 }
 
-/* Table Delete Order Button: Clean Ghost Icon Button */
+/* Table Delete Order Button: Red Trash Basket Button (Style 6A) */
 .order-delete-btn {
-  height: 30px !important;
-  width: 30px !important;
+  height: 29px !important;
+  width: 29px !important;
   padding: 0 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   border-radius: 7px !important;
-  background: transparent !important;
-  border: 1px solid var(--border, #cbd5e1) !important;
-  color: var(--muted-foreground, #94a3b8) !important;
-  box-shadow: none !important;
-  transition: all 0.16s ease !important;
+  background: rgba(239, 68, 68, 0.11) !important;
+  border: 1px solid rgba(239, 68, 68, 0.38) !important;
+  color: #dc2626 !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.order-delete-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke: currentColor !important;
+  transition: transform 0.18s ease !important;
 }
 
 .order-delete-btn:hover {
-  background: #fef2f2 !important;
-  border-color: #fca5a5 !important;
-  color: #dc2626 !important;
-  transform: translateY(-1px) !important;
+  background: #dc2626 !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) scale(1.04) !important;
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.38) !important;
+}
+
+.order-delete-btn:hover svg {
+  stroke: #ffffff !important;
 }
 
 .dark .order-delete-btn {
-  border-color: #334155 !important;
-  color: #64748b !important;
+  background: rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(248, 113, 113, 0.45) !important;
+  color: #fca5a5 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
 .dark .order-delete-btn:hover {
-  background: rgba(239, 68, 68, 0.15) !important;
-  border-color: rgba(239, 68, 68, 0.35) !important;
-  color: #f87171 !important;
+  background: #dc2626 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 12px rgba(220, 38, 38, 0.45) !important;
+}
+
+.dark .order-delete-btn:hover svg {
+  stroke: #ffffff !important;
+}
+
+/* 1-Click WhatsApp Button (Style 6A: Frosted Emerald -> Solid WhatsApp Green) */
+.order-whatsapp-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  height: 27px !important;
+  font-size: 0.72rem !important;
+  font-weight: 520 !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  background: rgba(22, 163, 74, 0.13) !important;
+  color: #15803d !important;
+  border: 1px solid rgba(22, 163, 74, 0.4) !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.order-whatsapp-btn:hover {
+  background: #25D366 !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 3px 8px rgba(37, 211, 102, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.order-whatsapp-btn:hover svg {
+  color: #ffffff !important;
+}
+
+.dark .order-whatsapp-btn {
+  background: rgba(34, 197, 94, 0.16) !important;
+  color: #86efac !important;
+  border-color: rgba(74, 222, 128, 0.45) !important;
+}
+
+.dark .order-whatsapp-btn:hover {
+  background: #25D366 !important;
+  color: #ffffff !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 3px 12px rgba(37, 211, 102, 0.45) !important;
 }
 
 /* ==========================================================================
@@ -7169,62 +7305,86 @@ footer {
 }
 
 
+/* Send to Vendor Button - Style 6A Frosted Indigo -> Solid Indigo */
 .send-vendor-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
+  height: 27px !important;
   font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  padding: 2px 8px !important;
+  font-weight: 520 !important;
+  padding: 0 9px !important;
   border-radius: 6px !important;
-  background: var(--muted, #f1f5f9) !important;
-  color: var(--primary, #2563eb) !important;
-  border: 1px solid var(--border, #cbd5e1) !important;
+  background: rgba(99, 102, 241, 0.11) !important;
+  color: #4338ca !important;
+  border: 1px solid rgba(99, 102, 241, 0.38) !important;
   cursor: pointer !important;
-  transition: all 0.16s ease !important;
-}
-.send-vendor-btn:hover {
-  background: #2563eb !important;
-  color: #ffffff !important;
-  border-color: #2563eb !important;
-}
-.dark .send-vendor-btn {
-  background: #1e293b !important;
-  color: #60a5fa !important;
-  border-color: #334155 !important;
-}
-.dark .send-vendor-btn:hover {
-  background: #2563eb !important;
-  color: #ffffff !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
 }
 
-/* Mark Shipped Button */
+.send-vendor-btn:hover {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+  border-color: #4338ca !important;
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+.dark .send-vendor-btn {
+  background: rgba(99, 102, 241, 0.16) !important;
+  color: #c7d2fe !important;
+  border-color: rgba(129, 140, 248, 0.45) !important;
+}
+
+.dark .send-vendor-btn:hover {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 3px 12px rgba(79, 70, 229, 0.4) !important;
+}
+
+/* Mark Shipped Button - Style 6A Frosted Sapphire -> Solid Royal Blue */
 .mark-shipped-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
+  height: 27px !important;
   font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  padding: 3px 9px !important;
+  font-weight: 520 !important;
+  padding: 0 9px !important;
   border-radius: 6px !important;
-  background: #2563eb !important;
-  color: #ffffff !important;
-  border: 1px solid #1d4ed8 !important;
+  background: rgba(37, 99, 235, 0.11) !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.38) !important;
   cursor: pointer !important;
   white-space: nowrap !important;
-  transition: all 0.16s ease !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
+
 .mark-shipped-btn:hover {
-  background: #1d4ed8 !important;
-  border-color: #1e40af !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35) !important;
+  transform: translateY(-1px) !important;
 }
+
 .dark .mark-shipped-btn {
+  background: rgba(59, 130, 246, 0.16) !important;
+  color: #93c5fd !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
+}
+
+.dark .mark-shipped-btn:hover {
   background: #2563eb !important;
   color: #ffffff !important;
   border-color: #3b82f6 !important;
-}
-.dark .mark-shipped-btn:hover {
-  background: #1d4ed8 !important;
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.4) !important;
 }
 
 /* Campus Dispatched Badges */
@@ -7271,13 +7431,26 @@ footer {
 }
 
 /* ==========================================================================
-   Data Table Status Badges - Clean Modern Solid Matte (2026)
+   Data Table Typography & Status Badges - Sleek 2026 Refined (No Chunky Bold)
    ========================================================================== */
+.data-table th {
+  font-weight: 550 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.data-table td {
+  font-weight: 450 !important;
+}
+
+.data-table td strong {
+  font-weight: 550 !important;
+}
+
 .data-table .status,
 .status {
   border-radius: 6px !important;
   font-size: 0.72rem !important;
-  font-weight: 600 !important;
+  font-weight: 520 !important;
   padding: 2px 8px !important;
   line-height: 1.35 !important;
   transition: all 0.16s ease !important;

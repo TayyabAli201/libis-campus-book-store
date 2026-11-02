@@ -9895,20 +9895,7 @@ function Orders({
                                   href={isHeld ? holdMsgUrl : resoldMsgUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="btn compact"
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 4,
-                                    fontSize: "0.72rem",
-                                    padding: "4px 8px",
-                                    background: "#25D366",
-                                    borderColor: "#25D366",
-                                    color: "#fff",
-                                    textDecoration: "none",
-                                    fontWeight: 700,
-                                    borderRadius: 6,
-                                  }}
+                                  className="order-whatsapp-btn"
                                   title="Send WhatsApp update to student"
                                 >
                                   <MessageCircle size={12} /> WhatsApp
@@ -10090,9 +10077,9 @@ function Orders({
                   <div
                     style={{
                       display: "flex",
-                      flexWrap: "wrap",
-                      gap: 5,
-                      alignItems: "center",
+                      flexDirection: "column",
+                      gap: 4,
+                      alignItems: "flex-start",
                       marginTop: 3,
                     }}
                   >
@@ -10121,21 +10108,7 @@ function Orders({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="btn compact"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontSize: "0.72rem",
-                              fontWeight: 700,
-                              padding: "2px 7px",
-                              borderRadius: 4,
-                              background: "#25D366",
-                              color: "#fff",
-                              border: "none",
-                              textDecoration: "none",
-                              cursor: "pointer",
-                            }}
+                            className="order-whatsapp-btn"
                             title={`Send 1-Click WhatsApp tracking message to ${o.name} (${o.phone})`}
                           >
                             <MessageCircle size={11} />
@@ -10574,21 +10547,7 @@ function Orders({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="btn compact"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontSize: "0.72rem",
-                              fontWeight: 700,
-                              padding: "2px 7px",
-                              borderRadius: 4,
-                              background: "#25D366",
-                              color: "#fff",
-                              border: "none",
-                              textDecoration: "none",
-                              cursor: "pointer",
-                            }}
+                            className="order-whatsapp-btn"
                             title={`Send 1-Click WhatsApp tracking message to ${o.name} (${o.phone})`}
                           >
                             <MessageCircle size={11} />
