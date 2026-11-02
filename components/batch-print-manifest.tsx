@@ -76,7 +76,7 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
             <Layers size={22} />
           </div>
           <div>
-            <h3 className="font-bold text-sm md:text-base">Vendor Batch Production & Print Manifest</h3>
+            <h3 className="font-bold text-sm md:text-base">Vendor Print Job Sheet (Bulk Production)</h3>
             <p className="text-xs text-slate-400">
               Consolidated print matrix for machine operators • Single copies aggregated into bulk jobs
             </p>

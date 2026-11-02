@@ -8956,7 +8956,7 @@ function Orders({
       )}
 
       {isVendor ? (
-        <div className="orders-workflow-cards-grid" role="tablist" aria-label="Vendor Order Stages">
+        <div className="orders-workflow-cards-grid vendor-workflow-cards-grid" role="tablist" aria-label="Vendor Order Stages">
           {VENDOR_STAGES_CONFIG.map((stage) => {
             const active = activeTab === stage.id;
             const count =
@@ -14113,24 +14113,6 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           <button
             type="button"
             className="btn compact"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontWeight: 600,
-              background: "rgba(79, 70, 229, 0.12)",
-              color: "#4f46e5",
-              borderColor: "rgba(79, 70, 229, 0.35)",
-            }}
-            onClick={() => setShowBatchManifest(true)}
-            title="Generate consolidated batch job manifest for machine operators"
-          >
-            <Layers size={14} />
-            Batch Print Manifest
-          </button>
-          <button
-            type="button"
-            className="btn compact"
             onClick={() => {
               reloadLedger();
               reloadOrders();
@@ -14461,8 +14443,9 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
               color: "#fff",
               fontWeight: 600,
             }}
+            title="Generate consolidated print job sheet for machine operators"
           >
-            <Layers size={16} /> Batch Print Manifest (Job Sheet)
+            <Layers size={16} /> Print Job Sheet
           </button>
           <button
             type="button"

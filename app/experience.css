@@ -6899,11 +6899,16 @@ footer {
    ========================================================================== */
 .orders-workflow-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin-bottom: 16px;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Vendor Portal Stage Cards: 5 equal cards distributed across 100% available space */
+.vendor-workflow-cards-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
 }
 
 .order-workflow-card {
@@ -7242,15 +7247,25 @@ footer {
 }
 
 /* Responsive adjustments for Orders page */
+@media (max-width: 980px) {
+  .vendor-workflow-cards-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
 @media (max-width: 860px) {
   .orders-workflow-cards-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+  .vendor-workflow-cards-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
 }
 
 @media (max-width: 640px) {
-  .orders-workflow-cards-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .orders-workflow-cards-grid,
+  .vendor-workflow-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px;
   }
   .order-workflow-card {
