@@ -787,17 +787,39 @@ export function Portal({
               </span>
               <h1>{title}</h1>
             </div>
-            <div className="portal-header-date-badge" title="Current Pakistan Standard Time">
-              <Calendar size={13} className="date-badge-icon" />
-              <span>
-                {new Date().toLocaleDateString("en-GB", {
-                  timeZone: "Asia/Karachi",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
+            {(() => {
+              const now = new Date();
+              const m = now.toLocaleDateString("en-GB", {
+                timeZone: "Asia/Karachi",
+                month: "short",
+              });
+              const d = now.toLocaleDateString("en-GB", {
+                timeZone: "Asia/Karachi",
+                day: "2-digit",
+              });
+              const dayName = now.toLocaleDateString("en-GB", {
+                timeZone: "Asia/Karachi",
+                weekday: "short",
+              });
+              const full = now.toLocaleDateString("en-GB", {
+                timeZone: "Asia/Karachi",
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+              return (
+                <div className="portal-header-date-badge" title="Current Pakistan Standard Time">
+                  <div className="cal-day-box">
+                    <span className="cal-m">{m}</span>
+                    <span className="cal-d">{d}</span>
+                  </div>
+                  <div className="cal-text-col">
+                    <span className="sub-label">Today · {dayName}</span>
+                    <span className="main-date">{full}</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           {!!user.must_change && (
             <div className="notice">
@@ -8245,7 +8267,8 @@ function Orders({
   const [q, setQ] = useState(""),
     [deliveryTypeList, setDeliveryTypeList] = useState<string[]>([]),
     [page, setPage] = useState(1),
-    [pageSize, setPageSize] = useState(15),
+    [pageSize, setPageSize] = useState(20),
+    [printingAllShipped, setPrintingAllShipped] = useState(false),
     [dates, setDates] = useState({ from: "", to: "" }),
     [activeOrderId, setActiveOrderId] = useState<string | null>(null),
     [deletingOrder, setDeletingOrder] = useState<any | null>(null),
@@ -9301,20 +9324,35 @@ function Orders({
           </button>
         )}
         {activeTab === "SHIPPED" && (() => {
-          const shippedOrders = (data?.rows || []).filter((o: any) => o.status === "SHIPPED");
-          const count = shippedOrders.length;
+          const totalShipped = data?.total ?? 0;
           return (
             <button
               type="button"
               className="btn compact"
-              onClick={() => {
-                if (count === 0) {
-                  toast.info("No shipped orders available to print labels.");
-                  return;
+              onClick={async () => {
+                try {
+                  setPrintingAllShipped(true);
+                  const campusQuery = campus ? `&campus=${encodeURIComponent(campus)}` : "";
+                  const res = await fetch(`/api/manage/orders?status=SHIPPED&limit=all${campusQuery}`);
+                  if (!res.ok) {
+                    toast.error("Failed to load shipped orders for labels.");
+                    return;
+                  }
+                  const d = (await res.json()) as any;
+                  const allShipped = (d?.rows || []).filter((o: any) => o.status === "SHIPPED");
+                  if (allShipped.length === 0) {
+                    toast.info("No shipped orders available to print labels.");
+                    return;
+                  }
+                  setLabelModalOrders(allShipped);
+                } catch (err) {
+                  console.error(err);
+                  toast.error("Error loading shipped orders.");
+                } finally {
+                  setPrintingAllShipped(false);
                 }
-                setLabelModalOrders(shippedOrders);
               }}
-              disabled={loading || count === 0}
+              disabled={loading || printingAllShipped || totalShipped === 0}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -9326,10 +9364,18 @@ function Orders({
                 color: "#ffffff",
                 boxShadow: "0 2px 4px rgba(124, 58, 237, 0.25)",
               }}
-              title="1-Click: Print compact A4/thermal shipping labels for all shipped orders"
+              title="1-Click: Print compact A4/thermal shipping labels for all shipped orders in system"
             >
-              <Tag size={14} />
-              <span>Print All Shipped Labels ({count})</span>
+              {printingAllShipped ? (
+                <RefreshCw size={14} className="refresh-spinning" />
+              ) : (
+                <Tag size={14} />
+              )}
+              <span>
+                {printingAllShipped
+                  ? "Loading All Shipped..."
+                  : `Print All Shipped Labels (${totalShipped})`}
+              </span>
             </button>
           );
         })()}
@@ -10102,19 +10148,6 @@ function Orders({
                         >
                           <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
                         </button>
-                        {o.phone && (
-                          <a
-                            href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="order-whatsapp-btn"
-                            title={`Send 1-Click WhatsApp tracking message to ${o.name} (${o.phone})`}
-                          >
-                            <MessageCircle size={11} />
-                            <span>WhatsApp</span>
-                          </a>
-                        )}
                       </div>
                     ) : o.payment_status === "VERIFIED" && o.status !== "PAYMENT_PENDING" ? (
                       <button
@@ -10541,19 +10574,6 @@ function Orders({
                         >
                           <Package size={11} /> {o.courier_name}: {o.courier_tracking_id}{Number(o.actual_courier_charges || 0) > 0 ? ` · Rs. ${Number(o.actual_courier_charges).toLocaleString()}` : ""}
                         </button>
-                        {o.phone && (
-                          <a
-                            href={getWhatsAppUrl(o, storeName || o?.store?.store_name)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="order-whatsapp-btn"
-                            title={`Send 1-Click WhatsApp tracking message to ${o.name} (${o.phone})`}
-                          >
-                            <MessageCircle size={11} />
-                            <span>WhatsApp</span>
-                          </a>
-                        )}
                       </div>
                     ) : (
                       <button
@@ -11075,9 +11095,8 @@ function Orders({
                 }}
                 aria-label="Rows per page"
               >
-                <option value={10}>10</option>
-                <option value={15}>15</option>
                 <option value={20}>20</option>
+                <option value={30}>30</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
@@ -13058,31 +13077,30 @@ function Vendors() {
                 </span>
               </div>,
 
-              <div key={`contact-${v.id}`} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
-                <span className="mono" style={{ fontSize: "0.84rem" }}>{v.phone || "—"}</span>
-                {waHref && (
+              <div key={`contact-${v.id}`} style={{ display: "flex", alignItems: "center" }}>
+                {waHref ? (
                   <a
                     href={waHref}
                     target="_blank"
                     rel="noreferrer"
-                    className="btn compact"
+                    className="mono"
                     style={{
-                      padding: "2px 7px",
-                      height: 24,
-                      fontSize: "0.74rem",
-                      gap: 4,
-                      color: "#16a34a",
-                      borderColor: "rgba(22, 163, 74, 0.3)",
-                      background: "rgba(22, 163, 74, 0.08)",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: "var(--foreground)",
                       textDecoration: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
+                      transition: "color 0.15s ease",
                     }}
-                    title={`Open WhatsApp chat with ${v.name}`}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#16a34a")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--foreground)")}
+                    title={`Open WhatsApp chat with ${v.name} (${v.phone})`}
                   >
-                    <MessageCircle size={12} />
-                    WhatsApp
+                    {v.phone}
                   </a>
+                ) : (
+                  <span className="mono" style={{ fontSize: "0.84rem", color: "var(--muted-foreground)" }}>
+                    {v.phone || "—"}
+                  </span>
                 )}
               </div>,
 

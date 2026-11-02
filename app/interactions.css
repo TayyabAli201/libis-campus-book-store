@@ -407,19 +407,61 @@ textarea:focus-visible,
 .dark .portal-main .metric-indigo {
   --metric-accent: #a78bfa;
 }
-.portal-main .metric-featured {
-  background: linear-gradient(135deg, #327ebd, #235b9a);
-  color: #f5faff;
-  border-color: #5393cd;
+.portal-main .metric-featured,
+a.metric.metric-featured,
+.metric.metric-featured {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(147, 197, 253, 0.45) !important;
+  box-shadow: 0 4px 18px rgba(30, 64, 175, 0.28) !important;
+  text-decoration: none !important;
 }
-.metric-featured .metric-heading,
-.portal-main .metric-featured small {
-  color: #e0f0ff;
-  opacity: 1;
+.portal-main .metric-featured:hover,
+a.metric.metric-featured:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  border-color: rgba(191, 219, 254, 0.75) !important;
+  box-shadow: 0 6px 22px rgba(37, 99, 235, 0.35) !important;
+  transform: translateY(-3px);
 }
-.metric-featured .metric-icon {
-  color: #e5f4ff;
-  background: #d6edff29;
+.portal-main .metric-featured strong,
+a.metric.metric-featured strong {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  font-weight: 700 !important;
+}
+.portal-main .metric-featured .metric-heading,
+.portal-main .metric-featured .metric-heading span,
+a.metric.metric-featured .metric-heading,
+a.metric.metric-featured .metric-heading span {
+  color: #e0f2fe !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
+}
+.portal-main .metric-featured small,
+a.metric.metric-featured small {
+  color: #bfdbfe !important;
+  font-weight: 500 !important;
+  opacity: 0.95 !important;
+}
+.portal-main .metric-featured .metric-icon,
+a.metric.metric-featured .metric-icon {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.portal-main .metric-featured .metric-click-arrow,
+a.metric.metric-featured .metric-click-arrow {
+  color: #ffffff !important;
+}
+.dark .portal-main .metric-featured,
+.dark a.metric.metric-featured {
+  background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%) !important;
+  border: 1px solid rgba(96, 165, 250, 0.35) !important;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.6) !important;
+}
+.dark .portal-main .metric-featured:hover,
+.dark a.metric.metric-featured:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%) !important;
 }
 .dashboard-notice {
   border-radius: 14px;

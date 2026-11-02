@@ -5939,39 +5939,82 @@ footer {
    Admin Portal Modernized Orders Page Theme Styles
    ========================================================================== */
 
-/* Portal Header Date Badge - Colorful Radiant Pill */
+/* Portal Header Date Badge - Design 4: Desk Calendar Box (Square 2-Line Widget) */
 .portal-header-date-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #e0f2fe 0%, #ede9fe 100%);
-  border: 1.5px solid #bfdbfe;
-  color: #1e40af;
-  font-size: 0.82rem;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 10px;
+  padding: 5px 13px 5px 6px;
+  border-radius: 9px;
+  background: var(--card, #ffffff);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  cursor: default;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
-.portal-header-date-badge:hover {
-  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
-  border-color: #3b82f6;
-  color: #1d4ed8;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
-  transform: translateY(-1.5px);
+.portal-header-date-badge .cal-day-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
 }
 
-.portal-header-date-badge .date-badge-icon {
+.portal-header-date-badge .cal-day-box .cal-m {
+  font-size: 0.58rem;
+  font-weight: 800;
   color: #2563eb;
-  transition: transform 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.portal-header-date-badge:hover .date-badge-icon {
-  transform: scale(1.15) rotate(-5deg);
+.portal-header-date-badge .cal-day-box .cal-d {
+  font-size: 0.86rem;
+  font-weight: 850;
+  color: #1e40af;
+  margin-top: 1px;
+}
+
+.portal-header-date-badge .cal-text-col {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 1px;
+}
+
+.portal-header-date-badge .cal-text-col .sub-label {
+  font-size: 0.62rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.portal-header-date-badge .cal-text-col .main-date {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.portal-header-date-badge:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.portal-header-date-badge:hover .cal-day-box {
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
 
 /* Toolbar Layout Enhancements & Executive Command Bar */
@@ -6649,15 +6692,41 @@ footer {
   color: #94a3b8 !important;
 }
 
-/* Portal Header Date Badge Dark Theme */
+/* Portal Header Date Badge Dark Theme - Design 4 */
 .dark .portal-header-date-badge {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.16) 0%, rgba(147, 51, 234, 0.2) 100%) !important;
-  border: 1.5px solid rgba(125, 211, 252, 0.35) !important;
-  color: #e0f2fe !important;
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
 
-.dark .portal-header-date-badge .date-badge-icon {
-  color: #38bdf8 !important;
+.dark .portal-header-date-badge .cal-day-box {
+  background: #1e3a8a !important;
+  border-color: #2563eb !important;
+}
+
+.dark .portal-header-date-badge .cal-day-box .cal-m {
+  color: #93c5fd !important;
+}
+
+.dark .portal-header-date-badge .cal-day-box .cal-d {
+  color: #ffffff !important;
+}
+
+.dark .portal-header-date-badge .cal-text-col .sub-label {
+  color: #94a3b8 !important;
+}
+
+.dark .portal-header-date-badge .cal-text-col .main-date {
+  color: #f8fafc !important;
+}
+
+.dark .portal-header-date-badge:hover {
+  border-color: #475569 !important;
+}
+
+.dark .portal-header-date-badge:hover .cal-day-box {
+  background: #1d4ed8 !important;
+  border-color: #3b82f6 !important;
 }
 
 /* ==========================================================================
