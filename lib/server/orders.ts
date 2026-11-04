@@ -3354,6 +3354,87 @@ export async function markItemReturnResold(
   };
 }
 
+export async function revertItemReturnResold(
+  req: Request,
+  u: User,
+  orderId: string,
+  itemId: string,
+) {
+  if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.update")) {
+    throw new AppError(403, "Only Super Admin can revert resold books.");
+  }
+
+  const o = await one<any>("SELECT * FROM orders WHERE id=?", orderId);
+  if (!o) throw new AppError(404, "Order not found.");
+
+  const it = await one<any>(
+    "SELECT * FROM order_items WHERE id=? AND order_id=?",
+    itemId,
+    orderId,
+  );
+  if (!it) throw new AppError(404, "Order item not found.");
+
+  if (it.return_status !== "RESOLD") {
+    throw new AppError(400, "This book is not currently marked as resold.");
+  }
+
+  const at = now();
+  const refundAmt = Math.round(Number(it.return_refund_amount) || 0);
+  const currentRefundDue = Math.round(Number(o.refund_due) || 0);
+  const newRefundDue = Math.max(0, currentRefundDue - refundAmt);
+  const currentRefundAmount = Math.round(Number(o.refund_amount) || 0);
+  const newRefundStatus =
+    newRefundDue > 0
+      ? "REFUND_PENDING"
+      : currentRefundAmount > 0
+        ? "REFUNDED"
+        : "NONE";
+
+  const histNote = `Returned book resold status reverted by admin! ${it.code} (${it.title}) returned back to Resell Hold in Office Stock (Shelf). Queued refund of ${money(refundAmt)} cancelled.`;
+
+  const statements: any[] = [
+    guard("EXISTS(SELECT 1 FROM orders WHERE id=? AND version=?)", o.id, o.version),
+    stmt(
+      "UPDATE order_items SET return_status='HELD_FOR_RESELL', return_resold_at=NULL, in_office_stock=1 WHERE id=? AND order_id=?",
+      itemId,
+      orderId,
+    ),
+    stmt(
+      "UPDATE orders SET refund_due=?, refund_status=?, version=version+1, updated_at=? WHERE id=?",
+      newRefundDue,
+      newRefundStatus,
+      at,
+      o.id,
+    ),
+    stmt(
+      "INSERT INTO order_history(id,order_id,status,note,actor,internal,created_at) VALUES(?,?,?,?,?,0,?)",
+      uid(),
+      o.id,
+      o.status,
+      histNote,
+      u.email,
+      at,
+    ),
+    auditStmt(
+      u.email,
+      "ORDER_ITEM_RETURN_RESOLD_REVERTED",
+      itemId,
+      { return_status: "RESOLD", refund_due: currentRefundDue },
+      { return_status: "HELD_FOR_RESELL", order_id: orderId, code: it.code, refund_due: newRefundDue },
+      req,
+    ),
+  ];
+
+  await batch(statements);
+  return {
+    ok: true,
+    itemId,
+    return_status: "HELD_FOR_RESELL",
+    in_office_stock: 1,
+    refund_due: newRefundDue,
+  };
+}
+
 export async function getResellHoldItems(req: Request, u: User) {
   if (u.role !== "SUPER_ADMIN" && !u.permissions?.includes("orders.manage")) {
     throw new AppError(403, "Access denied.");

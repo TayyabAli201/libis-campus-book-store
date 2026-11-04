@@ -4290,6 +4290,23 @@ function AdminOrderBooksPanel({
     }
   };
 
+  const revertItemResold = async (itemId: string) => {
+    setTogglingItemId(itemId);
+    try {
+      await api(`manage/orders/${o.id}`, {
+        action: "revert_item_return_resold",
+        item_id: itemId,
+      });
+      toast.success("Book reverted back to Campus Office Shelf! Queued refund cancelled.");
+      notifyOrdersUpdated();
+      await onUpdated();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setTogglingItemId(null);
+    }
+  };
+
   const rawItems: any[] = o?.items || [];
   const totalBooks = rawItems.reduce(
     (sum: number, it: any) => sum + (it.quantity || 1),
@@ -5246,27 +5263,60 @@ function AdminOrderBooksPanel({
                             >
                               ✅ RESOLD ({money(it.return_refund_amount || 0)})
                             </span>
-                            {o.phone && (
-                              <a
-                                href={getReturnResoldWhatsAppUrl(o, it, it.return_refund_amount, "EasyPaisa", "", storeName)}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              {o.phone && (
+                                <a
+                                  href={getReturnResoldWhatsAppUrl(o, it, it.return_refund_amount, "EasyPaisa", "", storeName)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 2,
+                                    fontSize: "0.68rem",
+                                    padding: "2px 5px",
+                                    borderRadius: 4,
+                                    background: "#25D366",
+                                    color: "#fff",
+                                    textDecoration: "none",
+                                  }}
+                                  title="Send WhatsApp notification that book was resold and payout is ready"
+                                >
+                                  <MessageCircle size={10} /> Notify Payout
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                disabled={togglingItemId === it.id}
+                                onClick={async () => {
+                                  if (
+                                    !window.confirm(
+                                      `Revert "${it.code} - ${it.title}" back to Office Shelf?\n\n` +
+                                      `• The book will be restored to Campus Office Stock (Shelf) for future orders.\n` +
+                                      `• The queued refund of ${money(it.return_refund_amount || 0)} will be cancelled from the Refunds Due queue.`
+                                    )
+                                  )
+                                    return;
+                                  await revertItemResold(it.id);
+                                }}
+                                className="btn compact"
                                 style={{
+                                  fontSize: "0.68rem",
+                                  padding: "2px 6px",
+                                  height: 22,
                                   display: "inline-flex",
                                   alignItems: "center",
-                                  gap: 2,
-                                  fontSize: "0.68rem",
-                                  padding: "2px 5px",
-                                  borderRadius: 4,
-                                  background: "#25D366",
-                                  color: "#fff",
-                                  textDecoration: "none",
+                                  gap: 3,
+                                  background: "rgba(220, 38, 38, 0.08)",
+                                  color: "#dc2626",
+                                  borderColor: "rgba(220, 38, 38, 0.25)",
                                 }}
-                                title="Send WhatsApp notification that book was resold and payout is ready"
+                                title="Revert back to Resell Hold in Office Stock & cancel queued refund"
                               >
-                                <MessageCircle size={10} /> Notify Payout
-                              </a>
-                            )}
+                                <RotateCcw size={10} />
+                                <span>Revert to Shelf</span>
+                              </button>
+                            </div>
                           </div>
                         ) : it.in_office_stock ? (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -8769,6 +8819,30 @@ function Orders({
     }
   };
 
+  const handleRevertResoldFromShelf = async (orderId: string, itemId: string, item: any) => {
+    if (
+      !window.confirm(
+        `Revert "${item.code || "Book"}" back to Return Office Shelf?\n\n` +
+        `• The book will be restored to Campus Office Stock (Shelf) for future orders.\n` +
+        `• The queued refund of ${money(item.return_refund_amount || 0)} will be cancelled from the Refunds Due queue.`
+      )
+    )
+      return;
+    try {
+      const res = await api(`manage/orders/${orderId}`, {
+        action: "revert_item_return_resold",
+        item_id: itemId,
+      });
+      if (res?.ok) {
+        toast.success(`Book reverted back to Return Office Shelf! Queued refund cancelled.`);
+        notifyOrdersUpdated();
+        await reload();
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to revert resold item");
+    }
+  };
+
   const isPaymentConfirmedTab = [
     "CONFIRMED",
     "PROCESSING",
@@ -9971,27 +10045,50 @@ function Orders({
                                   <Sparkles size={12} /> Mark Resold
                                 </button>
                               ) : (
-                                <button
-                                  type="button"
-                                  className="btn compact"
-                                  onClick={() => setActiveOrderId(item.order_id)}
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 4,
-                                    fontSize: "0.72rem",
-                                    padding: "4px 10px",
-                                    background: "#2563eb",
-                                    borderColor: "#2563eb",
-                                    color: "#fff",
-                                    fontWeight: 700,
-                                    borderRadius: 6,
-                                    cursor: "pointer",
-                                  }}
-                                  title="Open order details to pay student refund"
-                                >
-                                  Open Order & Pay Refund →
-                                </button>
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                  <button
+                                    type="button"
+                                    className="btn compact"
+                                    onClick={() => handleRevertResoldFromShelf(item.order_id, item.item_id, item)}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      fontSize: "0.72rem",
+                                      padding: "4px 9px",
+                                      background: "rgba(220, 38, 38, 0.08)",
+                                      borderColor: "rgba(220, 38, 38, 0.25)",
+                                      color: "#dc2626",
+                                      fontWeight: 700,
+                                      borderRadius: 6,
+                                      cursor: "pointer",
+                                    }}
+                                    title="Revert back to Return Office Shelf & cancel queued refund"
+                                  >
+                                    <RotateCcw size={11} /> Revert to Shelf
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn compact"
+                                    onClick={() => setActiveOrderId(item.order_id)}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      fontSize: "0.72rem",
+                                      padding: "4px 10px",
+                                      background: "#2563eb",
+                                      borderColor: "#2563eb",
+                                      color: "#fff",
+                                      fontWeight: 700,
+                                      borderRadius: 6,
+                                      cursor: "pointer",
+                                    }}
+                                    title="Open order details to pay student refund"
+                                  >
+                                    Open Order & Pay Refund →
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>

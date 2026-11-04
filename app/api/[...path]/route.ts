@@ -65,6 +65,7 @@ import {
   recordStudentRefund,
   acceptItemReturnResellHold,
   markItemReturnResold,
+  revertItemReturnResold,
   getResellHoldItems,
   fulfillItemFromResellShelf,
   changeDeliveryType,
@@ -776,6 +777,7 @@ async function handle(req: Request) {
               "record_refund",
               "accept_item_return_resell_hold",
               "mark_item_return_resold",
+              "revert_item_return_resold",
               "fulfill_item_from_resell_shelf",
               "change_delivery_type",
             ]),
@@ -938,6 +940,10 @@ async function handle(req: Request) {
         if (b.action === "mark_item_return_resold") {
           if (!b.item_id) throw new AppError(400, "Item ID is required.");
           return ok(await markItemReturnResold(req, u, id, b.item_id, b.resell_order_id));
+        }
+        if (b.action === "revert_item_return_resold") {
+          if (!b.item_id) throw new AppError(400, "Item ID is required.");
+          return ok(await revertItemReturnResold(req, u, id, b.item_id));
         }
         if (b.action === "fulfill_item_from_resell_shelf") {
           if (!b.target_item_id || !b.source_order_id || !b.source_item_id) {

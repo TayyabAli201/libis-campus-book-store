@@ -74,6 +74,7 @@ const {
   handoverAvailableItemsToStudent,
   acceptItemReturnResellHold,
   markItemReturnResold,
+  revertItemReturnResold,
   batchChangeStatus,
 } = await import("../lib/server/orders.ts");
 const {
@@ -4047,6 +4048,33 @@ test("Post-Delivery Return on Resell Hold workflow: student returns book, book p
   // Verify order appears in REFUNDS_DUE queue so admin can pay student
   const refundDueList = await listOrders(adminUser, "", "REFUNDS_DUE");
   assert.ok(refundDueList.rows.some((o) => o.id === placed.id));
+
+  // 7b. Admin marked resold by mistake: test reverting back to shelf
+  const revertRes = await revertItemReturnResold(request, adminUser, placed.id, item.id);
+  assert.equal(revertRes.ok, true);
+  assert.equal(revertRes.return_status, "HELD_FOR_RESELL");
+  assert.equal(revertRes.in_office_stock, 1);
+  assert.equal(revertRes.refund_due, 0);
+
+  const revertedOrder = await getOrder(request, placed.id, adminUser);
+  const revertedItem = revertedOrder.items[0];
+  assert.equal(revertedItem.return_status, "HELD_FOR_RESELL");
+  assert.equal(revertedItem.return_resold_at, null);
+  assert.equal(revertedItem.in_office_stock, 1);
+  assert.equal(revertedOrder.refund_due, 0);
+  assert.equal(revertedOrder.refund_status, "NONE");
+
+  // Verify order is no longer in REFUNDS_DUE queue
+  const afterRevertRefundList = await listOrders(adminUser, "", "REFUNDS_DUE");
+  assert.ok(!afterRevertRefundList.rows.some((o) => o.id === placed.id));
+
+  // Verify order is back in RESELL_HOLD queue
+  const afterRevertResellList = await listOrders(adminUser, "", "RESELL_HOLD");
+  assert.ok(afterRevertResellList.rows.some((o) => o.id === placed.id));
+
+  // Re-mark as resold so subsequent test flow continues
+  const resoldAgain = await markItemReturnResold(request, adminUser, placed.id, item.id, "VU-9999");
+  assert.equal(resoldAgain.ok, true);
 
   // 8. Super Admin pays the student refund via EasyPaisa
   const refundSettled = await recordStudentRefund(
