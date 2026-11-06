@@ -1019,34 +1019,34 @@ const dashboardMetrics: {
   {
     key: "net_profit",
     label: "Net Profit",
-    hint: "Total Sales minus Vendor Production",
+    hint: "Total Sales minus Vendor Liability",
     icon: Banknote,
     tone: "green",
     href: "/vendors",
   },
   {
-    key: "total_vendor_cost",
-    label: "Vendor Payment",
-    hint: "Shipped orders (Printing + delivery)",
+    key: "vendor_total_liability",
+    label: "Total Vendor Income",
+    hint: "Billed + In Queue Hold",
     icon: Factory,
+    tone: "blue",
+    href: "/vendors",
+  },
+  {
+    key: "total_vendor_cost",
+    label: "Vendor Billed (Shipped)",
+    hint: "Shipped orders (Printing + delivery)",
+    icon: Package,
     tone: "amber",
     href: "/vendors",
   },
   {
     key: "vendor_queue_cost",
-    label: "In Printing Queue",
+    label: "In Queue (Hold)",
     hint: "Committed printing cost",
     icon: Printer,
     tone: "purple",
     href: "/orders?status=PROCESSING",
-  },
-  {
-    key: "office_stock_savings",
-    label: "Office Stock Savings",
-    hint: "Saved by shelf fulfillment",
-    icon: PackageCheck,
-    tone: "green",
-    href: "/books",
   },
   {
     key: "total_orders",
@@ -1058,15 +1058,23 @@ const dashboardMetrics: {
   },
   {
     key: "total_print_books",
-    label: "Vendor Production",
+    label: "Vendor Books",
     hint: "Books to print & deliver",
     icon: BookOpen,
     tone: "blue",
     href: "/orders?status=PROCESSING",
   },
   {
+    key: "office_stock_savings",
+    label: "Office Shelf Saved",
+    hint: "Saved by shelf fulfillment",
+    icon: PackageCheck,
+    tone: "green",
+    href: "/books",
+  },
+  {
     key: "pending_payments",
-    label: "Payments to Review",
+    label: "Review Slips",
     hint: "Awaiting slip verification",
     icon: ShieldCheck,
     tone: "amber",
@@ -1074,19 +1082,11 @@ const dashboardMetrics: {
   },
   {
     key: "refunds_due_orders",
-    label: "Refunds Pending",
+    label: "Refunds Due",
     hint: "Advance return owed to students",
     icon: AlertCircle,
     tone: "rose",
     href: "/orders?tab=REFUNDS_DUE",
-  },
-  {
-    key: "total_books",
-    label: "Catalog Books",
-    hint: "Active courses in catalog",
-    icon: Library,
-    tone: "blue",
-    href: "/books",
   },
 ];
 function Dashboard({
@@ -1545,6 +1545,14 @@ function Dashboard({
 
                     if (key === "gross_revenue" || key === "total_sales") {
                       mainDisplay = money(Number(data.stats[key] || 0));
+                    } else if (key === "net_profit") {
+                      mainDisplay = money(Number(data.stats.net_profit || 0));
+                      subDisplay = "Total Sales minus Vendor Liability";
+                    } else if (key === "vendor_total_liability") {
+                      mainDisplay = money(Number(data.stats.vendor_total_liability || 0));
+                      const billed = Number(data.stats.total_vendor_cost || 0);
+                      const queue = Number(data.stats.vendor_queue_cost || 0);
+                      subDisplay = `Billed: ${money(billed)} + Hold: ${money(queue)}`;
                     } else if (key === "total_vendor_cost") {
                       mainDisplay = money(Number(data.stats.total_vendor_cost || 0));
                       const paid = Number(data.stats.vendor_total_paid || 0);
@@ -1555,32 +1563,31 @@ function Dashboard({
                       const qOrders = Number(data.stats.queue_orders || 0);
                       const qBks = Number(data.stats.queue_books || 0);
                       const qPgs = Number(data.stats.queue_pages || 0);
-                      subDisplay = `${qOrders} ${qOrders === 1 ? "Order" : "Orders"} · ${qBks} ${qBks === 1 ? "Book" : "Books"} · ${qPgs.toLocaleString()} Pages`;
-                    } else if (key === "office_stock_savings") {
-                      mainDisplay = money(Number(data.stats.office_stock_savings || 0));
-                      const shelfBks = Number(data.stats.total_office_stock_books || 0);
-                      subDisplay = `${shelfBks} ${shelfBks === 1 ? "Book" : "Books"} fulfilled from campus shelf`;
-                    } else if (key === "net_profit") {
-                      mainDisplay = money(Number(data.stats.net_profit || 0));
-                      subDisplay = "Total Sales minus Vendor (Shipped + Queue)";
+                      subDisplay = `${qOrders} ${qOrders === 1 ? "Order" : "Orders"} · ${qBks} ${qBks === 1 ? "Book" : "Books"} · ${qPgs.toLocaleString()} Pgs`;
                     } else if (key === "total_orders") {
                       mainDisplay = `${Number(data.stats.total_orders || 0)} Orders`;
                       const bks = Number(data.stats.total_books_ordered || 0);
-                      const pgs = Number(data.stats.total_pages_printed || 0);
-                      subDisplay = `${bks} ${bks === 1 ? "Book" : "Books"} · ${pgs.toLocaleString()} Pages`;
+                      subDisplay = `${bks} Total ${bks === 1 ? "Book" : "Books"} Ordered`;
                     } else if (key === "total_print_books") {
                       const printBks = Number(data.stats.total_print_books || 0);
+                      const qBks = Number(data.stats.queue_books || 0);
+                      const shippedBks = Math.max(0, printBks - qBks);
                       const pgs = Number(data.stats.total_pages_printed || 0);
+                      mainDisplay = `${printBks} Books`;
+                      subDisplay = `${shippedBks} Shipped · ${qBks} in Queue (${pgs.toLocaleString()} pgs)`;
+                    } else if (key === "office_stock_savings") {
+                      mainDisplay = money(Number(data.stats.office_stock_savings || 0));
                       const shelfBks = Number(data.stats.total_office_stock_books || 0);
-                      mainDisplay = `${printBks} to Print`;
-                      subDisplay = `${pgs.toLocaleString()} pgs · ${shelfBks} from Office Shelf`;
+                      subDisplay = `${shelfBks} ${shelfBks === 1 ? "Book" : "Books"} fulfilled from shelf stock`;
                     } else if (key === "pending_payments") {
-                      mainDisplay = Number(data.stats.pending_payments || 0).toLocaleString();
+                      const pCount = Number(data.stats.pending_payments || 0);
+                      mainDisplay = pCount.toLocaleString();
+                      subDisplay = pCount > 0 ? "Awaiting slip verification" : "All payment proofs verified ✓";
                     } else if (key === "refunds_due_orders") {
                       const rCount = Number(data.stats.refunds_due_orders || 0);
                       const rAmt = Number(data.stats.total_refund_due_amount || 0);
-                      mainDisplay = `${rCount} ${rCount === 1 ? "Order" : "Orders"}`;
-                      subDisplay = rCount > 0 ? `Total: ${money(rAmt)} due` : "No pending refunds ✓";
+                      mainDisplay = `${rCount}`;
+                      subDisplay = rCount > 0 ? `Total: ${money(rAmt)} due` : "No pending student refunds ✓";
                     } else {
                       mainDisplay = Number(data.stats[key] || 0).toLocaleString();
                     }
@@ -14180,6 +14187,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
     queue_estimated_cost: 0,
     total_courier_charges: 0,
     courier_orders_count: 0,
+    total_production_value: 0,
     total_earned: 0,
     total_paid: 0,
     pending_balance: 0,
@@ -14256,7 +14264,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
       </div>
 
       <Result loading={loading} error={error}>
-        {/* 6 Clickable Metric Cards - 3 columns per row for clarity */}
+        {/* 8 Clickable Metric Cards - 4 columns per row on desktop */}
         <div className="metrics vendor-metrics-grid">
           {/* 1. Total Orders Assigned */}
           <a
@@ -14264,8 +14272,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             className="metric metric-blue vendor-metric-card"
             title="Click to view all assigned orders"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
                 Total Orders Assigned
               </span>
               <span
@@ -14273,40 +14281,84 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
                   background: "rgba(37, 99, 235, 0.1)",
                   color: "#2563eb",
                   flexShrink: 0,
                 }}
               >
-                <ShoppingBag size={20} />
+                <ShoppingBag size={18} />
               </span>
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--foreground)", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--foreground)", marginBottom: 4 }}>
                 {summary.total_orders}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "#2563eb", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.80rem", color: "#2563eb", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
                 View all orders & history →
               </div>
             </div>
           </a>
 
-          {/* 2. Detailed In Printing Queue Card */}
+          {/* 2. Total Production Value (Expected Gross Income) */}
+          <a
+            href="/vendor/ledger"
+            className="metric vendor-metric-card"
+            style={{
+              border: "1.5px solid #3b82f6",
+              background: "rgba(239, 246, 255, 0.7)",
+            }}
+            title="Total gross production value (Billed + Hold in Queue)"
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "#1d4ed8", letterSpacing: "0.3px" }}>
+                Total Production Value
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  background: "rgba(37, 99, 235, 0.16)",
+                  color: "#1d4ed8",
+                  flexShrink: 0,
+                }}
+              >
+                <Factory size={18} />
+              </span>
+            </div>
+
+            <div>
+              <strong style={{ fontSize: "1.7rem", fontWeight: 800, lineHeight: 1.15, display: "block", color: "#1e3a8a", marginBottom: 4 }}>
+                Rs. {((summary.total_production_value ?? (summary.total_earned + (summary.queue_estimated_cost || 0))) || 0).toLocaleString()}
+              </strong>
+              <div style={{ fontSize: "0.78rem", color: "#1d4ed8", fontWeight: 600, marginBottom: 2 }}>
+                Billed Rs. {summary.total_earned.toLocaleString()} + Hold Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}
+              </div>
+              <div style={{ fontSize: "0.74rem", color: "var(--muted-foreground)" }}>
+                All {summary.total_orders} orders production →
+              </div>
+            </div>
+          </a>
+
+          {/* 3. Detailed In Printing Queue Card */}
           <a
             href="/vendor/orders?status=PROCESSING"
-            className="metric metric-amber vendor-metric-card"
+            className="metric metric-purple vendor-metric-card"
             style={{
-              border: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "1.5px solid #fde68a" : undefined,
-              background: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "rgba(254, 243, 199, 0.45)" : undefined,
+              border: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "1.5px solid #e9d5ff" : undefined,
+              background: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "rgba(250, 245, 255, 0.6)" : undefined,
             }}
             title="Click to view orders waiting to be printed"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 700, color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#92400e" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 700, color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#7c3aed" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
                 In Printing Queue (Hold)
               </span>
               <span
@@ -14314,39 +14366,39 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
-                  background: "rgba(245, 158, 11, 0.14)",
-                  color: "#d97706",
+                  background: "rgba(124, 58, 237, 0.14)",
+                  color: "#7c3aed",
                   flexShrink: 0,
                 }}
               >
-                <Printer size={20} />
+                <Printer size={18} />
               </span>
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#92400e" : "var(--foreground)", marginBottom: 4 }}>
+              <strong style={{ fontSize: "1.7rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#7c3aed" : "var(--foreground)", marginBottom: 4 }}>
                 Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.84rem", fontWeight: 650, color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#b45309" : "var(--muted-foreground)", marginBottom: 4 }}>
-                {summary.queue_orders || summary.printing_orders || 0} {(summary.queue_orders || summary.printing_orders || 0) === 1 ? "Order" : "Orders"} · {summary.queue_books || 0} Books · {(summary.queue_pages || 0).toLocaleString()} Pages
+              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: (summary.queue_orders || summary.printing_orders || 0) > 0 ? "#6b21a8" : "var(--muted-foreground)", marginBottom: 2 }}>
+                {(summary.queue_pages || 0).toLocaleString()} pgs · {summary.queue_books || 0} bks ({summary.queue_orders || summary.printing_orders || 0} orders)
               </div>
-              <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
-                {(summary.queue_orders || summary.printing_orders || 0) > 0 ? "ℹ️ Unbilled · Added to ledger once shipped →" : "Print queue clear ✓"}
+              <div style={{ fontSize: "0.74rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                {(summary.queue_orders || summary.printing_orders || 0) > 0 ? "Added once shipped →" : "Print queue clear ✓"}
               </div>
             </div>
           </a>
 
-          {/* 3. Printed Orders */}
+          {/* 4. Printed Orders */}
           <a
             href="/vendor/orders?status=PRINTED"
             className="metric metric-emerald vendor-metric-card"
             title="Click to view printed orders ready for dispatch"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
                 Printed Orders
               </span>
               <span
@@ -14354,36 +14406,36 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
                   background: "var(--status-good-bg)",
                   color: "var(--status-good-text)",
                   flexShrink: 0,
                 }}
               >
-                <CheckCircle2 size={20} />
+                <CheckCircle2 size={18} />
               </span>
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.9rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-good-text)", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-good-text)", marginBottom: 4 }}>
                 {summary.printed_orders || 0}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "var(--status-good-text)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.80rem", color: "var(--status-good-text)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
                 Ready for dispatch / pickup →
               </div>
             </div>
           </a>
 
-          {/* 4. Courier Charges */}
+          {/* 5. Courier Charges */}
           <a
             href="/vendor/ledger"
             className="metric metric-sky vendor-metric-card"
             title="Click to view courier charges"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--primary)", letterSpacing: "0.3px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--primary)", letterSpacing: "0.3px" }}>
                 Courier Charges
               </span>
               <span
@@ -14391,105 +14443,105 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
                   background: "rgba(37, 99, 235, 0.12)",
                   color: "var(--primary)",
                   flexShrink: 0,
                 }}
               >
-                <Truck size={20} />
+                <Truck size={18} />
               </span>
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--primary)", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.7rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--primary)", marginBottom: 4 }}>
                 Rs. {(summary.total_courier_charges || 0).toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
                 <span>{summary.courier_orders_count || 0} Other City parcel{summary.courier_orders_count !== 1 ? "s" : ""}</span>
                 <span style={{ color: "var(--primary)", fontWeight: 600 }}>→</span>
               </div>
             </div>
           </a>
 
-          {/* 5. Total Earnings */}
+          {/* 6. Total Billed Earnings (Shipped) */}
           <a
             href="/vendor/ledger"
             className="metric metric-blue vendor-metric-card"
             title="Click to view payment ledger details"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
-                Total Billed Earnings (Shipped)
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Total Billed (Shipped)
               </span>
               <span
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
                   background: "var(--status-info-bg)",
                   color: "var(--status-info-text)",
                   flexShrink: 0,
                 }}
               >
-                <Coins size={20} />
+                <Coins size={18} />
               </span>
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-info-text)", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.7rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-info-text)", marginBottom: 4 }}>
                 Rs. {summary.total_earned.toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
-                <span>Print: Rs. {(summary.shipped_printing_cost ?? summary.total_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()} + Courier: Rs. {(summary.total_courier_charges || 0).toLocaleString()}</span>
+              <div style={{ fontSize: "0.76rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                <span>Print: Rs. {(summary.shipped_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()} + Courier: Rs. {(summary.total_courier_charges || 0).toLocaleString()}</span>
                 <span style={{ color: "var(--primary)", fontWeight: 600 }}>→</span>
               </div>
             </div>
           </a>
 
-          {/* 5. Total Received */}
+          {/* 7. Total Received */}
           <a
             href="/vendor/ledger"
             className="metric metric-emerald vendor-metric-card"
             title="Click to view payments received from Admin"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
-                Total Received
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+                Total Received (Paid)
               </span>
               <span
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
                   background: "var(--status-good-bg)",
                   color: "var(--status-good-text)",
                   flexShrink: 0,
                 }}
               >
-                <CreditCard size={20} />
+                <CreditCard size={18} />
               </span>
             </div>
 
             <div>
-              <strong style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-good-text)", marginBottom: 6 }}>
+              <strong style={{ fontSize: "1.7rem", fontWeight: 700, lineHeight: 1.15, display: "block", color: "var(--status-good-text)", marginBottom: 4 }}>
                 Rs. {summary.total_paid.toLocaleString()}
               </strong>
-              <div style={{ fontSize: "0.82rem", color: "var(--status-good-text)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: "0.80rem", color: "var(--status-good-text)", fontWeight: 550, display: "flex", alignItems: "center", gap: 4 }}>
                 Disbursed by Admin →
               </div>
             </div>
           </a>
 
-          {/* 6. Total Remaining / Pending Payment */}
+          {/* 8. Total Remaining / Pending Payment */}
           <a
             href="/vendor/ledger"
             className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"} vendor-metric-card`}
@@ -14499,8 +14551,8 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
             }}
             title="Click to view payment ledger balance"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 600, color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--muted-foreground)", letterSpacing: "0.3px" }}>
                 Remaining Balance (Due)
               </span>
               <span
@@ -14508,34 +14560,34 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: 10,
-                  background: summary.pending_balance > 0 ? "var(--status-warn-bg)" : "var(--status-good-bg)",
+                  background: summary.pending_balance > 0 ? "rgba(245, 158, 11, 0.16)" : "var(--status-good-bg)",
                   color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
                   flexShrink: 0,
                 }}
               >
-                <Receipt size={20} />
+                <Receipt size={18} />
               </span>
             </div>
 
             <div>
               <strong
                 style={{
-                  fontSize: "1.75rem",
+                  fontSize: "1.7rem",
                   fontWeight: 700,
                   lineHeight: 1.15,
                   display: "block",
                   color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
-                  marginBottom: 6,
+                  marginBottom: 4,
                 }}
               >
                 Rs. {summary.pending_balance.toLocaleString()}
               </strong>
               <div
                 style={{
-                  fontSize: "0.80rem",
+                  fontSize: "0.78rem",
                   color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)",
                   fontWeight: 550,
                   display: "flex",
@@ -14954,6 +15006,7 @@ function VendorLedgerView({ user }: { user: User }) {
     queue_estimated_cost: 0,
     total_courier_charges: 0,
     courier_orders_count: 0,
+    total_production_value: 0,
     total_earned: 0,
     total_paid: 0,
     pending_balance: 0,
@@ -15007,16 +15060,32 @@ function VendorLedgerView({ user }: { user: User }) {
       </div>
 
       <Result loading={loading} error={error}>
-        {/* 6 Financial Summary Cards */}
+        {/* 7 Financial & Production Summary Cards */}
         <div
           className="metrics"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
             gap: 14,
           }}
         >
-          {/* 1. Shipped Printing Cost */}
+          {/* 1. Total Production Value */}
+          <div className="metric" style={{ border: "1.5px solid #3b82f6", background: "rgba(239, 246, 255, 0.7)" }}>
+            <div className="metric-heading">
+              <span style={{ color: "#1d4ed8", fontWeight: 700 }}>Total Production Value</span>
+              <span className="metric-icon" style={{ background: "rgba(37, 99, 235, 0.15)", color: "#1d4ed8" }}>
+                <Factory size={19} />
+              </span>
+            </div>
+            <strong style={{ fontSize: "1.6rem", color: "#1e3a8a" }}>
+              Rs. {((summary.total_production_value ?? (summary.total_earned + (summary.queue_estimated_cost || 0))) || 0).toLocaleString()}
+            </strong>
+            <small style={{ color: "#1d4ed8", fontWeight: 600 }}>
+              All {summary.total_orders} orders (Billed + Queue Hold)
+            </small>
+          </div>
+
+          {/* 2. Shipped Printing Cost */}
           <div className="metric metric-blue">
             <div className="metric-heading">
               <span>Shipped Printing Cost</span>
@@ -15025,14 +15094,14 @@ function VendorLedgerView({ user }: { user: User }) {
               </span>
             </div>
             <strong style={{ fontSize: "1.55rem", color: "var(--foreground)" }}>
-              Rs. {(summary.shipped_printing_cost ?? summary.total_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()}
+              Rs. {(summary.shipped_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
-              {summary.shipped_orders || 0} shipped & delivered orders
+              {(summary.shipped_pages || 0).toLocaleString()} pgs · {summary.shipped_books || 0} bks ({summary.shipped_orders || 0} orders)
             </small>
           </div>
 
-          {/* 2. In Printing Queue / Hold */}
+          {/* 3. In Printing Queue / Hold */}
           <div className="metric metric-purple">
             <div className="metric-heading">
               <span>In Printing Queue (Hold)</span>
@@ -15044,11 +15113,11 @@ function VendorLedgerView({ user }: { user: User }) {
               Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
-              {summary.queue_orders || 0} orders · {summary.queue_books || 0} bks (Added once shipped)
+              {(summary.queue_pages || 0).toLocaleString()} pgs · {summary.queue_books || 0} bks (Added once shipped)
             </small>
           </div>
 
-          {/* 3. Courier Charges */}
+          {/* 4. Courier Charges */}
           <div className="metric metric-sky">
             <div className="metric-heading">
               <span>Courier Charges</span>
@@ -15060,11 +15129,11 @@ function VendorLedgerView({ user }: { user: User }) {
               Rs. {(summary.total_courier_charges || 0).toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
-              {summary.courier_orders_count || 0} Other City courier parcel{summary.courier_orders_count !== 1 ? "s" : ""}
+              {summary.courier_orders_count || 0} Other City parcel{summary.courier_orders_count !== 1 ? "s" : ""} (100% credited)
             </small>
           </div>
 
-          {/* 4. Total Billed Earnings */}
+          {/* 5. Total Billed Earnings */}
           <div className="metric metric-blue">
             <div className="metric-heading">
               <span>Total Billed Earnings</span>
@@ -15076,11 +15145,11 @@ function VendorLedgerView({ user }: { user: User }) {
               Rs. {summary.total_earned.toLocaleString()}
             </strong>
             <small style={{ color: "var(--muted-foreground)" }}>
-              Print Rs. {(summary.shipped_printing_cost ?? summary.total_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()} + Courier Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+              Print Rs. {(summary.shipped_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()} + Courier Rs. {(summary.total_courier_charges || 0).toLocaleString()}
             </small>
           </div>
 
-          {/* 5. Total Received */}
+          {/* 6. Total Received */}
           <div className="metric metric-emerald">
             <div className="metric-heading">
               <span>Total Received (Paid)</span>
@@ -15096,7 +15165,7 @@ function VendorLedgerView({ user }: { user: User }) {
             </small>
           </div>
 
-          {/* 6. Remaining Balance Due */}
+          {/* 7. Remaining Balance Due */}
           <div className={`metric ${summary.pending_balance > 0 ? "metric-amber" : "metric-emerald"}`}>
             <div className="metric-heading">
               <span>Remaining Balance (Due)</span>
@@ -15118,34 +15187,37 @@ function VendorLedgerView({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* Calculation formula explanation */}
+        {/* Transparent Calculation & Rates Formula */}
         <div
           style={{
-            padding: "14px 18px",
-            borderRadius: 8,
-            background: "var(--muted)",
+            padding: "16px 20px",
+            borderRadius: 10,
+            background: "var(--card)",
             border: "1px solid var(--border)",
             fontSize: "0.85rem",
-            lineHeight: 1.5,
+            lineHeight: 1.6,
           }}
         >
-          <strong style={{ display: "block", marginBottom: 6, fontSize: "0.92rem" }}>
-            📐 Auto-Calculation & Ledger Formula:
+          <strong style={{ display: "block", marginBottom: 8, fontSize: "0.94rem", color: "var(--foreground)" }}>
+            📐 Transparent Rates & Auto-Calculation Formula:
           </strong>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div>
-              1. <strong>Shipped Printing Cost (Billed):</strong> (Shipped Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + (Shipped Books × Rs. {Number(summary.binding_rate).toFixed(2)}) = Rs. {(summary.shipped_printing_cost ?? summary.total_printing_cost ?? 0).toLocaleString()}
-            </div>
-            <div>
-              2. <strong>In Printing Queue / Hold (Unbilled):</strong> (Queue Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + (Queue Books × Rs. {Number(summary.binding_rate).toFixed(2)}) = Rs. {(summary.queue_estimated_cost || 0).toLocaleString()} (Added to ledger once shipped)
+              1. <strong>Shipped Printing Cost (Billed):</strong> ({(summary.shipped_pages || 0).toLocaleString()} Shipped Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + ({summary.shipped_books || 0} Shipped Books × Rs. {Number(summary.binding_rate).toFixed(2)}) = <span style={{ fontWeight: 700, color: "var(--foreground)" }}>Rs. {(summary.shipped_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()}</span>
             </div>
             <div>
-              3. <strong>Courier Charges:</strong> Reimbursed courier expenses on outer-city orders = Rs. {(summary.total_courier_charges || 0).toLocaleString()}
+              2. <strong>In Printing Queue / Hold (Unbilled):</strong> ({(summary.queue_pages || 0).toLocaleString()} Queue Pages × Rs. {Number(summary.per_page_rate).toFixed(2)}) + ({summary.queue_books || 0} Queue Books × Rs. {Number(summary.binding_rate).toFixed(2)}) = <span style={{ fontWeight: 700, color: "#7c3aed" }}>Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}</span> (Added to ledger once shipped)
             </div>
-            <div style={{ fontWeight: 600, color: "var(--primary)", marginTop: 3 }}>
-              ➔ Total Billed Earnings = Shipped Printing Cost (Rs. {(summary.shipped_printing_cost ?? summary.total_printing_cost ?? 0).toLocaleString()}) + Courier Charges (Rs. {(summary.total_courier_charges || 0).toLocaleString()}) = Rs. {summary.total_earned.toLocaleString()}
+            <div>
+              3. <strong>Courier Delivery Charges:</strong> Reimbursed delivery expenses on {summary.courier_orders_count || 0} outer-city parcels = <span style={{ fontWeight: 700, color: "var(--primary)" }}>Rs. {(summary.total_courier_charges || 0).toLocaleString()}</span>
             </div>
-            <div style={{ fontWeight: 600, color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)" }}>
+            <div style={{ fontWeight: 700, color: "#1d4ed8", marginTop: 4, padding: "8px 12px", background: "rgba(37, 99, 235, 0.08)", borderRadius: 6 }}>
+              ➔ Total Gross Production Value = Total Billed (Rs. {summary.total_earned.toLocaleString()}) + In Queue Hold (Rs. {(summary.queue_estimated_cost || 0).toLocaleString()}) = Rs. {((summary.total_production_value ?? (summary.total_earned + (summary.queue_estimated_cost || 0))) || 0).toLocaleString()} ({((summary.shipped_pages || 0) + (summary.queue_pages || 0)).toLocaleString()} total pages · {(summary.shipped_books || 0) + (summary.queue_books || 0)} books)
+            </div>
+            <div style={{ fontWeight: 650, color: "var(--primary)" }}>
+              ➔ Total Billed Earnings = Shipped Printing Cost (Rs. {(summary.shipped_printing_cost ?? (summary.total_earned - (summary.total_courier_charges || 0))).toLocaleString()}) + Courier Charges (Rs. {(summary.total_courier_charges || 0).toLocaleString()}) = Rs. {summary.total_earned.toLocaleString()}
+            </div>
+            <div style={{ fontWeight: 650, color: summary.pending_balance > 0 ? "var(--status-warn-text)" : "var(--status-good-text)" }}>
               ➔ Remaining Balance (Due) = Total Billed Earnings (Rs. {summary.total_earned.toLocaleString()}) − Total Paid (Rs. {summary.total_paid.toLocaleString()}) = Rs. {summary.pending_balance.toLocaleString()}
             </div>
           </div>

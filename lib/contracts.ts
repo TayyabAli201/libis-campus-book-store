@@ -495,6 +495,7 @@ export interface VendorLedgerSummary {
   total_printing_cost?: number;
   total_courier_charges?: number;
   courier_orders_count?: number;
+  total_production_value?: number;
   total_earned: number;
   total_paid: number;
   pending_balance: number;

@@ -490,6 +490,7 @@ export async function getVendorLedger(
     queue_estimated_cost: queueEstimatedCost,
     total_courier_charges: totalCourierCharges,
     courier_orders_count: Number(courierStats?.courier_orders_count || 0),
+    total_production_value: totalEarnings + queueEstimatedCost,
     total_earned: totalEarnings,
     total_paid: totalPaid,
     pending_balance: pendingBalance,

@@ -1504,8 +1504,8 @@ footer {
 
 .vendor-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
   margin: 20px 0 24px;
 }
 
@@ -1515,8 +1515,8 @@ footer {
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  padding: 20px 22px !important;
-  min-height: 140px;
+  padding: 16px 18px !important;
+  min-height: 128px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--card);
