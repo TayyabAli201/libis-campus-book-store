@@ -2701,7 +2701,7 @@ test("Vendor Ledger automatically credits actual courier delivery charges for Ot
   assert.equal(attachRes.ok, true);
   assert.equal(attachRes.actual_courier_charges, 380);
 
-  // 6. Vendor Ledger Khata check: Printing (420) + Courier (380) = Rs. 800
+  // 6. Vendor Ledger check: Printing (420) + Courier (380) = Rs. 800
   const ledgerAfterCourier = await getVendorLedger(adminUser, vendorId);
   assert.equal(ledgerAfterCourier.summary.total_printing_cost, 420);
   assert.equal(ledgerAfterCourier.summary.total_courier_charges, 380);

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { all, one, stmt, batch, now, uid, AppError, auditStmt } from "./db";
 import { passwordHash, verifyPassword } from "./security";
-import type { User, Vendor, VendorLedger } from "@/lib/contracts";
+import type { User, Vendor, VendorLedger, VendorLedgerSummary } from "@/lib/contracts";
 import {
   getVendorWhatsAppMessage,
   getVendorWhatsAppUrl,
@@ -120,6 +120,7 @@ export async function listVendors(u: User): Promise<Vendor[]> {
       queue_books: qAgg.queue_books,
       queue_pages: qAgg.queue_pages,
       queue_estimated_cost: queueEstCost,
+      shipped_printing_cost: printingEarnings,
       total_printing_cost: printingEarnings,
       total_courier_charges: courierCharges,
       total_earnings: totalEarnings,
@@ -401,7 +402,7 @@ export async function getVendorLedger(
 
   const totalOrders = Number(orderStats?.total_orders || 0);
   const totalCourierCharges = Math.round(Number(courierStats?.total_courier_charges || 0));
-  const totalPrintingCost = Math.round((totalPages * perPageRate) + (totalBooks * bindingRate));
+  const totalAssignedPrintingCost = Math.round((totalPages * perPageRate) + (totalBooks * bindingRate));
   const shippedPrintingCost = Math.round((shippedPages * perPageRate) + (shippedBooks * bindingRate));
   const queueEstimatedCost = Math.round((queuePages * perPageRate) + (queueBooks * bindingRate));
   const totalEarnings = shippedPrintingCost + totalCourierCharges;
@@ -469,15 +470,20 @@ export async function getVendorLedger(
     };
   });
 
-  const summary = {
+  const summary: VendorLedgerSummary = {
     total_orders: totalOrders,
     total_pages: totalPages,
     total_books: totalBooks,
+    shipped_orders: Number(orderStats?.shipped_orders || 0),
+    shipped_pages: shippedPages,
+    shipped_books: shippedBooks,
     printing_orders: Number(orderStats?.printing_orders || 0),
     printed_orders: Number(orderStats?.printed_orders || 0),
     per_page_rate: perPageRate,
     binding_rate: bindingRate,
-    total_printing_cost: totalPrintingCost,
+    total_printing_cost: totalAssignedPrintingCost,
+    shipped_printing_cost: shippedPrintingCost,
+    total_assigned_printing_cost: totalAssignedPrintingCost,
     queue_orders: Number(orderStats?.queue_orders || 0),
     queue_pages: queuePages,
     queue_books: queueBooks,

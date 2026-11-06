@@ -454,6 +454,7 @@ export interface Vendor {
   queue_books?: number;
   queue_pages?: number;
   queue_estimated_cost?: number;
+  shipped_printing_cost?: number;
   total_printing_cost?: number;
   total_courier_charges?: number;
   total_earnings?: number;
@@ -478,6 +479,9 @@ export interface VendorLedgerSummary {
   total_orders: number;
   total_pages: number;
   total_books: number;
+  shipped_orders?: number;
+  shipped_pages?: number;
+  shipped_books?: number;
   printing_orders?: number;
   printed_orders?: number;
   queue_orders?: number;
@@ -486,6 +490,8 @@ export interface VendorLedgerSummary {
   queue_estimated_cost?: number;
   per_page_rate: number;
   binding_rate: number;
+  shipped_printing_cost?: number;
+  total_assigned_printing_cost?: number;
   total_printing_cost?: number;
   total_courier_charges?: number;
   courier_orders_count?: number;
