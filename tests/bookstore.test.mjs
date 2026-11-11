@@ -312,6 +312,47 @@ test("Super Admin can permanently delete orders and order items", async (t) => {
   assert.equal(sqlite.prepare("SELECT 1 FROM order_items WHERE order_id=?").get(newOrder.id), undefined);
 });
 
+test("Super Admin can delete user accounts with safety protections", async (t) => {
+  const sqlite = database(t);
+  sqlite.exec("UPDATE users SET role='SUPER_ADMIN',must_change=0 WHERE id='admin'");
+  const adminSession = "delete-user-admin-session";
+  sqlite
+    .prepare("INSERT INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)")
+    .run(hash(adminSession), "admin", Date.now() + 60000, "2026-01-01");
+
+  // Create a secondary user
+  sqlite
+    .prepare(
+      "INSERT INTO users(id,name,email,role,active,password_hash,must_change,created_at) VALUES(?,?,?,?,?,?,?,?)",
+    )
+    .run("user-to-del", "Test User", "testuser@example.com", "SUPER_ADMIN", 1, "ph", 0, "2026-01-01");
+
+  // 1. Super admin cannot delete self
+  const selfDelReq = new Request("http://127.0.0.1:5173/api/manage/users/admin", {
+    method: "DELETE",
+    headers: {
+      origin: "http://127.0.0.1:5173",
+      cookie: "cbs_session=" + adminSession,
+      "X-Requested-With": "CampusBookstore",
+    },
+  });
+  const selfRes = await DELETE(selfDelReq);
+  assert.equal(selfRes.status, 400);
+
+  // 2. Super admin deletes secondary user
+  const delReq = new Request("http://127.0.0.1:5173/api/manage/users/user-to-del", {
+    method: "DELETE",
+    headers: {
+      origin: "http://127.0.0.1:5173",
+      cookie: "cbs_session=" + adminSession,
+      "X-Requested-With": "CampusBookstore",
+    },
+  });
+  const delRes = await DELETE(delReq);
+  assert.equal(delRes.status, 200);
+  assert.equal(sqlite.prepare("SELECT 1 FROM users WHERE id=?").get("user-to-del"), undefined);
+});
+
 test("Excel round trip keeps only code, name and pages, without copying prices", async () => {
   const books = [
     {

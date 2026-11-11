@@ -841,7 +841,7 @@ export function Portal({
           ) : section === "vendors" ? (
             <Vendors />
           ) : section === "users" ? (
-            <UserAccounts />
+            <UserAccounts currentUser={user} />
           ) : section === "settings" ? (
             <SettingsPage />
           ) : section === "audit" ? (
@@ -15434,16 +15434,31 @@ function VendorLedgerView({ user }: { user: User }) {
   );
 }
 
-function UserAccounts() {
+function UserAccounts({ currentUser }: { currentUser?: User }) {
   const { data, error, loading, reload } = useData<any[]>("manage/users");
-  const [campuses, setCampuses] = useState<any[]>([]),
-    [edit, setEdit] = useState<any>(null),
+  const [edit, setEdit] = useState<any>(null),
+    [userToDelete, setUserToDelete] = useState<any | null>(null),
+    [deleting, setDeleting] = useState(false),
     [busy, setBusy] = useState(false);
-  useEffect(() => {
-    api("manage/campuses")
-      .then(setCampuses)
-      .catch(() => {});
-  }, []);
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete?.id) return;
+    setDeleting(true);
+    try {
+      await api(`manage/users/${userToDelete.id}`, {}, "DELETE");
+      toast.success(`User account "${userToDelete.email}" deleted successfully.`);
+      setUserToDelete(null);
+      if (edit?.id === userToDelete.id) {
+        setEdit(null);
+      }
+      await reload();
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <div className="toolbar">
@@ -15453,7 +15468,7 @@ function UserAccounts() {
             setEdit({
               name: "",
               email: "",
-              role: "CAMPUS_ADMIN",
+              role: "SUPER_ADMIN",
               campus_id: null,
               active: true,
               password: "",
@@ -15466,22 +15481,63 @@ function UserAccounts() {
       </div>
       <Result loading={loading} error={error}>
         <DataTable
-          headers={["Name", "Email", "Role", "Campus", "Status", "Manage"]}
-          rows={(data || []).map((u) => [
-            u.name,
-            u.email,
-            u.role,
-            u.campus_name || "All",
-            u.active ? "Enabled" : "Disabled",
-            <button
-              className="text-link"
-              onClick={() =>
-                setEdit({ ...u, active: !!u.active, password: "" })
-              }
-            >
-              Edit / reset password
-            </button>,
-          ])}
+          headers={["Name", "Email", "Role", "Status", "Manage"]}
+          rows={(data || []).map((u) => {
+            const isSelf =
+              currentUser &&
+              (u.id === currentUser.id ||
+                u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+            return [
+              u.name,
+              u.email,
+              u.role,
+              u.active ? "Enabled" : "Disabled",
+              <div
+                key={u.id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <button
+                  className="text-link"
+                  onClick={() =>
+                    setEdit({ ...u, active: !!u.active, password: "" })
+                  }
+                >
+                  Edit / reset password
+                </button>
+                {isSelf ? (
+                  <span
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "var(--muted-foreground, #64748b)",
+                      fontWeight: 500,
+                    }}
+                    title="Your current logged-in account"
+                  >
+                    (You)
+                  </span>
+                ) : (
+                  <button
+                    className="text-link"
+                    style={{
+                      color: "#dc2626",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                    onClick={() => setUserToDelete(u)}
+                    title={`Delete account ${u.email}`}
+                  >
+                    <Trash2 size={13} />
+                    Delete
+                  </button>
+                )}
+              </div>,
+            ];
+          })}
         />
       </Result>
       <Dialog open={!!edit} onOpenChange={(v) => !v && setEdit(null)}>
@@ -15504,6 +15560,8 @@ function UserAccounts() {
                 try {
                   const b = {
                     ...edit,
+                    role: edit.role || "SUPER_ADMIN",
+                    campus_id: null,
                     ...(!edit.password ? { password: undefined } : {}),
                   };
                   await api("manage/users" + (edit.id ? "/" + edit.id : ""), b);
@@ -15533,29 +15591,13 @@ function UserAccounts() {
               <Field label="Role">
                 <Choose
                   label="Role"
-                  value={edit.role}
+                  value={edit.role || "SUPER_ADMIN"}
                   onChange={(v) => setEdit({ ...edit, role: v })}
                   options={[
-                    { value: "CAMPUS_ADMIN", label: "Campus Admin" },
-                    { value: "SUPER_ADMIN", label: "Super Admin" },
+                    { value: "SUPER_ADMIN", label: "Super Admin (Full Access)" },
                   ]}
                 />
               </Field>
-              {edit.role === "CAMPUS_ADMIN" && (
-                <Field label="Campus">
-                  <Choose
-                    label="Campus"
-                    value={edit.campus_id || "none"}
-                    onChange={(v) =>
-                      setEdit({ ...edit, campus_id: v === "none" ? null : v })
-                    }
-                    options={[
-                      { value: "none", label: "Choose campus" },
-                      ...campuses.map((c) => ({ value: c.id, label: c.name })),
-                    ]}
-                  />
-                </Field>
-              )}
               <Field
                 label={
                   edit.id
@@ -15582,13 +15624,55 @@ function UserAccounts() {
                   onCheckedChange={(v) => setEdit({ ...edit, active: v })}
                 />
               </div>
-              <button className="btn primary" disabled={busy}>
-                {busy ? "Saving…" : "Save account"}
-              </button>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginTop: 8,
+                }}
+              >
+                <button className="btn primary" disabled={busy}>
+                  {busy ? "Saving…" : "Save account"}
+                </button>
+                {edit.id &&
+                  (!currentUser ||
+                    (edit.id !== currentUser.id &&
+                      edit.email?.toLowerCase() !==
+                        currentUser.email?.toLowerCase())) && (
+                    <button
+                      type="button"
+                      className="btn compact danger-button"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        color: "#dc2626",
+                        borderColor: "#fca5a5",
+                      }}
+                      onClick={() => {
+                        const targetUser = edit;
+                        setEdit(null);
+                        setUserToDelete(targetUser);
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      Delete User
+                    </button>
+                  )}
+              </div>
             </form>
           )}
         </DialogContent>
       </Dialog>
+      <Confirm
+        open={!!userToDelete}
+        onClose={() => !deleting && setUserToDelete(null)}
+        title={`Delete User ${userToDelete?.name || userToDelete?.email}?`}
+        description={`Are you sure you want to permanently delete the account "${userToDelete?.email}"? This action cannot be undone.`}
+        onConfirm={handleDeleteUser}
+      />
     </>
   );
 }

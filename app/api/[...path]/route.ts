@@ -1251,6 +1251,67 @@ async function handle(req: Request) {
         ]);
         return ok({ id: userId });
       }
+      if (method === "DELETE") {
+        if (!id) throw new AppError(400, "User ID is required.");
+        if (id === u.id) {
+          throw new AppError(400, "You cannot delete your own account.");
+        }
+        const target = await one<any>("SELECT * FROM users WHERE id=?", id);
+        if (!target) throw new AppError(404, "User not found.");
+
+        if (target.role === "SUPER_ADMIN") {
+          const activeAdmins = await one<any>(
+            "SELECT COUNT(*) AS count FROM users WHERE role='SUPER_ADMIN' AND active=1 AND id != ?",
+            id,
+          );
+          if (!activeAdmins || Number(activeAdmins.count) < 1) {
+            throw new AppError(
+              400,
+              "At least one active Super Admin account is required.",
+            );
+          }
+        }
+
+        const vendor = await one<any>(
+          "SELECT * FROM vendors WHERE user_id=?",
+          id,
+        );
+        if (vendor) {
+          const ordersCount = await one<any>(
+            "SELECT COUNT(*) AS n FROM orders WHERE vendor_id=?",
+            vendor.id,
+          );
+          if (ordersCount && Number(ordersCount.n) > 0) {
+            throw new AppError(
+              400,
+              `Cannot delete user "${target.email}" because it is linked to vendor "${vendor.name}" with assigned orders. Manage the vendor from Vendors section first.`,
+            );
+          }
+        }
+
+        const statements: any[] = [];
+        statements.push(
+          stmt("UPDATE payments SET reviewer=NULL WHERE reviewer=?", id),
+        );
+        statements.push(stmt("DELETE FROM sessions WHERE user_id=?", id));
+        if (vendor) {
+          statements.push(stmt("DELETE FROM vendors WHERE id=?", vendor.id));
+        }
+        statements.push(stmt("DELETE FROM users WHERE id=?", id));
+        statements.push(
+          auditStmt(
+            u.email,
+            "DELETE_USER",
+            id,
+            { email: target.email, role: target.role, name: target.name },
+            undefined,
+            req,
+          ),
+        );
+
+        await batch(statements);
+        return ok({ ok: true });
+      }
     }
     if (section === "vendors") {
       const u = await admin(req);
