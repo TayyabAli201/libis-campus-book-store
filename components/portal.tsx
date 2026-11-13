@@ -68,6 +68,7 @@ import { ShippingLabelModal } from "./shipping-label";
 import { BatchPrintManifestModal } from "./batch-print-manifest";
 import { PakPostManifestModal } from "./pak-post-manifest";
 import { QuickTrackingModal } from "./quick-tracking-modal";
+import { BookCoverModal } from "./book-cover-modal";
 import {
   SidebarProvider,
   Sidebar,
@@ -1140,6 +1141,14 @@ function Dashboard({
       allowed: isAdmin || user.permissions.includes("books.read"),
     },
     {
+      label: "Cover Studio",
+      description: "Print title covers",
+      href: "/books?cover=1",
+      icon: Sparkles,
+      tone: "amber",
+      allowed: isAdmin || user.permissions.includes("books.read"),
+    },
+    {
       label: "Printing Vendors",
       description: "Queues & ledgers",
       href: "/vendors",
@@ -1832,6 +1841,11 @@ function Books({ readOnly }: { readOnly: boolean }) {
     [clearReview, setClearReview] = useState<{ count: number } | null>(null),
     [clearConfirmation, setClearConfirmation] = useState(""),
     [clearBusy, setClearBusy] = useState(false);
+  const [coverModal, setCoverModal] = useState<{
+    open: boolean;
+    code?: string;
+    title?: string;
+  } | null>(null);
   const transferBusy = useRef(false);
   const visibilityPending = useRef(false);
   const [visibilityBusy, setVisibilityBusy] = useState<string | null>(null);
@@ -1839,6 +1853,11 @@ function Books({ readOnly }: { readOnly: boolean }) {
   const { data, error, loading, reload, setData } = useData<Book[]>(
     "manage/books?q=" + encodeURIComponent(q) + "&page=" + bookPage,
   );
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("cover")) {
+      setCoverModal({ open: true, code: "CS101", title: "INTRODUCTION TO COMPUTING" });
+    }
+  }, []);
   const setVisibility = async (book: Book, active: boolean) => {
     if (readOnly || visibilityPending.current) return;
     visibilityPending.current = true;
@@ -1885,6 +1904,21 @@ function Books({ readOnly }: { readOnly: boolean }) {
             Add book
           </button>
         )}
+        <button
+          type="button"
+          className="btn compact"
+          onClick={() =>
+            setCoverModal({
+              open: true,
+              code: "CS101",
+              title: "INTRODUCTION TO COMPUTING",
+            })
+          }
+          title="Open Title Page & Cover Studio (Variant 4: Classic Minimal)"
+        >
+          <Sparkles size={16} />
+          Cover Studio
+        </button>
         <button
           className="btn compact"
           disabled={exporting || importing || loading}
@@ -2016,6 +2050,19 @@ function Books({ readOnly }: { readOnly: boolean }) {
             </div>,
             b.course_code,
             <div className="row-actions book-row-actions">
+              <button
+                type="button"
+                onClick={() =>
+                  setCoverModal({
+                    open: true,
+                    code: b.code || b.course_code || "",
+                    title: b.title || "",
+                  })
+                }
+                title={`Generate Cover Page for ${b.code}`}
+              >
+                Cover
+              </button>
               {!readOnly && (
                 <>
                   <button onClick={() => setEdit({ ...b, active: !!b.active })}>
@@ -2226,6 +2273,15 @@ function Books({ readOnly }: { readOnly: boolean }) {
           }
         }}
       />
+      {coverModal?.open && (
+        <BookCoverModal
+          open={coverModal.open}
+          onClose={() => setCoverModal(null)}
+          initialCode={coverModal.code}
+          initialTitle={coverModal.title}
+          books={(data || []).map((bk) => ({ code: bk.code, title: bk.title }))}
+        />
+      )}
     </>
   );
 }

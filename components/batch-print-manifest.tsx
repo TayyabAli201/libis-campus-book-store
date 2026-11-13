@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X, Download, CheckSquare, Square, Layers, BookOpen, Package } from "lucide-react";
+import { BookCoverModal } from "./book-cover-modal";
 
 interface BatchPrintManifestProps {
   vendorId?: string;
@@ -15,6 +16,7 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedBooks, setCompletedBooks] = useState<Record<string, boolean>>({});
+  const [coverBook, setCoverBook] = useState<{ code: string; title: string } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -84,6 +86,16 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCoverBook({ code: "CS101", title: "INTRODUCTION TO COMPUTING" })}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold rounded-lg border border-slate-700 shadow transition-all cursor-pointer"
+            title="Open Book Cover / Title Page Studio"
+          >
+            <BookOpen size={16} />
+            <span>Cover Studio</span>
+          </button>
+
           {data && (
             <button
               type="button"
@@ -212,7 +224,19 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
                                 {isDone ? <CheckSquare size={14} className="text-emerald-600" /> : <Square size={14} />}
                               </button>
                             </td>
-                            <td className="py-1 px-2 font-bold text-slate-950 font-sans">{b.code}</td>
+                            <td className="py-1 px-2 font-bold text-slate-950 font-sans">
+                              <div className="flex items-center gap-1.5">
+                                <span>{b.code}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setCoverBook({ code: b.code, title: b.title })}
+                                  className="px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 font-medium no-print cursor-pointer"
+                                  title={`Print ${b.code} Title Cover Page`}
+                                >
+                                  Cover
+                                </button>
+                              </div>
+                            </td>
                             <td className="py-1 px-2 text-slate-800 font-sans font-medium">{b.title}</td>
                             <td className="py-1 px-2 text-center">{b.pages}</td>
                             <td className="py-1 px-2 text-center bg-indigo-50/60 font-black text-indigo-800">
@@ -361,6 +385,16 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
           }
         }
       `}</style>
+
+      {coverBook && (
+        <BookCoverModal
+          open={!!coverBook}
+          onClose={() => setCoverBook(null)}
+          initialCode={coverBook.code}
+          initialTitle={coverBook.title}
+          books={data?.books?.map((bk: any) => ({ code: bk.code, title: bk.title }))}
+        />
+      )}
     </div>
   );
 
