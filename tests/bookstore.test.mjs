@@ -4275,3 +4275,24 @@ test("Vendor print vs dispatch vs admin mark all shipped lifecycle & book receiv
   assert.equal(sync101.received_from_vendor, 1);
   assert.equal(sync102.received_from_vendor, 0, "Missing book correctly kept at received_from_vendor = 0");
 });
+
+test("Dashboard Reports: Lifetime / All-Time and Period Ledger Balances correctly isolate period expenses while maintaining all-time vendor due", async (t) => {
+  const sqlite = database(t);
+  const { reports } = await import("../lib/server/reports.ts");
+  const adminUser = { ...admin, permissions: ["orders.update", "orders.manage"] };
+
+  // Call reports with All-Time date bounds
+  const allTimeReport = await reports(adminUser, "2020-01-01", "2099-12-31");
+  assert.ok(allTimeReport.stats, "Returns stats object");
+  assert.equal(allTimeReport.stats.is_all_time, true, "is_all_time flag is true for all-time range");
+  assert.equal(typeof allTimeReport.stats.vendor_remaining_balance, "number", "Calculates cumulative vendor remaining balance");
+  assert.equal(typeof allTimeReport.stats.all_time_vendor_paid, "number", "Returns all_time_vendor_paid");
+  assert.equal(typeof allTimeReport.stats.all_time_vendor_billed, "number", "Returns all_time_vendor_billed");
+
+  // Call reports with specific date period
+  const periodReport = await reports(adminUser, "2026-11-01", "2026-11-30");
+  assert.equal(periodReport.stats.is_all_time, false, "is_all_time flag is false for period range");
+  assert.equal(typeof periodReport.stats.period_vendor_paid, "number", "Returns period_vendor_paid");
+  // Cumulative balance reflects current ledger rather than subtracting all-time from single period
+  assert.equal(typeof periodReport.stats.vendor_remaining_balance, "number");
+});

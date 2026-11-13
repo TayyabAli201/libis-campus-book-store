@@ -988,7 +988,12 @@ function Profile({ user, base }: { user: User; base: string }) {
 function dateRange(range: string) {
   const now = new Date(),
     from = new Date(now);
-  if (range === "today") {
+  if (range === "all") {
+    return {
+      from: "2020-01-01",
+      to: now.toISOString().slice(0, 10),
+    };
+  } else if (range === "today") {
   } else if (range === "7") from.setDate(from.getDate() - 6);
   else if (range === "month") from.setDate(1);
   else if (range === "year") {
@@ -1183,8 +1188,8 @@ function Dashboard({
       allowed: true,
     },
   ].filter((link) => link.allowed);
-  const [range, setRange] = useState("30"),
-    [dates, setDates] = useState(dateRange("30"));
+  const [range, setRange] = useState("all"),
+    [dates, setDates] = useState(dateRange("all"));
   const [selectedVendor, setSelectedVendor] = useState("all");
   const { data: vendorsData } = useData<any>(isAdmin ? "manage/vendors" : "");
   const vendorsList: any[] = Array.isArray(vendorsData) ? vendorsData : ((vendorsData as any)?.vendors || []);
@@ -1279,6 +1284,7 @@ function Dashboard({
               if (v !== "custom") setDates(dateRange(v));
             }}
             options={[
+              { value: "all", label: "All Time (Lifetime)" },
               { value: "today", label: "Today" },
               { value: "7", label: "7 Days" },
               { value: "30", label: "30 Days" },
@@ -1555,9 +1561,22 @@ function Dashboard({
                       subDisplay = `Billed: ${money(billed)} + Hold: ${money(queue)}`;
                     } else if (key === "total_vendor_cost") {
                       mainDisplay = money(Number(data.stats.total_vendor_cost || 0));
-                      const paid = Number(data.stats.vendor_total_paid || 0);
+                      const isAll = !!data.stats.is_all_time;
+                      const paid = Number((isAll ? data.stats.all_time_vendor_paid : data.stats.period_vendor_paid) || 0);
                       const due = Number(data.stats.vendor_remaining_balance || 0);
-                      subDisplay = `Paid: ${money(paid)} · Due: ${money(due)}`;
+
+                      let dueText = "";
+                      if (due === 0) {
+                        dueText = "Due: Rs. 0 (All Settled ✓)";
+                      } else if (due < 0) {
+                        dueText = `Advance: ${money(Math.abs(due))}`;
+                      } else {
+                        dueText = `Due: ${money(due)}`;
+                      }
+
+                      subDisplay = isAll
+                        ? `Paid: ${money(paid)} · ${dueText}`
+                        : `Paid in period: ${money(paid)} · Ledger ${dueText}`;
                     } else if (key === "vendor_queue_cost") {
                       mainDisplay = money(Number(data.stats.vendor_queue_cost || 0));
                       const qOrders = Number(data.stats.queue_orders || 0);

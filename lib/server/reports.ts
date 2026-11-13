@@ -114,12 +114,60 @@ export async function reports(u: User, from: string, to: string, vendorId?: stri
   const profitMarginPct = grossRevenue > 0 ? Math.round((netProfit / grossRevenue) * 1000) / 10 : 0;
   const officeSavings = Math.round(Number(itemStats?.office_stock_savings || 0)) * 100;
 
-  const vendorPaymentsRow = await one<any>(
-    "SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments",
+  // Payments & Ledger Balance Calculations
+  const isAllTime = from <= "2020-01-01" || from <= "2024-01-01";
+  const vpVendorFilter = vendorId && vendorId !== "all" ? "vendor_id = ?" : "1=1";
+  const vpVendorArgs = vendorId && vendorId !== "all" ? [vendorId] : [];
+
+  // Payments made within the filtered reporting period
+  const periodPaymentsRow = await one<any>(
+    `SELECT COALESCE(SUM(amount), 0) AS period_paid 
+     FROM vendor_payments 
+     WHERE ${vpVendorFilter} AND payment_date >= ? AND payment_date <= ?`,
+    ...vpVendorArgs,
+    from,
+    to,
   );
-  const vendorTotalPaidRupees = Number(vendorPaymentsRow?.total_paid || 0);
-  const vendorTotalPaid = vendorTotalPaidRupees * 100;
-  const vendorRemainingBalance = totalVendorCost - vendorTotalPaid;
+  const periodVendorPaidRupees = Number(periodPaymentsRow?.period_paid || 0);
+  const periodVendorPaid = periodVendorPaidRupees * 100;
+
+  // Cumulative all-time payments made to this vendor (or all vendors)
+  const allTimePaymentsRow = await one<any>(
+    `SELECT COALESCE(SUM(amount), 0) AS all_time_paid 
+     FROM vendor_payments 
+     WHERE ${vpVendorFilter}`,
+    ...vpVendorArgs,
+  );
+  const allTimeVendorPaidRupees = Number(allTimePaymentsRow?.all_time_paid || 0);
+  const allTimeVendorPaid = allTimeVendorPaidRupees * 100;
+
+  // Cumulative all-time vendor earnings (Billed shipped orders)
+  const vFilter = vendorId && vendorId !== "all" ? "AND o.vendor_id = ?" : "";
+  const vArgs = vendorId && vendorId !== "all" ? [...s.args, vendorId] : s.args;
+  const allTimePrintingStats = await one<any>(
+    `SELECT 
+       COALESCE(SUM(CASE WHEN o.status IN ('SHIPPED', 'DELIVERED') AND (i.is_unavailable = 1 OR i.in_office_stock = 1) THEN 0 WHEN o.status IN ('SHIPPED', 'DELIVERED') THEN (COALESCE(i.pages, 0) * i.quantity * COALESCE(v.per_page_rate, 1.60)) + (i.quantity * COALESCE(v.binding_rate, 30.00)) ELSE 0 END), 0) AS all_time_printing
+     FROM order_items i
+     JOIN orders o ON o.id = i.order_id
+     JOIN payments p ON p.order_id = o.id
+     LEFT JOIN vendors v ON v.id = o.vendor_id
+     WHERE ${s.sql} AND p.status='VERIFIED' AND o.status NOT IN ('CANCELLED','REFUND_REQUESTED') ${vFilter}`,
+    ...vArgs,
+  );
+  const allTimeCourierStats = await one<any>(
+    `SELECT COALESCE(SUM(o.actual_courier_charges), 0) AS all_time_courier
+     FROM orders o
+     JOIN payments p ON p.order_id = o.id
+     WHERE ${s.sql} AND p.status='VERIFIED' AND o.status IN ('SHIPPED', 'DELIVERED') ${vFilter}`,
+    ...vArgs,
+  );
+  const allTimeEarningsRupees = Math.round(Number(allTimePrintingStats?.all_time_printing || 0)) + Math.round(Number(allTimeCourierStats?.all_time_courier || 0));
+  const allTimeVendorBilled = allTimeEarningsRupees * 100;
+
+  // Real Current Ledger Due across all time (what is actually owed as of today)
+  // If allTimeVendorBilled == allTimeVendorPaid, balance is 0!
+  const vendorRemainingBalance = allTimeVendorBilled - allTimeVendorPaid;
+  const vendorTotalPaid = isAllTime ? allTimeVendorPaid : periodVendorPaid;
 
   const bscope =
     u.role === "SUPER_ADMIN" ? "1=1" : "(b.campus_id=? OR b.campus_id IS NULL)";
@@ -203,7 +251,11 @@ export async function reports(u: User, from: string, to: string, vendorId?: stri
       queue_pages: Number(itemStats?.queue_pages || 0),
       vendor_total_liability: totalVendorLiability,
       vendor_total_paid: vendorTotalPaid,
+      period_vendor_paid: periodVendorPaid,
+      all_time_vendor_paid: allTimeVendorPaid,
+      all_time_vendor_billed: allTimeVendorBilled,
       vendor_remaining_balance: vendorRemainingBalance,
+      is_all_time: isAllTime,
       net_profit: netProfit,
       profit_margin_pct: profitMarginPct,
       office_stock_savings: officeSavings,
