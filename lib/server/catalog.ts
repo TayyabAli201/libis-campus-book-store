@@ -66,6 +66,8 @@ export async function getSettings() {
     cover_y_offset: typeof raw.cover_y_offset === "number" ? raw.cover_y_offset : 0,
     cover_code_size: typeof raw.cover_code_size === "number" ? raw.cover_code_size : 120,
     cover_variant: typeof raw.cover_variant === "number" ? raw.cover_variant : 4,
+    cover_subtitle: raw.cover_subtitle || "Complete Course Handouts · Lectures 1 to 45",
+    cover_badge_text: raw.cover_badge_text || "★ PREPARED FOR HIGH SCORING VU STUDENTS ★",
   };
   if (runtime().MAX_UPLOAD_MB)
     settings.max_upload_mb = Math.min(

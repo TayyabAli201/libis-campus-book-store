@@ -14,9 +14,10 @@ import {
   MoveVertical,
   Type,
   Save,
-  CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "./shared";
 
 export interface BookCoverModalProps {
   open: boolean;
@@ -110,6 +111,8 @@ export function BookCoverModal({
             if (typeof s.cover_y_offset === "number") setYOffset(s.cover_y_offset);
             if (typeof s.cover_code_size === "number") setCodeFontSize(s.cover_code_size);
             if (typeof s.cover_variant === "number") setVariant(s.cover_variant);
+            if (s.cover_subtitle) setSubtitle(s.cover_subtitle);
+            if (s.cover_badge_text) setBadgeText(s.cover_badge_text);
           }
         }
       } catch (err) {
@@ -257,26 +260,29 @@ export function BookCoverModal({
     try {
       let finalUrl = customTemplateUrl;
 
-      // If a local image file was uploaded, upload it to the server's bucket
+      // If a local image file was uploaded, upload it to the server's bucket with X-Requested-With header
       if (uploadedFile) {
         const coverRes = await fetch("/api/covers", {
           method: "POST",
           body: uploadedFile,
-          headers: { "Content-Type": uploadedFile.type },
+          headers: {
+            "Content-Type": uploadedFile.type,
+            "X-Requested-With": "CampusBookstore",
+          },
         });
-        if (coverRes.ok) {
-          const coverData: any = await coverRes.json();
-          if (coverData?.url) {
-            finalUrl = coverData.url;
-            setCustomTemplateUrl(coverData.url);
-          }
+        if (!coverRes.ok) {
+          const errData: any = await coverRes.json().catch(() => ({}));
+          throw new Error(errData?.error || "Failed to upload cover template image.");
+        }
+        const coverData: any = await coverRes.json();
+        if (coverData?.url) {
+          finalUrl = coverData.url;
+          setCustomTemplateUrl(coverData.url);
         }
       }
 
-      // Fetch current settings & version
-      const settingsRes = await fetch("/api/manage/settings");
-      if (!settingsRes.ok) throw new Error("Could not retrieve current settings.");
-      const settingsData: any = await settingsRes.json();
+      // Fetch current settings & version using official api() helper
+      const settingsData: any = await api("manage/settings");
       const curSettings = settingsData.settings;
       const version = settingsData.version;
 
@@ -286,22 +292,17 @@ export function BookCoverModal({
         cover_y_offset: yOffset,
         cover_code_size: codeFontSize,
         cover_variant: variant,
+        cover_subtitle: subtitle,
+        cover_badge_text: badgeText,
       };
 
-      const saveRes = await fetch("/api/manage/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: updatedSettings, version }),
-      });
-
-      if (!saveRes.ok) {
-        const errJson: any = await saveRes.json().catch(() => ({}));
-        throw new Error(errJson?.error || "Failed to save settings.");
-      }
+      // Save settings using api() helper (properly includes X-Requested-With and passes CSRF)
+      await api("manage/settings", { settings: updatedSettings, version });
 
       setUploadedFile(null);
-      toast.success("Cover template and layout saved as global default for all vendors!");
+      toast.success("Cover template, alignment, subtitle & tagline saved as global default for all vendors!");
     } catch (err: any) {
+      console.error("Save error:", err);
       toast.error(err?.message || "Failed to save global template");
     } finally {
       setSavingGlobal(false);
@@ -726,7 +727,7 @@ export function BookCoverModal({
                     ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
                     : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                 }`}>
-                  {isAdmin ? "👑 Admin Master Mode" : "Variant 4: Classic Minimal"}
+                  {isAdmin ? "👑 Admin Master Mode" : "Vendor Print Studio"}
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
                   A4 Borderless
@@ -734,8 +735,8 @@ export function BookCoverModal({
               </h3>
               <p className="text-xs text-slate-400">
                 {isAdmin
-                  ? "Configure master cover background, alignment & default layout for all vendors."
-                  : "Generate high-resolution printable title covers for VU academic book binding."}
+                  ? "Configure master cover background, alignment, subtitle & tagline for all vendors."
+                  : "Select any book from bookstore catalog to print high-resolution title cover."}
               </p>
             </div>
           </div>
@@ -911,13 +912,13 @@ export function BookCoverModal({
                       type="button"
                       disabled={savingGlobal}
                       onClick={handleSaveGlobalDefault}
-                      className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow"
+                      className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow"
                     >
                       <Save size={14} />
                       <span>{savingGlobal ? "Saving to server..." : "Save As Global Default For All Vendors"}</span>
                     </button>
                     <p className="text-[10px] text-slate-400 mt-1 text-center">
-                      Saves template and exact alignment to server database so all vendors automatically inherit it.
+                      Saves template, alignment, subtitle & tagline to server database so all vendors automatically inherit it.
                     </p>
                   </div>
                 </div>
@@ -933,7 +934,7 @@ export function BookCoverModal({
                     Select Book From Bookstore Catalog:
                   </span>
                   <span className="text-[10px] font-mono text-sky-400/80 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800">
-                    {catalogBooks.length} Books
+                    {catalogBooks.length} Books Available
                   </span>
                 </label>
                 <select
@@ -962,90 +963,137 @@ export function BookCoverModal({
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Selecting any book immediately auto-fills the Course Code and Title below.
+                  Selecting any book immediately loads the course code and title into the A4 cover preview.
                 </p>
               </div>
             )}
 
-            {/* Inputs Form with Explicit High-Contrast Text Styling */}
-            <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-blue-300 mb-1">
-                  Course Code
-                </label>
-                <input
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. CS101, BIF401"
-                  style={{
-                    backgroundColor: "#0f172a",
-                    color: "#38bdf8",
-                    borderColor: "#334155",
-                    outline: "none",
-                  }}
-                  className="w-full px-3 py-2 text-base font-black tracking-wider border rounded-lg font-mono uppercase focus:ring-2 focus:ring-blue-500"
-                  maxLength={15}
-                />
-              </div>
+            {/* VENDOR READ-ONLY SELECTED BOOK DISPLAY (Vendor cannot edit text) */}
+            {!isAdmin ? (
+              <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
+                  <span className="font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                    <Lock size={12} className="text-amber-400" />
+                    Active Book Data (Admin Controlled)
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    Official Edition
+                  </span>
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
-                  Course Title
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value.toUpperCase())}
-                  placeholder="e.g. INTRODUCTION TO COMPUTING"
-                  style={{
-                    backgroundColor: "#0f172a",
-                    color: "#ffffff",
-                    borderColor: "#334155",
-                    outline: "none",
-                  }}
-                  className="w-full px-3 py-2 text-sm font-bold border rounded-lg uppercase focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-blue-300">
+                    Course Code
+                  </div>
+                  <div className="text-lg font-black tracking-wider text-sky-400 font-mono mt-0.5">
+                    {code || "NO BOOK SELECTED"}
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
-                  Subtitle / Edition
-                </label>
-                <input
-                  type="text"
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="e.g. Complete Course Handouts · Lectures 1 to 45"
-                  style={{
-                    backgroundColor: "#0f172a",
-                    color: "#93c5fd",
-                    borderColor: "#334155",
-                    outline: "none",
-                  }}
-                  className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Course Title
+                  </div>
+                  <div className="text-sm font-bold text-white mt-0.5">
+                    {title || "—"}
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
-                  Badge / Tagline
-                </label>
-                <input
-                  type="text"
-                  value={badgeText}
-                  onChange={(e) => setBadgeText(e.target.value)}
-                  placeholder="e.g. ★ PREPARED FOR HIGH SCORING VU STUDENTS ★"
-                  style={{
-                    backgroundColor: "#0f172a",
-                    color: "#34d399",
-                    borderColor: "#334155",
-                    outline: "none",
-                  }}
-                  className="w-full px-3 py-2 text-xs font-bold border rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="pt-2 border-t border-slate-800/60 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Subtitle / Edition:</span>
+                  <span className="text-slate-300 font-medium">{subtitle}</span>
+                </div>
+
+                <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Badge Tagline:</span>
+                  <span className="text-emerald-400 font-medium">{badgeText}</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* ADMIN EDITABLE INPUTS FORM */
+              <div className="bg-slate-950/60 p-4 rounded-xl border border-purple-500/30 space-y-3.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-purple-300 pb-1 border-b border-purple-500/20">
+                  Master Text & Typography Settings
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-blue-300 mb-1">
+                    Course Code
+                  </label>
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. CS101, BIF401"
+                    style={{
+                      backgroundColor: "#0f172a",
+                      color: "#38bdf8",
+                      borderColor: "#334155",
+                      outline: "none",
+                    }}
+                    className="w-full px-3 py-2 text-base font-black tracking-wider border rounded-lg font-mono uppercase focus:ring-2 focus:ring-blue-500"
+                    maxLength={15}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                    Course Title
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value.toUpperCase())}
+                    placeholder="e.g. INTRODUCTION TO COMPUTING"
+                    style={{
+                      backgroundColor: "#0f172a",
+                      color: "#ffffff",
+                      borderColor: "#334155",
+                      outline: "none",
+                    }}
+                    className="w-full px-3 py-2 text-sm font-bold border rounded-lg uppercase focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                    Subtitle / Edition (Master Default)
+                  </label>
+                  <input
+                    type="text"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="e.g. Complete Course Handouts · Lectures 1 to 45"
+                    style={{
+                      backgroundColor: "#0f172a",
+                      color: "#93c5fd",
+                      borderColor: "#334155",
+                      outline: "none",
+                    }}
+                    className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                    Badge / Tagline (Master Default)
+                  </label>
+                  <input
+                    type="text"
+                    value={badgeText}
+                    onChange={(e) => setBadgeText(e.target.value)}
+                    placeholder="e.g. ★ PREPARED FOR HIGH SCORING VU STUDENTS ★"
+                    style={{
+                      backgroundColor: "#0f172a",
+                      color: "#34d399",
+                      borderColor: "#334155",
+                      outline: "none",
+                    }}
+                    className="w-full px-3 py-2 text-xs font-bold border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="pt-1 flex flex-col sm:flex-row gap-2.5">

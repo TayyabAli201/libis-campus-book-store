@@ -406,6 +406,8 @@ export const settingsInput = z.object({
   cover_y_offset: z.number().int().min(-250).max(250).optional().default(0),
   cover_code_size: z.number().int().min(50).max(200).optional().default(120),
   cover_variant: z.number().int().min(1).max(4).optional().default(4),
+  cover_subtitle: z.string().max(250).optional().default("Complete Course Handouts · Lectures 1 to 45"),
+  cover_badge_text: z.string().max(250).optional().default("★ PREPARED FOR HIGH SCORING VU STUDENTS ★"),
 });
 export type StoreSettings = z.infer<typeof settingsInput>;
 export type Book = {

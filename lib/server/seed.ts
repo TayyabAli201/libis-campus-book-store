@@ -47,6 +47,8 @@ export async function bootstrap(req: Request) {
     cover_y_offset: 0,
     cover_code_size: 120,
     cover_variant: 4,
+    cover_subtitle: "Complete Course Handouts · Lectures 1 to 45",
+    cover_badge_text: "★ PREPARED FOR HIGH SCORING VU STUDENTS ★",
   };
   const statements = [
     stmt(
