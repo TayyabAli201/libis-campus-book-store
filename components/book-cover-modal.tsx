@@ -13,7 +13,10 @@ import {
   Image as ImageIcon,
   MoveVertical,
   Type,
+  Save,
+  CheckCircle2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export interface BookCoverModalProps {
   open: boolean;
@@ -21,6 +24,7 @@ export interface BookCoverModalProps {
   initialCode?: string;
   initialTitle?: string;
   books?: Array<{ code: string; title: string }>;
+  isAdmin?: boolean;
 }
 
 export function BookCoverModal({
@@ -29,6 +33,7 @@ export function BookCoverModal({
   initialCode = "CS101",
   initialTitle = "INTRODUCTION TO COMPUTING",
   books = [],
+  isAdmin = false,
 }: BookCoverModalProps) {
   const [mounted, setMounted] = useState(false);
   const [code, setCode] = useState(initialCode);
@@ -37,9 +42,13 @@ export function BookCoverModal({
   const [badgeText, setBadgeText] = useState("★ PREPARED FOR HIGH SCORING VU STUDENTS ★");
   const [variant, setVariant] = useState<number>(4); // Default: Variant 4: Classic Minimal
   const [customTemplateActive, setCustomTemplateActive] = useState<boolean>(false);
+  const [customTemplateUrl, setCustomTemplateUrl] = useState<string | null>(null);
   const [yOffset, setYOffset] = useState<number>(0);
   const [codeFontSize, setCodeFontSize] = useState<number>(120);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [catalogBooks, setCatalogBooks] = useState<Array<{ code: string; title: string }>>(books || []);
+  const [savingGlobal, setSavingGlobal] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
@@ -53,47 +62,111 @@ export function BookCoverModal({
     }
   }, [open, initialCode, initialTitle]);
 
-  // Load custom template or default VU template on mount
+  // Load catalog books if not passed or empty
+  useEffect(() => {
+    if (books && books.length > 0) {
+      setCatalogBooks(books);
+    } else if (open) {
+      fetch("/api/catalog?pageSize=500")
+        .then((res) => res.json())
+        .then((data: any) => {
+          if (data && Array.isArray(data.books) && data.books.length > 0) {
+            const mapped = data.books
+              .map((b: any) => ({
+                code: (b.code || b.course_code || "").trim().toUpperCase(),
+                title: (b.title || b.course_name || "").trim().toUpperCase(),
+              }))
+              .filter((b: any) => Boolean(b.code));
+            setCatalogBooks(mapped);
+          }
+        })
+        .catch((err) => console.warn("Failed to load catalog books for Cover Studio", err));
+    }
+  }, [open, books]);
+
+  // Load server-persisted template and layout settings
   useEffect(() => {
     setMounted(true);
 
-    try {
-      const savedY = localStorage.getItem("vu_book_cover_y_offset");
-      if (savedY !== null) setYOffset(Number(savedY) || 0);
-
-      const savedSize = localStorage.getItem("vu_book_cover_code_size");
-      if (savedSize !== null) setCodeFontSize(Number(savedSize) || 120);
-
-      const savedCustomTemplate = localStorage.getItem("vu_book_cover_custom_template");
-      const img = new Image();
-      if (savedCustomTemplate) {
-        img.src = savedCustomTemplate;
-        setCustomTemplateActive(true);
-      } else {
-        img.src = "/vu-book-cover-template.jpg";
-        setCustomTemplateActive(false);
+    const initSettings = async () => {
+      let serverSettingsLoaded = false;
+      try {
+        const res = await fetch("/api/catalog");
+        if (res.ok) {
+          const data: any = await res.json();
+          const s = data?.settings;
+          if (s) {
+            serverSettingsLoaded = true;
+            if (s.cover_template_url) {
+              setCustomTemplateUrl(s.cover_template_url);
+              setCustomTemplateActive(true);
+              const img = new Image();
+              img.onload = () => {
+                bgImageRef.current = img;
+                setImgLoaded(true);
+              };
+              img.src = s.cover_template_url;
+            }
+            if (typeof s.cover_y_offset === "number") setYOffset(s.cover_y_offset);
+            if (typeof s.cover_code_size === "number") setCodeFontSize(s.cover_code_size);
+            if (typeof s.cover_variant === "number") setVariant(s.cover_variant);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch server cover settings, fallback to local/default", err);
       }
-      img.onload = () => {
-        bgImageRef.current = img;
-        setImgLoaded(true);
-      };
-      img.onerror = () => {
-        console.warn("Could not load saved template, reverting to default template");
-        const fallback = new Image();
-        fallback.src = "/vu-book-cover-template.jpg";
-        fallback.onload = () => {
-          bgImageRef.current = fallback;
+
+      if (!serverSettingsLoaded) {
+        // Fallback to local storage or official VU template
+        try {
+          const savedY = localStorage.getItem("vu_book_cover_y_offset");
+          if (savedY !== null) setYOffset(Number(savedY) || 0);
+
+          const savedSize = localStorage.getItem("vu_book_cover_code_size");
+          if (savedSize !== null) setCodeFontSize(Number(savedSize) || 120);
+
+          const savedCustom = localStorage.getItem("vu_book_cover_custom_template");
+          const img = new Image();
+          if (savedCustom) {
+            img.src = savedCustom;
+            setCustomTemplateActive(true);
+            setCustomTemplateUrl(savedCustom);
+          } else {
+            img.src = "/vu-book-cover-template.jpg";
+            setCustomTemplateActive(false);
+          }
+          img.onload = () => {
+            bgImageRef.current = img;
+            setImgLoaded(true);
+          };
+          img.onerror = () => {
+            const fallback = new Image();
+            fallback.src = "/vu-book-cover-template.jpg";
+            fallback.onload = () => {
+              bgImageRef.current = fallback;
+              setImgLoaded(true);
+            };
+          };
+        } catch {
+          const fallback = new Image();
+          fallback.src = "/vu-book-cover-template.jpg";
+          fallback.onload = () => {
+            bgImageRef.current = fallback;
+            setImgLoaded(true);
+          };
+        }
+      } else if (!bgImageRef.current) {
+        // Load default if no custom template was set on server
+        const img = new Image();
+        img.onload = () => {
+          bgImageRef.current = img;
           setImgLoaded(true);
         };
-      };
-    } catch {
-      const fallback = new Image();
-      fallback.src = "/vu-book-cover-template.jpg";
-      fallback.onload = () => {
-        bgImageRef.current = fallback;
-        setImgLoaded(true);
-      };
-    }
+        img.src = "/vu-book-cover-template.jpg";
+      }
+    };
+
+    initSettings();
 
     return () => {
       setMounted(false);
@@ -116,10 +189,12 @@ export function BookCoverModal({
     } catch {}
   };
 
-  // Handle Custom Template Upload (PNG/JPG)
+  // Handle Custom Template Upload (PNG/JPG) - Admin Only
   const handleCustomTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAdmin) return;
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadedFile(file);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -141,29 +216,30 @@ export function BookCoverModal({
           newImg.onload = () => {
             bgImageRef.current = newImg;
             setCustomTemplateActive(true);
+            setCustomTemplateUrl(normalizedDataUrl);
             setImgLoaded((prev) => !prev);
           };
           newImg.src = normalizedDataUrl;
 
           try {
             localStorage.setItem("vu_book_cover_custom_template", normalizedDataUrl);
-          } catch (err) {
-            console.warn("Storage quota exceeded, custom template stored in active session only.", err);
-          }
+          } catch {}
         }
       };
       tempImg.src = rawData;
     };
     reader.readAsDataURL(file);
-    // Reset file input value so re-uploading same file triggers event
     e.target.value = "";
   };
 
-  // Reset to Default Official VU Template
+  // Reset to Default Official VU Template - Admin Only
   const handleResetTemplate = () => {
+    if (!isAdmin) return;
     try {
       localStorage.removeItem("vu_book_cover_custom_template");
     } catch {}
+    setUploadedFile(null);
+    setCustomTemplateUrl(null);
     const img = new Image();
     img.onload = () => {
       bgImageRef.current = img;
@@ -171,6 +247,65 @@ export function BookCoverModal({
       setImgLoaded((prev) => !prev);
     };
     img.src = "/vu-book-cover-template.jpg";
+    toast.info("Reset to official default template. Click 'Save Global Default' to make it permanent for all vendors.");
+  };
+
+  // Save Settings as Global Default for All Vendors - Admin Only
+  const handleSaveGlobalDefault = async () => {
+    if (!isAdmin) return;
+    setSavingGlobal(true);
+    try {
+      let finalUrl = customTemplateUrl;
+
+      // If a local image file was uploaded, upload it to the server's bucket
+      if (uploadedFile) {
+        const coverRes = await fetch("/api/covers", {
+          method: "POST",
+          body: uploadedFile,
+          headers: { "Content-Type": uploadedFile.type },
+        });
+        if (coverRes.ok) {
+          const coverData: any = await coverRes.json();
+          if (coverData?.url) {
+            finalUrl = coverData.url;
+            setCustomTemplateUrl(coverData.url);
+          }
+        }
+      }
+
+      // Fetch current settings & version
+      const settingsRes = await fetch("/api/manage/settings");
+      if (!settingsRes.ok) throw new Error("Could not retrieve current settings.");
+      const settingsData: any = await settingsRes.json();
+      const curSettings = settingsData.settings;
+      const version = settingsData.version;
+
+      const updatedSettings = {
+        ...curSettings,
+        cover_template_url: customTemplateActive ? (finalUrl || null) : null,
+        cover_y_offset: yOffset,
+        cover_code_size: codeFontSize,
+        cover_variant: variant,
+      };
+
+      const saveRes = await fetch("/api/manage/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: updatedSettings, version }),
+      });
+
+      if (!saveRes.ok) {
+        const errJson: any = await saveRes.json().catch(() => ({}));
+        throw new Error(errJson?.error || "Failed to save settings.");
+      }
+
+      setUploadedFile(null);
+      toast.success("Cover template and layout saved as global default for all vendors!");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save global template");
+    } finally {
+      setSavingGlobal(false);
+    }
   };
 
   // Helper: Draw rounded rectangle
@@ -234,7 +369,6 @@ export function BookCoverModal({
   };
 
   // Render Variant 4: Minimalist Classic Typography (Requested Default)
-  // High-Res A4 Canvas Coordinates (Width: 1240, Height: 1754, CX: 620)
   const renderVariant4 = useCallback(
     (ctx: CanvasRenderingContext2D, CX: number, cText: string, tText: string) => {
       ctx.save();
@@ -587,15 +721,21 @@ export function BookCoverModal({
             <div>
               <h3 className="font-bold text-base md:text-lg flex items-center gap-2">
                 Book Title & Cover Page Studio
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">
-                  Variant 4: Classic Minimal
+                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
+                  isAdmin
+                    ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                    : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                }`}>
+                  {isAdmin ? "👑 Admin Master Mode" : "Variant 4: Classic Minimal"}
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
                   A4 Borderless
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Generate high-resolution printable title covers for VU academic book binding.
+                {isAdmin
+                  ? "Configure master cover background, alignment & default layout for all vendors."
+                  : "Generate high-resolution printable title covers for VU academic book binding."}
               </p>
             </div>
           </div>
@@ -612,155 +752,220 @@ export function BookCoverModal({
         <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Controls Column */}
           <div className="lg:col-span-5 space-y-4">
-            {/* Style Variant Selector */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Cover Style Variant
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 4, name: "Variant 4: Classic Minimal (Recommended)" },
-                  { id: 1, name: "Variant 1: Royal Pill" },
-                  { id: 2, name: "Variant 2: Executive Ribbon" },
-                  { id: 3, name: "Variant 3: Dual-Tone Card" },
-                ].map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setVariant(v.id)}
-                    className={`px-3 py-2 text-xs font-bold rounded-lg border text-left transition-all cursor-pointer ${
-                      variant === v.id
-                        ? "bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400"
-                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750 hover:text-white"
-                    }`}
-                  >
-                    {v.name}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {/* Custom Background Template & Positioning Card */}
-            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ImageIcon size={16} className={customTemplateActive ? "text-emerald-400" : "text-blue-400"} />
-                  <div>
-                    <div className="text-xs font-bold text-slate-200">
-                      Cover Background Template
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      {customTemplateActive ? "🟢 Custom Uploaded Template Active" : "🔷 Official VU Default Template"}
+            {/* ADMIN ONLY: Style Variant Selector */}
+            {isAdmin && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                  <span>Cover Style Variant</span>
+                  <span className="text-[10px] text-purple-400 font-mono">Admin Control</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 4, name: "Variant 4: Classic Minimal (Recommended)" },
+                    { id: 1, name: "Variant 1: Royal Pill" },
+                    { id: 2, name: "Variant 2: Executive Ribbon" },
+                    { id: 3, name: "Variant 3: Dual-Tone Card" },
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setVariant(v.id)}
+                      className={`px-3 py-2 text-xs font-bold rounded-lg border text-left transition-all cursor-pointer ${
+                        variant === v.id
+                          ? "bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400"
+                          : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750 hover:text-white"
+                      }`}
+                    >
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ADMIN ONLY: Custom Background Template & Positioning Card */}
+            {isAdmin && (
+              <div className="bg-slate-950/70 p-3.5 rounded-xl border border-purple-500/30 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon size={16} className={customTemplateActive ? "text-emerald-400" : "text-blue-400"} />
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">
+                        Cover Background Template
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {customTemplateActive ? "🟢 Custom Template Active" : "🔷 Official VU Default Template"}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-1.5">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png, image/jpeg, image/webp"
-                    onChange={handleCustomTemplateUpload}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-blue-600 hover:bg-blue-500 text-white border-blue-400 flex items-center gap-1.5 transition-all cursor-pointer shadow"
-                    title="Upload your own custom A4 template image (PNG or JPG)"
-                  >
-                    <Upload size={12} />
-                    <span>Upload Template</span>
-                  </button>
-
-                  {customTemplateActive && (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp"
+                      onChange={handleCustomTemplateUpload}
+                      className="hidden"
+                    />
                     <button
                       type="button"
-                      onClick={handleResetTemplate}
-                      className="px-2 py-1 text-xs font-bold rounded-lg border bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
-                      title="Reset to default official VU template"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-blue-600 hover:bg-blue-500 text-white border-blue-400 flex items-center gap-1.5 transition-all cursor-pointer shadow"
+                      title="Upload your own custom A4 template image (PNG or JPG)"
                     >
-                      <RotateCcw size={12} />
-                      <span>Reset</span>
+                      <Upload size={12} />
+                      <span>Upload Template</span>
                     </button>
-                  )}
-                </div>
-              </div>
 
-              {/* Text Alignment Sliders */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
-                {/* Y Offset Slider */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-semibold text-slate-300 flex items-center gap-1">
-                      <MoveVertical size={13} className="text-amber-400" />
-                      Text Vertical Position (Y-Offset):
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs font-bold text-amber-300">
-                        {yOffset > 0 ? `+${yOffset}px` : `${yOffset}px`}
-                      </span>
-                      {yOffset !== 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleYOffsetChange(0)}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
-                        >
-                          Reset 0
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min={-180}
-                    max={180}
-                    step={5}
-                    value={yOffset}
-                    onChange={(e) => handleYOffsetChange(Number(e.target.value))}
-                    className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500 mt-0.5">
-                    <span>▲ Move Up (-180px)</span>
-                    <span>Center (0)</span>
-                    <span>▼ Move Down (+180px)</span>
+                    {customTemplateActive && (
+                      <button
+                        type="button"
+                        onClick={handleResetTemplate}
+                        className="px-2 py-1 text-xs font-bold rounded-lg border bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                        title="Reset to default official VU template"
+                      >
+                        <RotateCcw size={12} />
+                        <span>Reset</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Course Code Font Size Slider */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-semibold text-slate-300 flex items-center gap-1">
-                      <Type size={13} className="text-cyan-400" />
-                      Course Code Font Size:
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs font-bold text-cyan-300">
-                        {codeFontSize}px
+                {/* Text Alignment Sliders */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
+                  {/* Y Offset Slider */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-semibold text-slate-300 flex items-center gap-1">
+                        <MoveVertical size={13} className="text-amber-400" />
+                        Text Vertical Position (Y-Offset):
                       </span>
-                      {codeFontSize !== 120 && (
-                        <button
-                          type="button"
-                          onClick={() => handleCodeSizeChange(120)}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
-                        >
-                          Reset 120
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-bold text-amber-300">
+                          {yOffset > 0 ? `+${yOffset}px` : `${yOffset}px`}
+                        </span>
+                        {yOffset !== 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleYOffsetChange(0)}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            Reset 0
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min={-180}
+                      max={180}
+                      step={5}
+                      value={yOffset}
+                      onChange={(e) => handleYOffsetChange(Number(e.target.value))}
+                      className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                      <span>▲ Move Up (-180px)</span>
+                      <span>Center (0)</span>
+                      <span>▼ Move Down (+180px)</span>
                     </div>
                   </div>
-                  <input
-                    type="range"
-                    min={70}
-                    max={150}
-                    step={2}
-                    value={codeFontSize}
-                    onChange={(e) => handleCodeSizeChange(Number(e.target.value))}
-                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
-                  />
+
+                  {/* Course Code Font Size Slider */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-semibold text-slate-300 flex items-center gap-1">
+                        <Type size={13} className="text-cyan-400" />
+                        Course Code Font Size:
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-bold text-cyan-300">
+                          {codeFontSize}px
+                        </span>
+                        {codeFontSize !== 120 && (
+                          <button
+                            type="button"
+                            onClick={() => handleCodeSizeChange(120)}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            Reset 120
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min={70}
+                      max={150}
+                      step={2}
+                      value={codeFontSize}
+                      onChange={(e) => handleCodeSizeChange(Number(e.target.value))}
+                      className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                    />
+                  </div>
+
+                  {/* Global Server Save Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={savingGlobal}
+                      onClick={handleSaveGlobalDefault}
+                      className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow"
+                    >
+                      <Save size={14} />
+                      <span>{savingGlobal ? "Saving to server..." : "Save As Global Default For All Vendors"}</span>
+                    </button>
+                    <p className="text-[10px] text-slate-400 mt-1 text-center">
+                      Saves template and exact alignment to server database so all vendors automatically inherit it.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* ALWAYS VISIBLE: Store Catalog Dropdown (User Highlighted Feature) */}
+            {catalogBooks && catalogBooks.length > 0 && (
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-sky-500/40 shadow-md">
+                <label className="block text-xs font-bold uppercase tracking-wider text-sky-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <BookOpen size={14} className="text-sky-400" />
+                    Select Book From Bookstore Catalog:
+                  </span>
+                  <span className="text-[10px] font-mono text-sky-400/80 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800">
+                    {catalogBooks.length} Books
+                  </span>
+                </label>
+                <select
+                  style={{
+                    backgroundColor: "#0f172a",
+                    color: "#ffffff",
+                    borderColor: "#0284c7",
+                  }}
+                  className="w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                  onChange={(e) => {
+                    const selected = catalogBooks.find((b) => b.code === e.target.value);
+                    if (selected) {
+                      setCode(selected.code.toUpperCase());
+                      setTitle(selected.title.toUpperCase());
+                    }
+                  }}
+                  value={catalogBooks.some((b) => b.code === code) ? code : ""}
+                >
+                  <option value="" disabled>
+                    -- Select any book from catalog to auto-fill --
+                  </option>
+                  {catalogBooks.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      {b.code} — {b.title}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Selecting any book immediately auto-fills the Course Code and Title below.
+                </p>
+              </div>
+            )}
 
             {/* Inputs Form with Explicit High-Contrast Text Styling */}
             <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3.5">
@@ -841,41 +1046,6 @@ export function BookCoverModal({
                 />
               </div>
             </div>
-
-            {/* Store Catalog Quick Selector */}
-            {books && books.length > 0 && (
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
-                  <BookOpen size={14} className="text-blue-400" />
-                  Select Book From Bookstore Catalog:
-                </label>
-                <select
-                  style={{
-                    backgroundColor: "#0f172a",
-                    color: "#ffffff",
-                    borderColor: "#334155",
-                  }}
-                  className="w-full px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  onChange={(e) => {
-                    const selected = books.find((b) => b.code === e.target.value);
-                    if (selected) {
-                      setCode(selected.code.toUpperCase());
-                      setTitle(selected.title.toUpperCase());
-                    }
-                  }}
-                  value={books.some((b) => b.code === code) ? code : ""}
-                >
-                  <option value="" disabled>
-                    -- Select a book to auto-fill --
-                  </option>
-                  {books.map((b) => (
-                    <option key={b.code} value={b.code}>
-                      {b.code} — {b.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             {/* Actions */}
             <div className="pt-1 flex flex-col sm:flex-row gap-2.5">

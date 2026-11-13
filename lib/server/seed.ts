@@ -43,6 +43,10 @@ export async function bootstrap(req: Request) {
     currency: "PKR",
     order_prefix: "VU",
     max_upload_mb: 5,
+    cover_template_url: null,
+    cover_y_offset: 0,
+    cover_code_size: 120,
+    cover_variant: 4,
   };
   const statements = [
     stmt(

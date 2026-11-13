@@ -2280,6 +2280,7 @@ function Books({ readOnly }: { readOnly: boolean }) {
           initialCode={coverModal.code}
           initialTitle={coverModal.title}
           books={(data || []).map((bk) => ({ code: bk.code, title: bk.title }))}
+          isAdmin={!readOnly}
         />
       )}
     </>
@@ -3872,6 +3873,7 @@ function VendorOrderBooksPanel({
           initialCode={coverBook.code}
           initialTitle={coverBook.title}
           books={items.map((it: any) => ({ code: it.code, title: it.title }))}
+          isAdmin={false}
         />
       )}
     </div>
@@ -15129,6 +15131,7 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
         <BookCoverModal
           open={showCoverStudio}
           onClose={() => setShowCoverStudio(false)}
+          isAdmin={false}
         />
       )}
       {vendorGpoOrders && (

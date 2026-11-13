@@ -62,6 +62,10 @@ export async function getSettings() {
     currency: raw.currency || "PKR",
     order_prefix: raw.order_prefix === "CBS" ? "VU" : raw.order_prefix || "VU",
     max_upload_mb: typeof raw.max_upload_mb === "number" ? raw.max_upload_mb : 5,
+    cover_template_url: raw.cover_template_url || null,
+    cover_y_offset: typeof raw.cover_y_offset === "number" ? raw.cover_y_offset : 0,
+    cover_code_size: typeof raw.cover_code_size === "number" ? raw.cover_code_size : 120,
+    cover_variant: typeof raw.cover_variant === "number" ? raw.cover_variant : 4,
   };
   if (runtime().MAX_UPLOAD_MB)
     settings.max_upload_mb = Math.min(

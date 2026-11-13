@@ -393,6 +393,7 @@ export function BatchPrintManifestModal({ vendorId, vendorName, onClose }: Batch
           initialCode={coverBook.code}
           initialTitle={coverBook.title}
           books={data?.books?.map((bk: any) => ({ code: bk.code, title: bk.title }))}
+          isAdmin={false}
         />
       )}
     </div>

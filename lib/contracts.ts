@@ -402,6 +402,10 @@ export const settingsInput = z.object({
   currency: z.enum(["PKR"]),
   order_prefix: str(8).regex(/^[A-Z]+$/),
   max_upload_mb: z.number().int().min(1).max(10),
+  cover_template_url: z.string().max(2000).optional().nullable(),
+  cover_y_offset: z.number().int().min(-250).max(250).optional().default(0),
+  cover_code_size: z.number().int().min(50).max(200).optional().default(120),
+  cover_variant: z.number().int().min(1).max(4).optional().default(4),
 });
 export type StoreSettings = z.infer<typeof settingsInput>;
 export type Book = {
