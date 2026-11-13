@@ -21,6 +21,7 @@ import {
   Download,
   Upload,
   Copy,
+  Database,
   ExternalLink,
   RefreshCw,
   Bell,
@@ -843,7 +844,7 @@ export function Portal({
           ) : section === "users" ? (
             <UserAccounts currentUser={user} />
           ) : section === "settings" ? (
-            <SettingsPage />
+            <SettingsPage user={user} base={base} />
           ) : section === "audit" ? (
             <Audit />
           ) : section === "students" ? (
@@ -15695,7 +15696,8 @@ function UserAccounts({ currentUser }: { currentUser?: User }) {
     </>
   );
 }
-function SettingsPage() {
+function SettingsPage({ user, base }: { user?: User; base?: string }) {
+  const isAdmin = user?.role === "SUPER_ADMIN";
   const { data, error, loading, reload } = useData<{
     settings: StoreSettings;
     version: number;
@@ -15703,6 +15705,93 @@ function SettingsPage() {
   const [form, setForm] = useState<any>(null),
     [logoUploading, setLogoUploading] = useState(false),
     [busy, setBusy] = useState(false);
+
+  const [exportingBackup, setExportingBackup] = useState(false);
+  const [cleaningSlips, setCleaningSlips] = useState(false);
+  const [confirmCleanSlips, setConfirmCleanSlips] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  const handleDownloadBackup = async () => {
+    setExportingBackup(true);
+    try {
+      const res = await fetch("/api/manage/reset-data", {
+        headers: { "X-Requested-With": "CampusBookstore" },
+      });
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => ({}))) as any;
+        throw new Error(errData.error || "Failed to fetch backup data");
+      }
+      const backupData = (await res.json()) as any;
+      const { exportFullStoreBackup } = await import("@/lib/orders-excel-browser");
+      await exportFullStoreBackup(backupData);
+      toast.success("Excel backup downloaded successfully!");
+    } catch (err: any) {
+      toast.error(errorText(err));
+    } finally {
+      setExportingBackup(false);
+    }
+  };
+
+  const handleCleanDeliveredSlips = async () => {
+    setCleaningSlips(true);
+    try {
+      const res = await fetch("/api/manage/reset-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "CampusBookstore",
+        },
+        body: JSON.stringify({ action: "clean_slips" }),
+      });
+      const resData = (await res.json()) as any;
+      if (!res.ok) throw new Error(resData.error || "Failed to clean slips");
+      toast.success(
+        `Storage cleaned! ${resData.cleanedSlips || 0} delivered payment slips removed from hosting disk.`,
+      );
+      setConfirmCleanSlips(false);
+    } catch (err: any) {
+      toast.error(errorText(err));
+    } finally {
+      setCleaningSlips(false);
+    }
+  };
+
+  const handleResetData = async () => {
+    if (resetConfirmText.trim() !== "RESET DATA") {
+      toast.error("Please type 'RESET DATA' exactly to confirm.");
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await fetch("/api/manage/reset-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "CampusBookstore",
+        },
+        body: JSON.stringify({
+          action: "reset_all",
+          confirmation: "RESET DATA",
+        }),
+      });
+      const resData = (await res.json()) as any;
+      if (!res.ok) throw new Error(resData.error || "Failed to reset data");
+      toast.success(
+        `Store data has been reset to 0! Cleared ${resData.clearedOrders || 0} orders.`,
+      );
+      setShowResetModal(false);
+      setResetConfirmText("");
+      setTimeout(() => {
+        window.location.href = base ? base : "/admin";
+      }, 1500);
+    } catch (err: any) {
+      toast.error(errorText(err));
+    } finally {
+      setResetting(false);
+    }
+  };
 
   useEffect(() => {
     if (data) {
@@ -16370,6 +16459,362 @@ function SettingsPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* DATA MAINTENANCE & STORAGE CLEANUP (SUPER ADMIN ONLY) */}
+      {isAdmin && (
+        <div
+          className="card settings-card"
+          style={{
+            marginTop: 24,
+            borderColor: "rgba(220, 38, 38, 0.3)",
+            background: "color-mix(in srgb, var(--card) 98%, var(--destructive))",
+          }}
+        >
+          <div
+            className="settings-card-header"
+            style={{ borderBottom: "1px solid rgba(220, 38, 38, 0.15)", padding: "16px 20px" }}
+          >
+            <div
+              className="settings-card-icon"
+              style={{
+                background: "rgba(220, 38, 38, 0.1)",
+                color: "#dc2626",
+                padding: 10,
+                borderRadius: 8,
+                display: "flex",
+              }}
+            >
+              <Database size={20} />
+            </div>
+            <div>
+              <h3 style={{ color: "#dc2626", margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>
+                DATA MAINTENANCE & STORAGE CLEANUP
+              </h3>
+              <p className="small-text muted" style={{ margin: "3px 0 0" }}>
+                Download complete store backup, free up hosting disk storage, or reset store orders for a fresh semester.
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="settings-card-body"
+            style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            {/* Action 1: Export Full Store Backup */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 18px",
+                borderRadius: 8,
+                background: "var(--muted)",
+                border: "1px solid var(--border)",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div>
+                <strong style={{ display: "block", fontSize: "0.92rem", marginBottom: 2 }}>
+                  📥 Download Complete Excel Backup
+                </strong>
+                <small className="muted" style={{ display: "block" }}>
+                  Exports all orders, customer details, book printing items, vendor payouts, and financial summary into an offline Excel workbook.
+                </small>
+              </div>
+              <button
+                type="button"
+                className="btn"
+                onClick={handleDownloadBackup}
+                disabled={exportingBackup}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+              >
+                <Download size={15} />
+                {exportingBackup ? "Preparing Backup…" : "Download Full Backup (.xlsx)"}
+              </button>
+            </div>
+
+            {/* Action 2: Clean Delivered Payment Slips */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 18px",
+                borderRadius: 8,
+                background: "var(--muted)",
+                border: "1px solid var(--border)",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div>
+                <strong style={{ display: "block", fontSize: "0.92rem", marginBottom: 2 }}>
+                  🧹 Clean Delivered Payment Slips (Free Hosting Storage)
+                </strong>
+                <small className="muted" style={{ display: "block" }}>
+                  Permanently deletes heavy image files for delivered orders from hosting storage, while keeping all order amounts, status, and verification records intact.
+                </small>
+              </div>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setConfirmCleanSlips(true)}
+                disabled={cleaningSlips}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+              >
+                <FileText size={15} />
+                {cleaningSlips ? "Cleaning…" : "Clean Delivered Slips"}
+              </button>
+            </div>
+
+            {/* Action 3: RESET DATA */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 18px",
+                borderRadius: 8,
+                background: "rgba(220, 38, 38, 0.05)",
+                border: "1px solid rgba(220, 38, 38, 0.25)",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div>
+                <strong style={{ display: "block", fontSize: "0.95rem", color: "#dc2626", marginBottom: 2 }}>
+                  ⚠️ Reset Store Operational Data (Fresh Start 0)
+                </strong>
+                <small className="muted" style={{ display: "block" }}>
+                  Clears all past orders, payments, vendor print ledger, and slip files. Books catalog, admin users, and store settings are preserved.
+                </small>
+              </div>
+              <button
+                type="button"
+                className="btn btn-destructive"
+                onClick={() => setShowResetModal(true)}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}
+              >
+                <Trash2 size={15} />
+                RESET DATA
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM CLEAN DELIVERED SLIPS DIALOG */}
+      <Confirm
+        open={confirmCleanSlips}
+        onClose={() => setConfirmCleanSlips(false)}
+        onConfirm={handleCleanDeliveredSlips}
+        title="Clean Delivered Payment Proofs"
+        description="Are you sure you want to clean delivered payment slips? This will permanently delete the heavy image files of all delivered orders from your hosting/bucket storage to free up disk space. Order history, student details, and sales totals will remain fully preserved."
+      />
+
+      {/* RESET DATA MODAL */}
+      {showResetModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !resetting) {
+              setShowResetModal(false);
+              setResetConfirmText("");
+            }
+          }}
+        >
+          <div
+            style={{
+              background: "var(--card)",
+              color: "var(--fg)",
+              border: "1px solid rgba(220, 38, 38, 0.35)",
+              borderRadius: 12,
+              maxWidth: 540,
+              width: "100%",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+              overflow: "hidden",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--border)",
+                background: "rgba(220, 38, 38, 0.08)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ color: "#dc2626", display: "flex" }}>
+                  <AlertCircle size={22} />
+                </span>
+                <strong style={{ fontSize: "1.1rem", color: "#dc2626" }}>
+                  Reset Store Operational Data
+                </strong>
+              </div>
+              <button
+                type="button"
+                className="btn compact"
+                disabled={resetting}
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetConfirmText("");
+                }}
+                style={{ padding: 4 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+              <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.5 }}>
+                Yeh action store ke tamam orders, customer history, payments aur hosting storage par mojud payment slip photos ko <strong>permanently delete (wipe)</strong> kar dega taake agla semester <strong>0 se fresh start</strong> ho sake.
+              </p>
+
+              {/* What will be reset vs kept */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  fontSize: "0.82rem",
+                  background: "var(--muted)",
+                  padding: 12,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div>
+                  <strong style={{ color: "#dc2626", display: "block", marginBottom: 6 }}>
+                    🗑️ Will be Cleared (0):
+                  </strong>
+                  <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.6, color: "var(--fg)" }}>
+                    <li>All Student Orders</li>
+                    <li>Order Items & History</li>
+                    <li>Student Payment Records</li>
+                    <li>Uploaded Slip Images</li>
+                    <li>Vendor Payment Logs</li>
+                  </ul>
+                </div>
+                <div>
+                  <strong style={{ color: "#16a34a", display: "block", marginBottom: 6 }}>
+                    🛡️ Will be Preserved (Safe):
+                  </strong>
+                  <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.6, color: "var(--fg)" }}>
+                    <li>Books Catalog & Rates</li>
+                    <li>Admin Login Accounts</li>
+                    <li>Vendor Profiles</li>
+                    <li>Store Logo & Settings</li>
+                    <li>Campus Delivery Rates</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Recommendation Alert */}
+              <div
+                style={{
+                  background: "rgba(31, 101, 168, 0.08)",
+                  border: "1px solid rgba(31, 101, 168, 0.25)",
+                  borderRadius: 8,
+                  padding: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ fontSize: "0.85rem", color: "var(--fg)" }}>
+                  💡 Reset karne se pehle complete backup file download kar lein:
+                </span>
+                <button
+                  type="button"
+                  className="btn compact"
+                  onClick={handleDownloadBackup}
+                  disabled={exportingBackup}
+                  style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.82rem" }}
+                >
+                  <Download size={14} />
+                  {exportingBackup ? "Downloading…" : "Download Backup Now"}
+                </button>
+              </div>
+
+              {/* Type confirmation */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: 6 }}>
+                  Confirm karne ke liye neechay box mein exactly <span style={{ color: "#dc2626", fontFamily: "monospace" }}>RESET DATA</span> type karein:
+                </label>
+                <input
+                  type="text"
+                  placeholder="RESET DATA"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  disabled={resetting}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: 6,
+                    border: "2px solid " + (resetConfirmText.trim() === "RESET DATA" ? "#dc2626" : "var(--border)"),
+                    fontFamily: "monospace",
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 12,
+                padding: "14px 20px",
+                borderTop: "1px solid var(--border)",
+                background: "var(--muted)",
+              }}
+            >
+              <button
+                type="button"
+                className="btn"
+                disabled={resetting}
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetConfirmText("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-destructive"
+                disabled={resetConfirmText.trim() !== "RESET DATA" || resetting}
+                onClick={handleResetData}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}
+              >
+                <Trash2 size={16} />
+                {resetting ? "Resetting Store Data…" : "RESET DATA"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </Result>
   );

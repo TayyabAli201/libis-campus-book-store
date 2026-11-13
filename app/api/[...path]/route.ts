@@ -1389,6 +1389,136 @@ async function handle(req: Request) {
         return ok({ ok: true });
       }
     }
+    if (section === "reset-data") {
+      const u = await admin(req);
+      if (method === "GET") {
+        const allOrders = await all(
+          `SELECT o.*, p.status AS payment_status, p.note AS payment_note, 
+                  s.ocr_status, s.detected_amount, s.mime,
+                  v.name AS vendor_name
+           FROM orders o
+           LEFT JOIN payments p ON p.order_id = o.id
+           LEFT JOIN payment_slips s ON s.id = p.slip_id
+           LEFT JOIN vendors v ON v.id = o.vendor_id
+           ORDER BY o.created_at ASC`,
+        );
+        const allItems = await all(
+          `SELECT oi.*, o.reference AS order_reference
+           FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           ORDER BY oi.id ASC`,
+        );
+        const allVendorPayments = await all(
+          `SELECT vp.*, v.name AS vendor_name
+           FROM vendor_payments vp
+           LEFT JOIN vendors v ON v.id = vp.vendor_id
+           ORDER BY vp.payment_date ASC`,
+        );
+        return ok({
+          orders: allOrders,
+          items: allItems,
+          vendor_payments: allVendorPayments,
+          total_orders: allOrders.length,
+        });
+      }
+      if (method === "POST") {
+        const body = (await json(req).catch(() => ({}))) as any;
+        const action = body.action || "reset_all";
+
+        if (action === "clean_slips") {
+          // Clean heavy image files of delivered orders only
+          const deliveredSlips = await all<{ id: string; object_key: string }>(
+            `SELECT s.id, s.object_key 
+             FROM payment_slips s 
+             JOIN orders o ON o.id = s.order_id 
+             WHERE o.status = 'DELIVERED' AND s.object_key IS NOT NULL`,
+          );
+          for (const s of deliveredSlips) {
+            if (s.object_key) {
+              try {
+                if (typeof bucket()?.delete === "function") {
+                  await bucket().delete(s.object_key);
+                }
+              } catch {}
+            }
+          }
+          if (deliveredSlips.length > 0) {
+            const ids = deliveredSlips.map((s) => s.id);
+            for (let i = 0; i < ids.length; i += 50) {
+              const chunk = ids.slice(i, i + 50);
+              const placeholders = chunk.map(() => "?").join(",");
+              await stmt(
+                `UPDATE payment_slips SET object_key = NULL WHERE id IN (${placeholders})`,
+                ...chunk,
+              ).run();
+            }
+          }
+          await batch([
+            auditStmt(
+              u.email,
+              "CLEAN_DELIVERED_SLIPS",
+              "STORAGE",
+              { cleanedSlipsCount: deliveredSlips.length },
+              undefined,
+              req,
+            ),
+          ]);
+          return ok({ ok: true, cleanedSlips: deliveredSlips.length });
+        }
+
+        if (action === "reset_all") {
+          if (body.confirmation !== "RESET DATA") {
+            throw new AppError(400, "Please type 'RESET DATA' to confirm reset.");
+          }
+
+          // 1. Fetch all slip keys to delete from bucket
+          const slips = await all<{ object_key: string }>(
+            "SELECT object_key FROM payment_slips WHERE object_key IS NOT NULL",
+          );
+          for (const slip of slips) {
+            if (slip.object_key) {
+              try {
+                if (typeof bucket()?.delete === "function") {
+                  await bucket().delete(slip.object_key);
+                }
+              } catch {}
+            }
+          }
+
+          // 2. Count before deleting for audit log
+          const orderCountRow = await one<{ count: number }>("SELECT COUNT(*) AS count FROM orders");
+          const orderCount = Number(orderCountRow?.count || 0);
+
+          // 3. Clear operational tables in transaction
+          await batch([
+            stmt("DELETE FROM order_items"),
+            stmt("DELETE FROM order_history"),
+            stmt("DELETE FROM order_payment_logs"),
+            stmt("DELETE FROM payments"),
+            stmt("DELETE FROM payment_slips"),
+            stmt("DELETE FROM orders"),
+            stmt("DELETE FROM vendor_payments"),
+            stmt("DELETE FROM quotes"),
+          ]);
+
+          // 4. Log audit record
+          await batch([
+            auditStmt(
+              u.email,
+              "RESET_STORE_DATA",
+              "ALL",
+              { clearedOrdersCount: orderCount, clearedSlipsCount: slips.length },
+              undefined,
+              req,
+            ),
+          ]);
+
+          return ok({ ok: true, clearedOrders: orderCount, clearedSlips: slips.length });
+        }
+
+        throw new AppError(400, "Invalid action.");
+      }
+    }
     if (section === "audit" && method === "GET") {
       await admin(req);
       const offset = Math.max(

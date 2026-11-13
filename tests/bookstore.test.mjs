@@ -4296,3 +4296,68 @@ test("Dashboard Reports: Lifetime / All-Time and Period Ledger Balances correctl
   // Cumulative balance reflects current ledger rather than subtracting all-time from single period
   assert.equal(typeof periodReport.stats.vendor_remaining_balance, "number");
 });
+
+test("Super Admin can clean delivered slips and RESET DATA with typed confirmation", async (t) => {
+  const sqlite = database(t);
+  const { GET, POST } = await import("../app/api/[...path]/route.ts");
+  const adminSession = "admin-session-token-for-reset-ops";
+  sqlite
+    .prepare("INSERT INTO sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)")
+    .run(hash(adminSession), "admin", Date.now() + 60000, "2026-01-01");
+  sqlite.exec("UPDATE users SET role='SUPER_ADMIN',must_change=0 WHERE id='admin'");
+
+  // Create book and place an order
+  const { id: bookId } = await saveBook(bookInput("RESET-B1"), admin, request);
+  await order(sqlite, bookId, 2);
+
+  // 1. GET /api/manage/reset-data exports orders
+  const getReq = new Request("http://127.0.0.1:5173/api/manage/reset-data", {
+    headers: { cookie: "cbs_session=" + adminSession },
+  });
+  const getRes = await GET(getReq);
+  assert.equal(getRes.status, 200);
+  const exportData = await getRes.json();
+  assert.ok(exportData.orders.length > 0, "Returns orders in backup export");
+  assert.ok(Array.isArray(exportData.items), "Returns items array in backup export");
+
+  // 2. POST without confirmation "RESET DATA" must fail with 400
+  const wrongReq = new Request("http://127.0.0.1:5173/api/manage/reset-data", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-requested-with": "CampusBookstore",
+      origin: "http://127.0.0.1:5173",
+      cookie: "cbs_session=" + adminSession,
+    },
+    body: JSON.stringify({ action: "reset_all", confirmation: "WRONG_TEXT" }),
+  });
+  const wrongRes = await POST(wrongReq);
+  assert.equal(wrongRes.status, 400);
+
+  // 3. POST with confirmation "RESET DATA" resets all orders and items
+  const resetReq = new Request("http://127.0.0.1:5173/api/manage/reset-data", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-requested-with": "CampusBookstore",
+      origin: "http://127.0.0.1:5173",
+      cookie: "cbs_session=" + adminSession,
+    },
+    body: JSON.stringify({ action: "reset_all", confirmation: "RESET DATA" }),
+  });
+  const resetRes = await POST(resetReq);
+  assert.equal(resetRes.status, 200);
+  const resetResult = await resetRes.json();
+  assert.equal(resetResult.ok, true);
+
+  // Verify DB state: orders and items are 0, but books and admin user remain!
+  const ordersCount = sqlite.prepare("SELECT COUNT(*) AS c FROM orders").get().c;
+  const itemsCount = sqlite.prepare("SELECT COUNT(*) AS c FROM order_items").get().c;
+  const booksCount = sqlite.prepare("SELECT COUNT(*) AS c FROM books").get().c;
+  const usersCount = sqlite.prepare("SELECT COUNT(*) AS c FROM users").get().c;
+
+  assert.equal(ordersCount, 0, "Orders completely wiped to 0");
+  assert.equal(itemsCount, 0, "Order items completely wiped to 0");
+  assert.ok(booksCount > 0, "Books catalog preserved intact");
+  assert.ok(usersCount > 0, "Users and admin accounts preserved intact");
+});
