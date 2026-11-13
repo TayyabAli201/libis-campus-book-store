@@ -8,8 +8,11 @@ import {
   X,
   BookOpen,
   Sparkles,
-  ShieldCheck,
-  CheckCircle2,
+  Upload,
+  RotateCcw,
+  Image as ImageIcon,
+  MoveVertical,
+  Type,
 } from "lucide-react";
 
 export interface BookCoverModalProps {
@@ -33,11 +36,14 @@ export function BookCoverModal({
   const [subtitle, setSubtitle] = useState("Complete Course Handouts · Lectures 1 to 45");
   const [badgeText, setBadgeText] = useState("★ PREPARED FOR HIGH SCORING VU STUDENTS ★");
   const [variant, setVariant] = useState<number>(4); // Default: Variant 4: Classic Minimal
-  const [safeMargin, setSafeMargin] = useState<boolean>(true); // Default safe margin prevents printer cutoff
+  const [customTemplateActive, setCustomTemplateActive] = useState<boolean>(false);
+  const [yOffset, setYOffset] = useState<number>(0);
+  const [codeFontSize, setCodeFontSize] = useState<number>(120);
   const [imgLoaded, setImgLoaded] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync initial props when modal is opened
   useEffect(() => {
@@ -47,23 +53,125 @@ export function BookCoverModal({
     }
   }, [open, initialCode, initialTitle]);
 
+  // Load custom template or default VU template on mount
   useEffect(() => {
     setMounted(true);
-    // Preload template image
-    const img = new Image();
-    img.src = "/vu-book-cover-template.jpg";
-    img.onload = () => {
-      bgImageRef.current = img;
-      setImgLoaded(true);
-    };
-    img.onerror = () => {
-      console.warn("Could not load /vu-book-cover-template.jpg");
-    };
+
+    try {
+      const savedY = localStorage.getItem("vu_book_cover_y_offset");
+      if (savedY !== null) setYOffset(Number(savedY) || 0);
+
+      const savedSize = localStorage.getItem("vu_book_cover_code_size");
+      if (savedSize !== null) setCodeFontSize(Number(savedSize) || 120);
+
+      const savedCustomTemplate = localStorage.getItem("vu_book_cover_custom_template");
+      const img = new Image();
+      if (savedCustomTemplate) {
+        img.src = savedCustomTemplate;
+        setCustomTemplateActive(true);
+      } else {
+        img.src = "/vu-book-cover-template.jpg";
+        setCustomTemplateActive(false);
+      }
+      img.onload = () => {
+        bgImageRef.current = img;
+        setImgLoaded(true);
+      };
+      img.onerror = () => {
+        console.warn("Could not load saved template, reverting to default template");
+        const fallback = new Image();
+        fallback.src = "/vu-book-cover-template.jpg";
+        fallback.onload = () => {
+          bgImageRef.current = fallback;
+          setImgLoaded(true);
+        };
+      };
+    } catch {
+      const fallback = new Image();
+      fallback.src = "/vu-book-cover-template.jpg";
+      fallback.onload = () => {
+        bgImageRef.current = fallback;
+        setImgLoaded(true);
+      };
+    }
 
     return () => {
       setMounted(false);
     };
   }, []);
+
+  // Save Y-Offset
+  const handleYOffsetChange = (val: number) => {
+    setYOffset(val);
+    try {
+      localStorage.setItem("vu_book_cover_y_offset", String(val));
+    } catch {}
+  };
+
+  // Save Code Font Size
+  const handleCodeSizeChange = (val: number) => {
+    setCodeFontSize(val);
+    try {
+      localStorage.setItem("vu_book_cover_code_size", String(val));
+    } catch {}
+  };
+
+  // Handle Custom Template Upload (PNG/JPG)
+  const handleCustomTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawData = event.target?.result as string;
+      if (!rawData) return;
+
+      const tempImg = new Image();
+      tempImg.onload = () => {
+        // Normalize to true A4 150 DPI dimensions (1240 x 1754)
+        const offCanvas = document.createElement("canvas");
+        offCanvas.width = 1240;
+        offCanvas.height = 1754;
+        const offCtx = offCanvas.getContext("2d");
+        if (offCtx) {
+          offCtx.drawImage(tempImg, 0, 0, 1240, 1754);
+          const normalizedDataUrl = offCanvas.toDataURL("image/jpeg", 0.92);
+
+          const newImg = new Image();
+          newImg.onload = () => {
+            bgImageRef.current = newImg;
+            setCustomTemplateActive(true);
+            setImgLoaded((prev) => !prev);
+          };
+          newImg.src = normalizedDataUrl;
+
+          try {
+            localStorage.setItem("vu_book_cover_custom_template", normalizedDataUrl);
+          } catch (err) {
+            console.warn("Storage quota exceeded, custom template stored in active session only.", err);
+          }
+        }
+      };
+      tempImg.src = rawData;
+    };
+    reader.readAsDataURL(file);
+    // Reset file input value so re-uploading same file triggers event
+    e.target.value = "";
+  };
+
+  // Reset to Default Official VU Template
+  const handleResetTemplate = () => {
+    try {
+      localStorage.removeItem("vu_book_cover_custom_template");
+    } catch {}
+    const img = new Image();
+    img.onload = () => {
+      bgImageRef.current = img;
+      setCustomTemplateActive(false);
+      setImgLoaded((prev) => !prev);
+    };
+    img.src = "/vu-book-cover-template.jpg";
+  };
 
   // Helper: Draw rounded rectangle
   const roundRect = (
@@ -136,42 +244,42 @@ export function BookCoverModal({
       // Top Header Bracket
       ctx.fillStyle = "#475569";
       ctx.font = '700 20px "Segoe UI", Arial, sans-serif';
-      ctx.fillText("— VIRTUAL UNIVERSITY OF PAKISTAN —", CX, 300);
+      ctx.fillText("— VIRTUAL UNIVERSITY OF PAKISTAN —", CX, 300 + yOffset);
 
       // Giant Crisp Code
       ctx.shadowColor = "rgba(0, 0, 0, 0.08)";
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 5;
       ctx.fillStyle = "#0A346C";
-      ctx.font = '900 120px "Segoe UI", Arial, sans-serif';
-      ctx.fillText(cText, CX, 415);
+      ctx.font = `900 ${codeFontSize}px "Segoe UI", Arial, sans-serif`;
+      ctx.fillText(cText, CX, 415 + yOffset);
 
       ctx.shadowColor = "transparent";
 
       // Golden Accent Bar
       ctx.fillStyle = "#EAB308";
-      roundRect(ctx, CX - 65, 470, 130, 8, 4, true, false);
+      roundRect(ctx, CX - 65, 470 + yOffset, 130, 8, 4, true, false);
 
       // Title (Wrapped if long)
       ctx.fillStyle = "#0F172A";
       ctx.font = '800 34px "Segoe UI", Arial, sans-serif';
-      const linesCount = wrapText(ctx, tText, CX, 540, 880, 44);
+      const linesCount = wrapText(ctx, tText, CX, 540 + yOffset, 880, 44);
 
       // Subtitle
-      const subY = linesCount > 1 ? 610 : 595;
+      const subY = (linesCount > 1 ? 610 : 595) + yOffset;
       ctx.fillStyle = "#0284C7";
       ctx.font = '600 23px "Segoe UI", Arial, sans-serif';
       ctx.fillText(subtitle || "Complete Course Handouts · Lectures 1 to 45", CX, subY);
 
       // Badge / Tagline
-      const badgeY = linesCount > 1 ? 655 : 640;
+      const badgeY = (linesCount > 1 ? 655 : 640) + yOffset;
       ctx.fillStyle = "#10B981";
       ctx.font = '700 19px "Segoe UI", Arial, sans-serif';
       ctx.fillText(badgeText || "★ PREPARED FOR HIGH SCORING VU STUDENTS ★", CX, badgeY);
 
       ctx.restore();
     },
-    [subtitle, badgeText]
+    [subtitle, badgeText, yOffset, codeFontSize]
   );
 
   // Render Variant 1: Royal Pill & Badge
@@ -184,41 +292,41 @@ export function BookCoverModal({
       pillGrad.addColorStop(0, "#00A3E0");
       pillGrad.addColorStop(1, "#0D3E83");
       ctx.fillStyle = pillGrad;
-      roundRect(ctx, CX - 250, 280, 500, 50, 25, true, false);
+      roundRect(ctx, CX - 250, 280 + yOffset, 500, 50, 25, true, false);
 
       ctx.fillStyle = "#FFFFFF";
       ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("VIRTUAL UNIVERSITY OF PAKISTAN", CX, 305);
+      ctx.fillText("VIRTUAL UNIVERSITY OF PAKISTAN", CX, 305 + yOffset);
 
       // Main Code
       ctx.shadowColor = "rgba(0, 0, 0, 0.12)";
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 5;
       ctx.fillStyle = "#0D3E83";
-      ctx.font = '900 110px "Segoe UI", Arial, sans-serif';
-      ctx.fillText(cText, CX, 415);
+      ctx.font = `900 ${Math.round(codeFontSize * 0.92)}px "Segoe UI", Arial, sans-serif`;
+      ctx.fillText(cText, CX, 415 + yOffset);
 
       ctx.shadowColor = "transparent";
 
       // Gold Accent Line
       ctx.fillStyle = "#D97706";
-      ctx.fillRect(CX - 130, 475, 260, 5);
+      ctx.fillRect(CX - 130, 475 + yOffset, 260, 5);
 
       // Title
       ctx.fillStyle = "#1E293B";
       ctx.font = 'bold 32px "Segoe UI", Arial, sans-serif';
-      wrapText(ctx, tText, CX, 535, 860, 40);
+      wrapText(ctx, tText, CX, 535 + yOffset, 860, 40);
 
       // Bottom Note
       ctx.fillStyle = "#0284C7";
       ctx.font = '600 22px "Segoe UI", Arial, sans-serif';
-      ctx.fillText(subtitle, CX, 595);
+      ctx.fillText(subtitle, CX, 595 + yOffset);
 
       ctx.restore();
     },
-    [subtitle]
+    [subtitle, yOffset, codeFontSize]
   );
 
   // Render Variant 2: Executive Ribbon
@@ -232,43 +340,43 @@ export function BookCoverModal({
       ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
       ctx.strokeStyle = "#CBD5E1";
       ctx.lineWidth = 2.5;
-      roundRect(ctx, CX - 400, 280, 800, 320, 20, true, true);
+      roundRect(ctx, CX - 400, 280 + yOffset, 800, 320, 20, true, true);
 
       // Ribbon text
       ctx.fillStyle = "#0A346C";
       ctx.font = '800 22px "Segoe UI", Arial, sans-serif';
-      ctx.fillText("OFFICIAL VU COURSEWARE EDITION", CX, 320);
+      ctx.fillText("OFFICIAL VU COURSEWARE EDITION", CX, 320 + yOffset);
 
       // Code
       ctx.fillStyle = "#0072CE";
-      ctx.font = '900 105px "Segoe UI", Arial, sans-serif';
-      ctx.fillText(cText, CX, 410);
+      ctx.font = `900 ${Math.round(codeFontSize * 0.88)}px "Segoe UI", Arial, sans-serif`;
+      ctx.fillText(cText, CX, 410 + yOffset);
 
       // Title
       ctx.fillStyle = "#0F172A";
       ctx.font = 'bold 32px "Segoe UI", Arial, sans-serif';
-      wrapText(ctx, tText, CX, 505, 750, 38);
+      wrapText(ctx, tText, CX, 505 + yOffset, 750, 38);
 
       // Decorative divider with diamond
       ctx.strokeStyle = "#94A3B8";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(CX - 200, 565);
-      ctx.lineTo(CX + 200, 565);
+      ctx.moveTo(CX - 200, 565 + yOffset);
+      ctx.lineTo(CX + 200, 565 + yOffset);
       ctx.stroke();
 
       ctx.fillStyle = "#F59E0B";
       ctx.beginPath();
-      ctx.moveTo(CX, 558);
-      ctx.lineTo(CX + 8, 565);
-      ctx.lineTo(CX, 572);
-      ctx.lineTo(CX - 8, 565);
+      ctx.moveTo(CX, 558 + yOffset);
+      ctx.lineTo(CX + 8, 565 + yOffset);
+      ctx.lineTo(CX, 572 + yOffset);
+      ctx.lineTo(CX - 8, 565 + yOffset);
       ctx.closePath();
       ctx.fill();
 
       ctx.restore();
     },
-    []
+    [yOffset, codeFontSize]
   );
 
   // Render Variant 3: Dual-Tone Card
@@ -283,7 +391,7 @@ export function BookCoverModal({
       ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
       ctx.strokeStyle = "#BAE6FD";
       ctx.lineWidth = 3;
-      roundRect(ctx, CX - 430, 280, 860, 350, 25, true, true);
+      roundRect(ctx, CX - 430, 280 + yOffset, 860, 350, 25, true, true);
       ctx.shadowColor = "transparent";
 
       // Card Header
@@ -291,52 +399,53 @@ export function BookCoverModal({
       ctx.font = '800 20px "Segoe UI", Arial, sans-serif';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("DIGITAL GROWTH HUB ACADEMIC SERIES", CX, 320);
+      ctx.fillText("DIGITAL GROWTH HUB ACADEMIC SERIES", CX, 320 + yOffset);
 
       ctx.strokeStyle = "#E0F2FE";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(CX - 330, 345);
-      ctx.lineTo(CX + 330, 345);
+      ctx.moveTo(CX - 330, 345 + yOffset);
+      ctx.lineTo(CX + 330, 345 + yOffset);
       ctx.stroke();
 
       // Split Code
       const match = cText.match(/^([A-Za-z]+)(.*)$/);
+      const size = Math.round(codeFontSize * 0.85);
       if (match && match[2]) {
-        ctx.font = '900 100px "Segoe UI", Arial, sans-serif';
+        ctx.font = `900 ${size}px "Segoe UI", Arial, sans-serif`;
         ctx.textAlign = "right";
         ctx.fillStyle = "#0D3E83";
-        ctx.fillText(match[1].toUpperCase(), CX - 12, 425);
+        ctx.fillText(match[1].toUpperCase(), CX - 12, 425 + yOffset);
 
         ctx.textAlign = "left";
         ctx.fillStyle = "#059669";
-        ctx.fillText(match[2], CX + 12, 425);
+        ctx.fillText(match[2], CX + 12, 425 + yOffset);
       } else {
-        ctx.font = '900 100px "Segoe UI", Arial, sans-serif';
+        ctx.font = `900 ${size}px "Segoe UI", Arial, sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#0D3E83";
-        ctx.fillText(cText, CX, 425);
+        ctx.fillText(cText, CX, 425 + yOffset);
       }
 
       // Title
       ctx.textAlign = "center";
       ctx.fillStyle = "#1E293B";
       ctx.font = '800 30px "Segoe UI", Arial, sans-serif';
-      wrapText(ctx, tText, CX, 505, 800, 36);
+      wrapText(ctx, tText, CX, 505 + yOffset, 800, 36);
 
       // Card Feature Pill
       ctx.fillStyle = "#F0FDF4";
       ctx.strokeStyle = "#BBF7D0";
       ctx.lineWidth = 1.5;
-      roundRect(ctx, CX - 350, 560, 700, 46, 14, true, true);
+      roundRect(ctx, CX - 350, 560 + yOffset, 700, 46, 14, true, true);
 
       ctx.fillStyle = "#166534";
       ctx.font = 'bold 19px "Segoe UI", Arial, sans-serif';
-      ctx.fillText("✓ Mid & Finalterm Focused   |   ✓ Highlighted Handouts & Solved MCQs", CX, 583);
+      ctx.fillText("✓ Mid & Finalterm Focused   |   ✓ Highlighted Handouts & Solved MCQs", CX, 583 + yOffset);
 
       ctx.restore();
     },
-    []
+    [yOffset, codeFontSize]
   );
 
   // Redraw canvas with exact A4 proportions (Width: 1240, Height: 1754 -> 210 x 297 mm)
@@ -394,7 +503,7 @@ export function BookCoverModal({
     link.click();
   };
 
-  // Handle Print Cover (Full Page A4: 210 × 297 mm with anti-crop safe margin)
+  // Handle Print Cover (Full Page 100% Borderless A4: 210 × 297 mm)
   const handlePrint = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -405,8 +514,6 @@ export function BookCoverModal({
       alert("Please allow popups to print the cover page.");
       return;
     }
-
-    const printPadding = safeMargin ? "4mm" : "0mm";
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -420,6 +527,8 @@ export function BookCoverModal({
             }
             * {
               box-sizing: border-box;
+              margin: 0;
+              padding: 0;
             }
             html, body {
               margin: 0 !important;
@@ -434,20 +543,23 @@ export function BookCoverModal({
               height: 297mm !important;
               max-width: 210mm !important;
               max-height: 297mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
               display: flex !important;
               align-items: center !important;
               justify-content: center !important;
-              padding: ${printPadding} !important;
               page-break-after: avoid !important;
               page-break-inside: avoid !important;
             }
             .a4-sheet img {
+              width: 210mm !important;
+              height: 297mm !important;
               max-width: 100% !important;
               max-height: 100% !important;
-              width: 100% !important;
-              height: 100% !important;
-              object-fit: contain !important;
+              object-fit: fill !important;
               display: block !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
           </style>
         </head>
@@ -479,7 +591,7 @@ export function BookCoverModal({
                   Variant 4: Classic Minimal
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
-                  A4: 210 × 297 mm
+                  A4 Borderless
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
@@ -525,6 +637,128 @@ export function BookCoverModal({
                     {v.name}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Custom Background Template & Positioning Card */}
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ImageIcon size={16} className={customTemplateActive ? "text-emerald-400" : "text-blue-400"} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-200">
+                      Cover Background Template
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {customTemplateActive ? "🟢 Custom Uploaded Template Active" : "🔷 Official VU Default Template"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={handleCustomTemplateUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-blue-600 hover:bg-blue-500 text-white border-blue-400 flex items-center gap-1.5 transition-all cursor-pointer shadow"
+                    title="Upload your own custom A4 template image (PNG or JPG)"
+                  >
+                    <Upload size={12} />
+                    <span>Upload Template</span>
+                  </button>
+
+                  {customTemplateActive && (
+                    <button
+                      type="button"
+                      onClick={handleResetTemplate}
+                      className="px-2 py-1 text-xs font-bold rounded-lg border bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                      title="Reset to default official VU template"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Text Alignment Sliders */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
+                {/* Y Offset Slider */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-semibold text-slate-300 flex items-center gap-1">
+                      <MoveVertical size={13} className="text-amber-400" />
+                      Text Vertical Position (Y-Offset):
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs font-bold text-amber-300">
+                        {yOffset > 0 ? `+${yOffset}px` : `${yOffset}px`}
+                      </span>
+                      {yOffset !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleYOffsetChange(0)}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+                        >
+                          Reset 0
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={-180}
+                    max={180}
+                    step={5}
+                    value={yOffset}
+                    onChange={(e) => handleYOffsetChange(Number(e.target.value))}
+                    className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                    <span>▲ Move Up (-180px)</span>
+                    <span>Center (0)</span>
+                    <span>▼ Move Down (+180px)</span>
+                  </div>
+                </div>
+
+                {/* Course Code Font Size Slider */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-semibold text-slate-300 flex items-center gap-1">
+                      <Type size={13} className="text-cyan-400" />
+                      Course Code Font Size:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs font-bold text-cyan-300">
+                        {codeFontSize}px
+                      </span>
+                      {codeFontSize !== 120 && (
+                        <button
+                          type="button"
+                          onClick={() => handleCodeSizeChange(120)}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+                        >
+                          Reset 120
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={70}
+                    max={150}
+                    step={2}
+                    value={codeFontSize}
+                    onChange={(e) => handleCodeSizeChange(Number(e.target.value))}
+                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                  />
+                </div>
               </div>
             </div>
 
@@ -643,32 +877,6 @@ export function BookCoverModal({
               </div>
             )}
 
-            {/* A4 Safe Margin Protection Toggle */}
-            <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-800 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={18} className={safeMargin ? "text-emerald-400" : "text-slate-500"} />
-                <div>
-                  <div className="text-xs font-bold text-slate-200">
-                    A4 Safe Margins (No Cutoff)
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Prevents printer rollers from cutting off side logos & text
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSafeMargin(!safeMargin)}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                  safeMargin
-                    ? "bg-emerald-600/30 text-emerald-300 border-emerald-500/50"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
-                }`}
-              >
-                {safeMargin ? "Enabled (4mm)" : "Borderless (0mm)"}
-              </button>
-            </div>
-
             {/* Actions */}
             <div className="pt-1 flex flex-col sm:flex-row gap-2.5">
               <button
@@ -677,7 +885,7 @@ export function BookCoverModal({
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs md:text-sm rounded-xl shadow-lg transition-all cursor-pointer"
               >
                 <Printer size={16} />
-                <span>Print Cover (A4 - 210×297mm)</span>
+                <span>Print Cover (A4 Borderless)</span>
               </button>
               <button
                 type="button"
@@ -694,7 +902,7 @@ export function BookCoverModal({
           <div className="lg:col-span-7 flex flex-col items-center justify-center">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Sparkles size={14} className="text-amber-400" />
-              Live A4 Preview (210 × 297 mm · 1240 × 1754 High-Res)
+              Live A4 Preview (210 × 297 mm · 1240 × 1754 High-Res Borderless)
             </div>
 
             <div className="relative w-full max-w-[380px] sm:max-w-[430px] rounded-xl overflow-hidden shadow-2xl border-2 border-slate-700 bg-slate-950">

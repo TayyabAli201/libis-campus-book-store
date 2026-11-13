@@ -3478,6 +3478,7 @@ function VendorOrderBooksPanel({
   onUpdated?: () => Promise<void> | void;
 }) {
   const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
+  const [coverBook, setCoverBook] = useState<{ code: string; title: string } | null>(null);
   const items: any[] = (o?.items || []).filter((it: any) => !it.in_office_stock);
   const printItems = items.filter((it: any) => !it.is_unavailable);
   const unavailableItems = items.filter((it: any) => Boolean(it.is_unavailable));
@@ -3581,23 +3582,49 @@ function VendorOrderBooksPanel({
 
       {/* Ordered Books list */}
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <BookOpen size={16} style={{ color: "var(--primary)" }} />
             <h3 style={{ margin: 0, fontSize: "0.96rem" }}>Ordered Books to Print</h3>
           </div>
-          <span
-            className="mono-pill"
-            style={{
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              background: "var(--status-info-bg)",
-              color: "var(--status-info-text)",
-              border: "1px solid var(--status-info-border)",
-            }}
-          >
-            {totalBooks} {totalBooks === 1 ? "book" : "books"} to print
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                const first = printItems[0] || items[0] || { code: "CS101", title: "INTRODUCTION TO COMPUTING" };
+                setCoverBook({ code: first.code, title: first.title });
+              }}
+              className="btn compact outline"
+              style={{
+                fontSize: "0.74rem",
+                padding: "3px 9px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                color: "#2563eb",
+                borderColor: "#bfdbfe",
+                background: "#eff6ff",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              title="Open Cover Studio for this order"
+            >
+              <BookOpen size={13} />
+              <span>Cover Studio</span>
+            </button>
+            <span
+              className="mono-pill"
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                background: "var(--status-info-bg)",
+                color: "var(--status-info-text)",
+                border: "1px solid var(--status-info-border)",
+              }}
+            >
+              {totalBooks} {totalBooks === 1 ? "book" : "books"} to print
+            </span>
+          </div>
         </div>
 
         {printItems.length === 0 ? (
@@ -3616,6 +3643,7 @@ function VendorOrderBooksPanel({
                   <th style={{ padding: "8px 10px", fontWeight: 600 }}>Book Title</th>
                   <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "right" }}>Pages</th>
                   <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "center", width: "60px" }}>Qty</th>
+                  <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "center", width: "95px" }}>Cover</th>
                   <th style={{ padding: "8px 10px", fontWeight: 600, textAlign: "center", width: "130px" }}>Print Status</th>
                 </tr>
               </thead>
@@ -3669,6 +3697,29 @@ function VendorOrderBooksPanel({
                       <td style={{ padding: "9px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
                         <button
                           type="button"
+                          onClick={() => setCoverBook({ code: it.code, title: it.title })}
+                          className="btn compact outline"
+                          style={{
+                            fontSize: "0.72rem",
+                            padding: "2px 8px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            color: "#1d4ed8",
+                            borderColor: "#bfdbfe",
+                            background: "#eff6ff",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                          title={`Print A4 Title Cover for ${it.code}`}
+                        >
+                          <Printer size={12} />
+                          <span>Cover</span>
+                        </button>
+                      </td>
+                      <td style={{ padding: "9px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
                           className="btn outline compact"
                           disabled={togglingItemId === it.id}
                           onClick={async () => {
@@ -3704,6 +3755,9 @@ function VendorOrderBooksPanel({
                   </td>
                   <td style={{ padding: "8px 10px", textAlign: "center", color: "var(--status-info-text)", fontWeight: 700 }}>
                     {totalBooks}
+                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
+                    —
                   </td>
                   <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
                     —
@@ -3810,6 +3864,16 @@ function VendorOrderBooksPanel({
           </div>
         )}
       </div>
+
+      {coverBook && (
+        <BookCoverModal
+          open={!!coverBook}
+          onClose={() => setCoverBook(null)}
+          initialCode={coverBook.code}
+          initialTitle={coverBook.title}
+          books={items.map((it: any) => ({ code: it.code, title: it.title }))}
+        />
+      )}
     </div>
   );
 }
@@ -14236,6 +14300,7 @@ function VendorLedgerModal({
 function VendorDashboard({ user, base }: { user: User; base: string }) {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showBatchManifest, setShowBatchManifest] = useState(false);
+  const [showCoverStudio, setShowCoverStudio] = useState(false);
   const [vendorGpoOrders, setVendorGpoOrders] = useState<any[] | null>(null);
   const [vendorTrackingOrders, setVendorTrackingOrders] = useState<any[] | null>(null);
   const { data: ledger, error: ledgerError, loading: ledgerLoading, reload: reloadLedger } =
@@ -14706,6 +14771,24 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           </button>
           <button
             type="button"
+            onClick={() => setShowCoverStudio(true)}
+            className="btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 18px",
+              background: "#0284c7",
+              borderColor: "#0284c7",
+              color: "#fff",
+              fontWeight: 600,
+            }}
+            title="Open Book Title Cover Studio to print A4 cover pages"
+          >
+            <BookOpen size={16} /> Cover Studio (A4)
+          </button>
+          <button
+            type="button"
             onClick={async () => {
               try {
                 const res = await fetch("/api/manage/orders?delivery_type=other&pageSize=100");
@@ -15040,6 +15123,12 @@ function VendorDashboard({ user, base }: { user: User; base: string }) {
           vendorId={user.vendor_id || user.id}
           vendorName={user.name || "Vendor"}
           onClose={() => setShowBatchManifest(false)}
+        />
+      )}
+      {showCoverStudio && (
+        <BookCoverModal
+          open={showCoverStudio}
+          onClose={() => setShowCoverStudio(false)}
         />
       )}
       {vendorGpoOrders && (
