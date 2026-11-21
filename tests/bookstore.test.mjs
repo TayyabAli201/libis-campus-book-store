@@ -156,6 +156,8 @@ function database(t) {
     "0014_item_office_stock.sql",
     "0015_student_partial_handover.sql",
     "0016_return_resell_workflow.sql",
+    "0017_password_resets_security.sql",
+    "0018_student_accounts.sql",
   ])
     sqlite.exec(
       readFileSync(new URL("../drizzle/" + file, import.meta.url), "utf8"),
@@ -4360,4 +4362,112 @@ test("Super Admin can clean delivered slips and RESET DATA with typed confirmati
   assert.equal(itemsCount, 0, "Order items completely wiped to 0");
   assert.ok(booksCount > 0, "Books catalog preserved intact");
   assert.ok(usersCount > 0, "Users and admin accounts preserved intact");
+});
+
+test("Student Accounts and Google Authentication workflow (student-auth, cloud cart sync, student orders)", async (t) => {
+  const sqlite = database(t);
+  // 1. Sign in as a student using student-auth
+  const studentEmail = "bc200401234@vu.edu.pk";
+  const authReq = new Request("http://127.0.0.1:5173/api/student-auth", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-requested-with": "CampusBookstore",
+      origin: "http://127.0.0.1:5173",
+    },
+    body: JSON.stringify({
+      email: studentEmail,
+      name: "Ali Raza",
+      picture: "https://lh3.googleusercontent.com/a/sample-avatar",
+    }),
+  });
+  const authRes = await POST(authReq);
+  assert.equal(authRes.status, 200);
+  const authData = await authRes.json();
+  assert.equal(authData.ok, true);
+  assert.equal(authData.user.email, studentEmail);
+  assert.equal(authData.user.role, "STUDENT");
+
+  // Extract student session cookie
+  const setCookie = authRes.headers.get("set-cookie") || "";
+  const match = setCookie.match(/cbs_student_session=([a-f0-9]+)/);
+  assert.ok(match, "cbs_student_session cookie returned");
+  const studentSession = match[1];
+
+  // 2. GET /api/session recognizes the student profile
+  const sessionReq = new Request("http://127.0.0.1:5173/api/session", {
+    headers: {
+      cookie: `cbs_student_session=${studentSession}`,
+    },
+  });
+  const sessionRes = await GET(sessionReq);
+  assert.equal(sessionRes.status, 200);
+  const sessionData = await sessionRes.json();
+  assert.equal(sessionData.user?.role, "STUDENT");
+  assert.equal(sessionData.user?.email, studentEmail);
+
+  // 3. POST /api/student-cart saves the cloud cart
+  const cartItems = [
+    { id: "book-1", quantity: 2 },
+    { id: "book-2", quantity: 1 },
+  ];
+  const saveCartReq = new Request("http://127.0.0.1:5173/api/student-cart", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-requested-with": "CampusBookstore",
+      origin: "http://127.0.0.1:5173",
+      cookie: `cbs_student_session=${studentSession}`,
+    },
+    body: JSON.stringify({ items: cartItems }),
+  });
+  const saveCartRes = await POST(saveCartReq);
+  assert.equal(saveCartRes.status, 200);
+  const saveCartData = await saveCartRes.json();
+  assert.equal(saveCartData.ok, true);
+
+  // 4. GET /api/student-cart retrieves the synced cloud cart
+  const getCartReq = new Request("http://127.0.0.1:5173/api/student-cart", {
+    headers: {
+      cookie: `cbs_student_session=${studentSession}`,
+    },
+  });
+  const getCartRes = await GET(getCartReq);
+  assert.equal(getCartRes.status, 200);
+  const getCartData = await getCartRes.json();
+  assert.deepEqual(getCartData.cart, cartItems);
+
+  // 5. GET /api/student-orders retrieves student's orders
+  const ordersReq = new Request("http://127.0.0.1:5173/api/student-orders", {
+    headers: {
+      cookie: `cbs_student_session=${studentSession}`,
+    },
+  });
+  const ordersRes = await GET(ordersReq);
+  assert.equal(ordersRes.status, 200);
+  const ordersData = await ordersRes.json();
+  assert.ok(Array.isArray(ordersData.orders));
+
+  // 6. Security guard: Student cannot access admin endpoints
+  const adminAccessReq = new Request("http://127.0.0.1:5173/api/manage/orders", {
+    headers: {
+      cookie: `cbs_student_session=${studentSession}`,
+    },
+  });
+  const adminAccessRes = await GET(adminAccessReq);
+  assert.ok(adminAccessRes.status === 401 || adminAccessRes.status === 403, "Student blocked from admin manage routes");
+
+  // 7. POST /api/logout clears student session
+  const logoutReq = new Request("http://127.0.0.1:5173/api/logout", {
+    method: "POST",
+    headers: {
+      "x-requested-with": "CampusBookstore",
+      origin: "http://127.0.0.1:5173",
+      cookie: `cbs_student_session=${studentSession}`,
+    },
+  });
+  const logoutRes = await POST(logoutReq);
+  assert.equal(logoutRes.status, 200);
+  const logoutCookie = logoutRes.headers.get("set-cookie") || "";
+  assert.ok(logoutCookie.includes("cbs_student_session=;"), "cbs_student_session cleared on logout");
 });

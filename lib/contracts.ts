@@ -382,10 +382,10 @@ export const settingsInput = z.object({
   support_email: z.string().max(150),
   support_hours: z.string().max(150),
   distribution_center_address: z.string().max(300).optional().default("Qanchi"),
-  facebook_link: z.string().max(300).optional().default("https://facebook.com/campusbookstore"),
-  twitter_link: z.string().max(300).optional().default("https://twitter.com/campusbookstore"),
-  instagram_link: z.string().max(300).optional().default("https://instagram.com/campusbookstore"),
-  linkedin_link: z.string().max(300).optional().default("https://linkedin.com/company/campusbookstore"),
+  facebook_link: z.string().max(300).optional().default(""),
+  twitter_link: z.string().max(300).optional().default(""),
+  instagram_link: z.string().max(300).optional().default(""),
+  linkedin_link: z.string().max(300).optional().default(""),
   store_open: z.boolean(),
   maintenance_message: z.string().max(500).optional().default("We are currently conducting scheduled system maintenance. Ordering is temporarily closed. Please check back soon!"),
   bank_name: str(100),
@@ -442,6 +442,8 @@ export type User = {
   vendor_id?: string | null;
   vendor_name?: string | null;
   vendor_phone?: string | null;
+  google_id?: string | null;
+  avatar_url?: string | null;
 };
 export interface Vendor {
   id: string;

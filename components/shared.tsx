@@ -1,4 +1,20 @@
 "use client";
+export function syncTabBranding(storeName?: string, logoUrl?: string | null) {
+  if (typeof document === "undefined") return;
+  const targetUrl = logoUrl && logoUrl.trim() ? logoUrl.trim() : "/favicon.svg";
+  const links = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
+  if (!links || links.length === 0) {
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = targetUrl;
+    document.head.appendChild(link);
+  } else {
+    links.forEach((link) => {
+      link.href = targetUrl;
+    });
+  }
+}
+
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import {
   ChevronDown,

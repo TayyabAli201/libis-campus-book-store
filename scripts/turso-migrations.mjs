@@ -19,6 +19,8 @@ export const migrations = [
   "0014_item_office_stock.sql",
   "0015_student_partial_handover.sql",
   "0016_return_resell_workflow.sql",
+  "0017_password_resets_security.sql",
+  "0018_student_accounts.sql",
 ];
 export async function migrateTurso(client, log = console.log) {
   await client.execute(

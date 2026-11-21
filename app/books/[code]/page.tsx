@@ -1,8 +1,10 @@
 import { Store } from "@/components/store";
 import { catalog, getSettings } from "@/lib/server/catalog";
-import { all } from "@/lib/server/db";
+import { all, runtime } from "@/lib/server/db";
 import { notFound } from "next/navigation";
-export const dynamic = "force-dynamic";
+
+export const revalidate = 300;
+
 export async function generateMetadata({
   params,
 }: {
@@ -12,10 +14,19 @@ export async function generateMetadata({
   const b = (await catalog(code)).find(
     (b) => b.code.toLowerCase() === code.toLowerCase(),
   );
+  const origin = (runtime() as any).APP_ORIGIN || "https://www.dghhub.com";
+  const canonicalUrl = `${origin}/books/${code.toLowerCase()}`;
   return {
     title: b?.title || "Book not found",
-    description: b ? `${b.code}: ${b.title}. ${b.pages} pages.` : undefined,
-    openGraph: { title: b?.title, description: b?.description },
+    description: b ? `${b.code}: ${b.title}. ${b.pages} pages course handouts.` : undefined,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: b?.title,
+      description: b?.description,
+      url: canonicalUrl,
+    },
   };
 }
 export default async function BookPage({
@@ -32,6 +43,7 @@ export default async function BookPage({
   ]);
   const book = books.find((b) => b.code.toLowerCase() === code.toLowerCase());
   if (!book) notFound();
+  const origin = (runtime() as any).APP_ORIGIN || "https://www.dghhub.com";
   const structured = {
     "@context": "https://schema.org",
     "@type": "Book",
@@ -39,6 +51,7 @@ export default async function BookPage({
     bookFormat: "https://schema.org/Paperback",
     numberOfPages: book.pages,
     sku: book.code,
+    url: `${origin}/books/${book.code.toLowerCase()}`,
     offers: {
       "@type": "Offer",
       priceCurrency: "PKR",
@@ -46,6 +59,7 @@ export default async function BookPage({
       availability: book.active
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
+      url: `${origin}/books/${book.code.toLowerCase()}`,
     },
   };
   return (

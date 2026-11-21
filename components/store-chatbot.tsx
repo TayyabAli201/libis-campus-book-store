@@ -29,6 +29,14 @@ import { api, errorText } from "./shared";
 import { money, formatWhatsAppPhone, isOtherCityOrder } from "../lib/contracts";
 import { WhatsAppIcon } from "./whatsapp-icon";
 
+function formatChatTime(date: Date = new Date()): string {
+  const hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  const h12 = hours % 12 || 12;
+  const ampm = hours >= 12 ? "PM" : "AM";
+  return `${h12.toString().padStart(2, "0")}:${minutes} ${ampm}`;
+}
+
 export interface ChatMessage {
   id: string;
   sender: "bot" | "user";
@@ -111,6 +119,13 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
 
   useEffect(() => {
     setMounted(true);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === "msg-welcome" && m.timestamp === "Just now"
+          ? { ...m, timestamp: formatChatTime() }
+          : m
+      )
+    );
   }, []);
 
   const isDark = mounted && resolvedTheme === "dark";
@@ -198,7 +213,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         id: "msg-welcome",
         sender: "bot",
         text: `Hello! 👋 Welcome to **${storeName} Assistant**.\n\nYou can track your order status by Order ID or Phone Number, check book prices, or view official payment details.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: "Just now",
       },
     ];
   });
@@ -232,7 +247,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         id: "msg-reset-" + Date.now(),
         sender: "bot",
         text: "Chat reset. Select a quick action below or type your question:",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: formatChatTime(),
       },
     ]);
   };
@@ -322,7 +337,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         const botReply: ChatMessage = {
           id: "bot-" + Date.now(),
           sender: "bot",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
           card: {
             type: "order",
             title: `Order #${res.reference}`,
@@ -358,7 +373,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         id: "bot-" + Date.now(),
         sender: "bot",
         text: `Order not found for **"${query}"**.\n\nPlease check your **Order Reference** (e.g. \`VU-2710-0006\`) or **Phone Number** and try again:`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: formatChatTime(),
         card: {
           type: "whatsapp",
           title: "Helpline Support",
@@ -400,7 +415,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         const botReply: ChatMessage = {
           id: "bot-book-" + Math.random(),
           sender: "bot",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
           card: {
             type: "book",
             title: book.code || book.course_code || "Book Details",
@@ -429,7 +444,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         id: "bot-" + Date.now(),
         sender: "bot",
         text: `Course **"${query}"** was not found in the catalog. Please search with a course code (e.g. \`CS101\`, \`MTH101\`, \`ENG101\`, \`ACC501\`).`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: formatChatTime(),
       },
     ]);
   };
@@ -444,7 +459,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
       id: "user-" + Date.now(),
       sender: "user",
       text: raw,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: formatChatTime(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -479,7 +494,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
           id: "bot-" + Date.now(),
           sender: "bot",
           text: `Please enter your **Order ID** (e.g. \`VU-2710-0006\`) or the **Phone Number** used when placing the order:`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
         },
       ]);
       setTimeout(() => inputRef.current?.focus(), 150);
@@ -507,7 +522,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
           id: "bot-" + Date.now(),
           sender: "bot",
           text: `Please enter your **Course Code or Book Name** (e.g. \`CS101\`, \`MTH101\`, \`ENG101\`, \`ACC501\`):\n\nI will check the student price for you right away: 👇`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
         },
       ]);
       setTimeout(() => inputRef.current?.focus(), 150);
@@ -526,7 +541,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         {
           id: "bot-" + Date.now(),
           sender: "bot",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
           card: {
             type: "delivery",
             title: "🚚 Delivery Options",
@@ -569,7 +584,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         {
           id: "bot-" + Date.now(),
           sender: "bot",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
           card: {
             type: "payment",
             title: "💳 Official Bank & Payment Accounts",
@@ -616,7 +631,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         {
           id: "bot-" + Date.now(),
           sender: "bot",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
           card: {
             type: "contact",
             title: "📍 Campus Bookstore Office",
@@ -652,7 +667,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
           id: "bot-" + Date.now(),
           sender: "bot",
           text: "Hello! 👋 How can I help you today? Select any of the quick action buttons below or ask your question:",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(),
         },
       ]);
       return;
@@ -676,7 +691,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
         id: "bot-" + Date.now(),
         sender: "bot",
         text: "For further assistance with your inquiry, please contact our support team on WhatsApp:",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: formatChatTime(),
         card: {
           type: "whatsapp",
           title: "Direct WhatsApp Support",
@@ -763,6 +778,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
       {/* ========================================================= */}
       {/* CHAT WINDOW POPUP (MODERN COLLAPSIBLE DIALOG)            */}
       {/* ========================================================= */}
+      {mounted && (
       <div
         style={{
           position: "fixed",
@@ -1265,6 +1281,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
                 </div>
 
                 <span
+                  suppressHydrationWarning
                   style={{
                     fontSize: "0.62rem",
                     color: colors.cardMuted,
@@ -1497,6 +1514,7 @@ export function StoreChatbot({ data, whatsappUrl, onNavigate }: StoreChatbotProp
             </div>
           </div>
         </div>
+      )}
 
       {/* ========================================================= */}
       {/* FULL-SIZE QR CODE ZOOM MODAL (FOR MOBILE SCANNING & SAVE) */}

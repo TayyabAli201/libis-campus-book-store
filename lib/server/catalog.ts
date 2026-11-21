@@ -42,10 +42,10 @@ export async function getSettings() {
     support_email: raw.support_email || "Not Available",
     support_hours: raw.support_hours || "Mon – Sat: 9am – 8pm",
     distribution_center_address: raw.distribution_center_address || "Qanchi, Lahore",
-    facebook_link: raw.facebook_link || "https://facebook.com/campusbookstore",
-    twitter_link: raw.twitter_link || "https://twitter.com/campusbookstore",
-    instagram_link: raw.instagram_link || "https://instagram.com/campusbookstore",
-    linkedin_link: raw.linkedin_link || "https://linkedin.com/company/campusbookstore",
+    facebook_link: raw.facebook_link || "",
+    twitter_link: raw.twitter_link || "",
+    instagram_link: raw.instagram_link || "",
+    linkedin_link: raw.linkedin_link || "",
     store_open: raw.store_open !== false,
     maintenance_message: raw.maintenance_message || "We are currently conducting scheduled system maintenance. Ordering is temporarily closed. Please check back soon!",
     bank_name: raw.bank_name || "Meezan Bank",
@@ -260,4 +260,14 @@ export async function clearBooks(input: unknown, u: User, req: Request) {
     ),
   ]);
   return { cleared: count };
+}
+
+export async function getStoreInitialData(q = "") {
+  const [{ settings }, books, campuses, prices] = await Promise.all([
+    getSettings(),
+    catalog(q),
+    all<any>("SELECT id,name,city FROM campuses WHERE active=1"),
+    all<any>("SELECT id,rate,binding_rate FROM pricing_categories ORDER BY id"),
+  ]);
+  return { settings, books, campuses, prices };
 }

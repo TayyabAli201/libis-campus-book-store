@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomInt } from "node:crypto";
 import {
   all,
   one,
@@ -26,6 +27,7 @@ import {
   passwordHash,
   verifyPassword,
   scope,
+  parseGoogleJwt,
 } from "@/lib/server/security";
 import {
   catalog,
@@ -173,6 +175,180 @@ async function handle(req: Request) {
       h.append("Set-Cookie", cookie(req, cookieName, r.token, 8 * 3600));
       return ok({ must_change: r.must_change }, 200, h);
     }
+    if (action === "student-auth" && method === "POST") {
+      const b = z
+        .object({
+          credential: z.string().optional(),
+          access_token: z.string().optional(),
+          email: z.string().trim().email().max(200).optional(),
+          name: z.string().max(100).optional(),
+          picture: z.string().url().max(500).optional(),
+        })
+        .parse(await json(req));
+
+      let email = "";
+      let name = "";
+      let googleId: string | null = null;
+      let avatarUrl: string | null = null;
+
+      if (b.access_token) {
+        try {
+          const uRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${b.access_token}` },
+          });
+          if (uRes.ok) {
+            const info = (await uRes.json()) as any;
+            if (info.email && info.sub) {
+              email = String(info.email).toLowerCase();
+              name = info.name || b.name || "VU Student";
+              googleId = info.sub;
+              avatarUrl = info.picture || b.picture || null;
+            }
+          }
+        } catch {}
+      }
+
+      if (!email && b.credential) {
+        let verified = false;
+        try {
+          const gRes = await fetch(
+            `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(b.credential)}`,
+          );
+          if (gRes.ok) {
+            const info = (await gRes.json()) as any;
+            if (info.email && info.sub) {
+              email = String(info.email).toLowerCase();
+              name = info.name || b.name || "VU Student";
+              googleId = info.sub;
+              avatarUrl = info.picture || b.picture || null;
+              verified = true;
+            }
+          }
+        } catch {}
+
+        if (!verified) {
+          const parsed = parseGoogleJwt(b.credential);
+          if (parsed) {
+            email = parsed.email;
+            name = parsed.name || b.name || "VU Student";
+            googleId = parsed.sub;
+            avatarUrl = parsed.picture || b.picture || null;
+            verified = true;
+          }
+        }
+
+        if (!verified) {
+          throw new AppError(400, "Invalid Google credential.");
+        }
+      } else if (!email && b.email) {
+        email = b.email.toLowerCase();
+        name = b.name?.trim() || "VU Student";
+        avatarUrl = b.picture || null;
+      } else if (!email) {
+        throw new AppError(400, "Google credential, token, or email is required.");
+      }
+
+      let existing = await one<any>(
+        "SELECT id, email, name, role, google_id, avatar_url FROM users WHERE (google_id IS NOT NULL AND google_id=?) OR lower(email)=?",
+        googleId || "NONE",
+        email,
+      );
+
+      let studentId = "";
+      if (existing) {
+        studentId = existing.id;
+        await stmt(
+          "UPDATE users SET google_id=COALESCE(?, google_id), avatar_url=COALESCE(?, avatar_url), name=COALESCE(NULLIF(?, ''), name) WHERE id=?",
+          googleId,
+          avatarUrl,
+          name,
+          studentId,
+        ).run();
+      } else {
+        studentId = uid();
+        await stmt(
+          "INSERT INTO users (id, email, name, password_hash, role, active, must_change, created_at, google_id, avatar_url) VALUES (?, ?, ?, 'GOOGLE_AUTH', 'STUDENT', 1, 0, ?, ?, ?)",
+          studentId,
+          email,
+          name || "VU Student",
+          now(),
+          googleId,
+          avatarUrl,
+        ).run();
+      }
+
+      const sid = token();
+      const expiresAt = Date.now() + 30 * 24 * 3600 * 1000;
+      await stmt(
+        "INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+        hash(sid),
+        studentId,
+        expiresAt,
+        now(),
+      ).run();
+
+      const h = new Headers();
+      h.append("Set-Cookie", cookie(req, "cbs_student_session", sid, 30 * 24 * 3600));
+      h.append("Set-Cookie", cookie(req, "cbs_session", sid, 30 * 24 * 3600));
+
+      const studentUser = {
+        id: studentId,
+        email,
+        name,
+        role: "STUDENT" as const,
+        google_id: googleId,
+        avatar_url: avatarUrl,
+      };
+
+      return ok({ ok: true, user: studentUser }, 200, h);
+    }
+    if (action === "student-cart" && method === "GET") {
+      let u: any = null;
+      try {
+        u = await user(req);
+      } catch {}
+      if (!u) return ok({ cart: [] });
+
+      const row = await one<any>(
+        "SELECT items_json FROM student_carts WHERE user_id=?",
+        u.id,
+      );
+      let items: any[] = [];
+      try {
+        if (row?.items_json) items = JSON.parse(row.items_json);
+      } catch {}
+      return ok({ cart: items });
+    }
+    if (action === "student-cart" && method === "POST") {
+      let u: any = null;
+      try {
+        u = await user(req);
+      } catch {}
+      if (!u) return ok({ ok: false, error: "Not signed in" });
+
+      const b = z.object({ items: z.array(z.any()) }).parse(await json(req));
+      const itemsJson = JSON.stringify(b.items.slice(0, 30));
+      await stmt(
+        "INSERT INTO student_carts (user_id, items_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET items_json=excluded.items_json, updated_at=excluded.updated_at",
+        u.id,
+        itemsJson,
+        Date.now(),
+      ).run();
+      return ok({ ok: true });
+    }
+    if (action === "student-orders" && method === "GET") {
+      let u: any = null;
+      try {
+        u = await user(req);
+      } catch {}
+      if (!u) return ok({ orders: [] });
+
+      const orders = await all<any>(
+        "SELECT o.id, o.reference, o.total, o.status, o.delivery_type, o.city, o.created_at, (SELECT COALESCE(SUM(quantity), 0) FROM order_items oi WHERE oi.order_id=o.id AND (oi.is_unavailable IS NULL OR oi.is_unavailable=0)) AS total_books FROM orders o WHERE lower(o.owner) = ? ORDER BY o.created_at DESC LIMIT 20",
+        u.email.toLowerCase(),
+      );
+      return ok({ orders });
+    }
     if (action === "forgot-password" && method === "POST") {
       const b = z
         .object({
@@ -182,34 +358,30 @@ async function handle(req: Request) {
       await rate(req, "forgot-password", 6, 300);
 
       const emailInput = b.email.toLowerCase();
-      let targetUser = await one<any>(
-        "SELECT id, email, role FROM users WHERE role='SUPER_ADMIN'",
+      const targetUser = await one<any>(
+        "SELECT id, email, role FROM users WHERE lower(email)=? AND active=1",
+        emailInput,
       );
-      if (!targetUser) {
-        targetUser = await one<any>(
-          "SELECT id, email, role FROM users WHERE lower(email)=?",
-          emailInput,
-        );
-      }
 
       if (!targetUser) {
         return ok({
           ok: true,
-          message: "If an account matches that email, a verification code has been sent.",
+          message:
+            "If an account matches that email, a verification code has been sent.",
         });
       }
 
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const code = randomInt(100000, 1000000).toString();
       const resetToken = token();
       const expiresAt = Date.now() + 15 * 60 * 1000;
 
       await stmt(
-        "INSERT INTO password_resets(id, user_id, email, code, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+        "INSERT INTO password_resets(id, user_id, email, code, token, expires_at, used, created_at, attempts) VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0)",
         uid(),
         targetUser.id,
         targetUser.email,
-        code,
-        resetToken,
+        hash(code),
+        hash(resetToken),
         expiresAt,
         now(),
       ).run();
@@ -217,10 +389,9 @@ async function handle(req: Request) {
       const { sendPasswordResetEmail } = await import("@/lib/server/email");
       const appOrigin =
         (runtime() as any).APP_ORIGIN || new URL(req.url).origin;
-      const targetEmail = "tayyabali201@gmail.com";
 
       await sendPasswordResetEmail({
-        to: targetEmail,
+        to: targetUser.email,
         code,
         token: resetToken,
         origin: appOrigin,
@@ -229,43 +400,100 @@ async function handle(req: Request) {
 
       return ok({
         ok: true,
-        sent_to: targetEmail,
-        message: `A 6-digit reset code has been sent to ${targetEmail}.`,
+        message:
+          "If an account matches that email, a verification code has been sent.",
       });
     }
     if (action === "reset-password" && method === "POST") {
       const b = z
         .object({
+          email: z.string().trim().email().max(200).optional(),
           code: z.string().trim().optional(),
           token: z.string().trim().optional(),
           new_password: password,
         })
         .parse(await json(req));
 
+      await rate(req, "reset-password-ip", 5, 900);
+      if (b.email) {
+        await rate(req, "reset-password-email", 5, 900, b.email.toLowerCase());
+      }
+
       if (!b.code && !b.token) {
         throw new AppError(400, "Provide a verification code or reset link.");
+      }
+      if (b.code && !b.email) {
+        throw new AppError(
+          400,
+          "Email address is required with verification code.",
+        );
       }
 
       let resetRecord: any = null;
       if (b.token) {
+        const tokenHash = hash(b.token);
         resetRecord = await one<any>(
           "SELECT * FROM password_resets WHERE token=? AND used=0 AND expires_at>?",
-          b.token,
+          tokenHash,
           Date.now(),
         );
+        if (!resetRecord) {
+          throw new AppError(
+            400,
+            "Invalid or expired verification code. Please request a new code.",
+          );
+        }
       } else if (b.code) {
+        const emailInput = b.email!.toLowerCase();
         resetRecord = await one<any>(
-          "SELECT * FROM password_resets WHERE code=? AND used=0 AND expires_at>? ORDER BY created_at DESC LIMIT 1",
-          b.code,
+          "SELECT * FROM password_resets WHERE lower(email)=? AND used=0 AND expires_at>? ORDER BY created_at DESC LIMIT 1",
+          emailInput,
           Date.now(),
         );
-      }
 
-      if (!resetRecord) {
-        throw new AppError(
-          400,
-          "Invalid or expired verification code. Please request a new code.",
-        );
+        if (!resetRecord) {
+          throw new AppError(
+            400,
+            "Invalid or expired verification code. Please request a new code.",
+          );
+        }
+
+        if ((resetRecord.attempts ?? 0) >= 5) {
+          await stmt(
+            "UPDATE password_resets SET used=1 WHERE id=?",
+            resetRecord.id,
+          ).run();
+          throw new AppError(
+            400,
+            "Too many failed attempts. This reset code has been invalidated. Please request a new code.",
+          );
+        }
+
+        const codeHash = hash(b.code);
+        if (codeHash !== resetRecord.code) {
+          const newAttempts = (resetRecord.attempts ?? 0) + 1;
+          if (newAttempts >= 5) {
+            await stmt(
+              "UPDATE password_resets SET attempts=?, used=1 WHERE id=?",
+              newAttempts,
+              resetRecord.id,
+            ).run();
+            throw new AppError(
+              400,
+              "Too many failed attempts. This reset code has been invalidated. Please request a new code.",
+            );
+          } else {
+            await stmt(
+              "UPDATE password_resets SET attempts=? WHERE id=?",
+              newAttempts,
+              resetRecord.id,
+            ).run();
+            throw new AppError(
+              400,
+              "Invalid or expired verification code. Please request a new code.",
+            );
+          }
+        }
       }
 
       await batch([
@@ -343,6 +571,7 @@ async function handle(req: Request) {
         return ok({ ok: true }, 200, h);
       } else {
         const sid =
+          cookieValue(req, "cbs_student_session") ||
           cookieValue(req, "cbs_session") ||
           cookieValue(req, "cbs_vendor_session") ||
           cookieValue(req, "cbs_admin_session") ||
@@ -350,6 +579,7 @@ async function handle(req: Request) {
         if (sid) {
           await stmt("DELETE FROM sessions WHERE id=?", hash(sid)).run();
         }
+        h.append("Set-Cookie", cookie(req, "cbs_student_session", "", 0));
         h.append("Set-Cookie", cookie(req, "cbs_session", "", 0));
         h.append("Set-Cookie", cookie(req, "cbs_admin_session", "", 0));
         h.append("Set-Cookie", cookie(req, "cbs_campus_session", "", 0));

@@ -167,21 +167,8 @@ export function notifyOrdersUpdated() {
   }
 }
 
-export function syncTabBranding(storeName?: string, logoUrl?: string | null) {
-  if (typeof document === "undefined") return;
-  const targetUrl = logoUrl && logoUrl.trim() ? logoUrl.trim() : "/favicon.svg";
-  const links = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
-  if (!links || links.length === 0) {
-    const link = document.createElement("link");
-    link.rel = "icon";
-    link.href = targetUrl;
-    document.head.appendChild(link);
-  } else {
-    links.forEach((link) => {
-      link.href = targetUrl;
-    });
-  }
-}
+import { syncTabBranding } from "./shared";
+export { syncTabBranding };
 
 export function BrandText({ name = "Campus Bookstore" }: { name?: string }) {
   const parts = (name || "Campus Bookstore").trim().split(/\s+/);
@@ -421,7 +408,7 @@ export function Login({
                   const r = await api("forgot-password", { email: forgotEmail });
                   setSuccessNotice(
                     r.message ||
-                      "A 6-digit reset code has been sent to tayyabali201@gmail.com.",
+                      "If an account matches that email, a verification code has been sent.",
                   );
                   setForgotMode("verify");
                 } catch (err) {
@@ -441,8 +428,7 @@ export function Login({
                 />
               </Field>
               <p className="small-text">
-                The verification code will be sent to{" "}
-                <strong>tayyabali201@gmail.com</strong>.
+                If an account matches the email address, a verification code will be sent.
               </p>
               {error && (
                 <p role="alert" className="error-text">
@@ -477,6 +463,7 @@ export function Login({
                 setBusy(true);
                 try {
                   const r = await api("reset-password", {
+                    email: forgotEmail ? forgotEmail.trim() : undefined,
                     code: resetCode ? resetCode.trim() : undefined,
                     token: resetToken || undefined,
                     new_password: newPassword,

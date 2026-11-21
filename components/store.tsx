@@ -33,7 +33,9 @@ import {
   QrCode,
   Maximize2,
   X,
+  User,
 } from "lucide-react";
+import { StudentAuthModal } from "./student-auth-modal";
 
 function FacebookIcon({ size = 18 }: { size?: number }) {
   return (
@@ -90,7 +92,7 @@ import {
 } from "./book-experience";
 import { StoreMotion } from "./store-motion";
 import { receiptDate, receiptPaymentNote } from "@/lib/receipt-format";
-import { syncTabBranding } from "./portal";
+import { syncTabBranding } from "./shared";
 import {
   api,
   Blank,
@@ -139,11 +141,41 @@ export function Store({
   const [data, setData] = useState<Catalog | undefined>(initial),
     [error, setError] = useState("");
   useEffect(() => {
-    if (initial) return;
-    if ((mode === "cart" || mode === "checkout") && !ready) return;
+    if (mode === "cart" || mode === "checkout") {
+      if (!ready || !cartIds) return;
+
+      const hasAllCartBooks =
+        data?.books &&
+        cart.length > 0 &&
+        cart.every((item) => data.books.some((b) => b.id === item.id));
+
+      if (hasAllCartBooks) return;
+
       api("catalog" + (cartIds ? "?ids=" + encodeURIComponent(cartIds) : ""))
-        .then(setData)
+        .then((fresh) => {
+          setData((prev) => {
+            if (!prev) return fresh;
+            const existingIds = new Set(prev.books.map((b) => b.id));
+            const newBooks = (fresh.books || []).filter(
+              (b: any) => !existingIds.has(b.id),
+            );
+            return {
+              ...prev,
+              settings: fresh.settings || prev.settings,
+              campuses: fresh.campuses || prev.campuses,
+              prices: fresh.prices || prev.prices,
+              books: [...prev.books, ...newBooks],
+            };
+          });
+        })
         .catch((e) => setError(errorText(e)));
+      return;
+    }
+
+    if (initial) return;
+    api("catalog")
+      .then(setData)
+      .catch((e) => setError(errorText(e)));
   }, [initial, ready, cartIds, mode]);
 
   useEffect(() => {
@@ -277,7 +309,8 @@ function MaintenanceScreen({ settings }: { settings: StoreSettings }) {
   );
 }
 function Header({ settings }: { settings?: StoreSettings }) {
-  const { cart } = useApp();
+  const { cart, user } = useApp();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const rawPathname = usePathname() || "/";
   const pathname = rawPathname === "" ? "/" : rawPathname;
   const [hash, setHash] = useState("");
@@ -319,6 +352,8 @@ function Header({ settings }: { settings?: StoreSettings }) {
               src={settings.logo_url}
               alt={storeName}
               className="brand-logo-img"
+              width={160}
+              height={44}
             />
           ) : (
             <BookOpen />
@@ -371,6 +406,81 @@ function Header({ settings }: { settings?: StoreSettings }) {
             <ShoppingBag size={21} />
             <span key={count}>{count}</span>
           </a>
+          {user && user.role === "STUDENT" ? (
+            <button
+              type="button"
+              onClick={() => setAuthModalOpen(true)}
+              className="student-account-btn"
+              title={`Signed in as ${user.name}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "3px 10px 3px 4px",
+                borderRadius: "9999px",
+                backgroundColor: "rgba(37, 99, 235, 0.12)",
+                border: "1px solid rgba(37, 99, 235, 0.25)",
+                color: "var(--foreground)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                height: "36px",
+              }}
+            >
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.name}
+                  style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    backgroundColor: "#2563eb",
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {(user.name || "U")[0].toUpperCase()}
+                </div>
+              )}
+              <span style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {user.name.split(" ")[0]}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAuthModalOpen(true)}
+              className="student-signin-btn"
+              title="Student Sign In"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "4px 12px",
+                borderRadius: "9999px",
+                backgroundColor: "transparent",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                height: "36px",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <User size={16} />
+              <span>Sign In</span>
+            </button>
+          )}
           <Sheet>
             <SheetTrigger asChild>
               <button
@@ -408,12 +518,36 @@ function Header({ settings }: { settings?: StoreSettings }) {
                     </a>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setAuthModalOpen(true)}
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 0",
+                    background: "none",
+                    border: "none",
+                    color: "var(--primary)",
+                    fontWeight: 700,
+                    fontSize: "0.95rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <User size={18} />
+                  <span>{user && user.role === "STUDENT" ? `Student Account (${user.name.split(" ")[0]})` : "Student Sign In / Account"}</span>
+                </button>
                 <a href="/campus/login">Campus portal</a>
               </div>
             </SheetContent>
           </Sheet>
         </div>
       </header>
+      <StudentAuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
     </>
   );
 }
@@ -1173,15 +1307,24 @@ function BookDetail({ data, code }: { data: Catalog; code: string }) {
 }
 function Cart({ data }: { data: Catalog }) {
   const { cart, setCart } = useApp();
+  const books = data?.books || [];
   const lines = cart.map((i) => ({
     ...i,
-    book: data.books.find((b) => b.id === i.id),
+    book: books.find((b) => b.id === i.id),
   }));
   const subtotal = lines.reduce(
     (s, i) => s + (i.book?.price || 0) * i.quantity,
     0,
   );
   const invalid = lines.some((i) => !i.book);
+
+  const removeUnavailableItems = () => {
+    const validIds = new Set(books.map((b) => b.id));
+    const filtered = cart.filter((c) => validIds.has(c.id));
+    setCart(filtered);
+    toast.success("Unavailable items removed from cart.");
+  };
+
   return (
     <section className="section">
       <span className="eyebrow">YOUR SEMESTER STARTS HERE</span>
@@ -1198,58 +1341,145 @@ function Cart({ data }: { data: Catalog }) {
       ) : (
         <div className="checkout-grid">
           <div className="stack">
+            {invalid && (
+              <div
+                style={{
+                  background: "rgba(245, 158, 11, 0.08)",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  color: "#b45309",
+                  padding: "14px 18px",
+                  borderRadius: "12px",
+                  marginBottom: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>⚠️</span>
+                  <div>
+                    <strong style={{ display: "block", fontSize: "0.88rem" }}>
+                      Notice: Some items are no longer in the catalog
+                    </strong>
+                    <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>
+                      Remove them below to proceed smoothly to checkout.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn outline"
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "0.8rem",
+                    borderColor: "#b45309",
+                    color: "#b45309",
+                    fontWeight: 600,
+                  }}
+                  onClick={removeUnavailableItems}
+                >
+                  Remove Unavailable Items
+                </button>
+              </div>
+            )}
             {lines.map((i) => (
               <div className="cart-row" key={i.id}>
-                {i.book && <Cover book={i.book} small />}
-                <div>
-                  <strong>{i.book?.title || "Unavailable book"}</strong>
-                  <p>
-                    {i.book?.code} · {i.book?.pages} pages
-                  </p>
-                  <p>
-                    {i.book ? money(i.book.price) : "Remove to continue"} per
-                    book
-                  </p>
-                  <div className="quantity">
-                    <button
-                      aria-label={`Decrease ${i.book?.code}`}
-                      onClick={() =>
-                        setCart(
-                          cart
-                            .map((c) =>
-                              c.id === i.id
-                                ? { ...c, quantity: c.quantity - 1 }
-                                : c,
-                            )
-                            .filter((c) => c.quantity > 0),
-                        )
-                      }
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <span>{i.quantity}</span>
-                    <button
-                      disabled={!i.book}
-                      aria-label={`Increase ${i.book?.code}`}
-                      onClick={() =>
-                        setCart(
-                          cart.map((c) =>
-                            c.id === i.id
-                              ? { ...c, quantity: c.quantity + 1 }
-                              : c,
-                          ),
-                        )
-                      }
-                    >
-                      <Plus size={16} />
-                    </button>
+                {i.book ? (
+                  <Cover book={i.book} small />
+                ) : (
+                  <div
+                    style={{
+                      width: "70px",
+                      height: "94px",
+                      borderRadius: "7px",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1px dashed rgba(239, 68, 68, 0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#ef4444",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <BookOpen size={24} style={{ opacity: 0.6 }} />
                   </div>
+                )}
+                <div>
+                  <strong>{i.book?.title || "Item No Longer Available"}</strong>
+                  <p>
+                    {i.book
+                      ? `${i.book.code} · ${i.book.pages} pages`
+                      : "This course book was removed or is out of catalog."}
+                  </p>
+                  <p style={{ color: i.book ? "inherit" : "#ef4444", fontWeight: i.book ? 400 : 600 }}>
+                    {i.book ? `${money(i.book.price)} per book` : "Remove to continue"}
+                  </p>
+                  {i.book ? (
+                    <div className="quantity">
+                      <button
+                        aria-label={`Decrease ${i.book.code}`}
+                        onClick={() =>
+                          setCart(
+                            cart
+                              .map((c) =>
+                                c.id === i.id
+                                  ? { ...c, quantity: c.quantity - 1 }
+                                  : c,
+                              )
+                              .filter((c) => c.quantity > 0),
+                          )
+                        }
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span>{i.quantity}</span>
+                      <button
+                        disabled={!i.book}
+                        aria-label={`Increase ${i.book.code}`}
+                        onClick={() =>
+                          setCart(
+                            cart.map((c) =>
+                              c.id === i.id
+                                ? { ...c, quantity: c.quantity + 1 }
+                                : c,
+                            ),
+                          )
+                        }
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn outline"
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "0.75rem",
+                        marginTop: "8px",
+                        borderColor: "#ef4444",
+                        color: "#ef4444",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      onClick={() => {
+                        setCart(cart.filter((c) => c.id !== i.id));
+                        toast.success("Unavailable book removed from cart.");
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      <span>Remove Item</span>
+                    </button>
+                  )}
                 </div>
                 <div className="cart-row-total">
                   <strong>{money((i.book?.price || 0) * i.quantity)}</strong>
                   <button
                     className="icon-button"
-                    aria-label={`Remove ${i.book?.code}`}
+                    aria-label={`Remove ${i.book?.code || "item"}`}
                     onClick={() => {
                       setCart(cart.filter((c) => c.id !== i.id));
                       toast.success("Book removed from cart.");
@@ -1289,9 +1519,21 @@ function Cart({ data }: { data: Catalog }) {
               Select your delivery method (VU Qanchi Campus Lahore, Lahore, or Other City) during checkout.
             </p>
             {invalid ? (
-              <div className="notice">
-                Update unavailable items to continue.
-              </div>
+              <button
+                type="button"
+                className="btn outline full"
+                style={{
+                  borderColor: "#ef4444",
+                  color: "#ef4444",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  padding: "12px",
+                  cursor: "pointer",
+                }}
+                onClick={removeUnavailableItems}
+              >
+                Remove Unavailable Items to Checkout
+              </button>
             ) : (
               <a className="btn primary full" href="/checkout">
                 Proceed to Checkout
@@ -2230,7 +2472,7 @@ function Checkout({ data }: { data: Catalog }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   {(quote!.items || cart).slice(0, 5).map((it: any) => {
-                    const b = it.book || data.books.find((bk) => bk.id === it.id || bk.code === it.code);
+                    const b = it.book || (data.books || []).find((bk) => bk.id === it.id || bk.code === it.code);
                     return (
                       <div key={it.id || it.code} title={`${it.title || b?.title} (${it.code || b?.code})`}>
                         {b ? (
@@ -2521,6 +2763,8 @@ function Checkout({ data }: { data: Catalog }) {
                       <img
                         src={quote!.settings.bank_qr_url || "/meezan-qr.png"}
                         alt="Meezan Bank Payment QR Code"
+                        width={160}
+                        height={160}
                         style={{
                           width: "160px",
                           height: "160px",
@@ -2698,6 +2942,8 @@ function Checkout({ data }: { data: Catalog }) {
                       <img
                         src={quote!.settings.bank_qr_url || "/meezan-qr.png"}
                         alt="Meezan Bank QR"
+                        width={270}
+                        height={270}
                         style={{
                           width: "270px",
                           height: "270px",
@@ -2904,7 +3150,7 @@ function Checkout({ data }: { data: Catalog }) {
           {(
             quote?.items ||
             cart.map((i) => {
-              const b = data.books.find((book) => book.id === i.id);
+              const b = (data.books || []).find((book) => book.id === i.id);
               return {
                 ...b,
                 id: i.id,
@@ -2918,7 +3164,7 @@ function Checkout({ data }: { data: Catalog }) {
           ).map((i: any) => {
             const bookObj =
               i.book ||
-              data.books.find(
+              (data.books || []).find(
                 (b) => b.code === i.code || b.id === i.id || b.title === i.title,
               );
             return (
@@ -2947,7 +3193,7 @@ function Checkout({ data }: { data: Catalog }) {
               cart.reduce(
                 (s, i) =>
                   s +
-                  (data.books.find((b) => b.id === i.id)?.price || 0) *
+                  ((data.books || []).find((b) => b.id === i.id)?.price || 0) *
                   i.quantity,
                 0,
               )
@@ -3484,6 +3730,8 @@ export function OrderReceipt({ o }: { o: any }) {
               <img
                 src={o.store.logo_url}
                 alt={storeName}
+                width={120}
+                height={30}
                 style={{
                   height: 30,
                   maxWidth: 120,
@@ -4212,29 +4460,29 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
   > = {
     about: {
       eyebrow: "ABOUT CAMPUS BOOKSTORE",
-      title: "Books that fit your campus life.",
+      title: "Who We Are & What We Do",
       subtitle:
-        "Empowering university students with effortless course book ordering, transparent pricing, and instant order tracking.",
+        "Empowering Virtual University students with comprehensive course handouts, clear pricing, and reliable nationwide delivery.",
       sections: [
         {
-          title: "Your courses, one place",
-          text: "We help students find required books using familiar course and book codes. Clear book prices make it easier to plan a semester, and online ordering keeps everything in one place.",
+          title: "Who Runs The Store",
+          text: "Campus Bookstore is an educational printing and book fulfillment service operated by Digital Growth Hub (DGH Hub, live at https://www.dghhub.com). Managed by [TODO: fill in founder/team names, e.g. Academic Support Team], we specialize in providing dedicated academic resources for Virtual University students.",
           icon: BookOpen,
-          badge: "SEMESTER READY",
+          badge: "WHO WE ARE",
           accent: "cyan",
         },
         {
-          title: "From search to your doorstep",
-          text: "Browse course materials, add books to your cart, enter delivery details and upload your bank payment proof. Track progress with your Order ID. Your receipt is available on the device used to place the order.",
-          icon: Truck,
-          badge: "FAST DISPATCH",
+          title: "What We Do",
+          text: "We print, bind, and distribute high-grade course handouts, lecture slides, and past papers. We ensure sharp black & white and color laser printing, durable spiral binding, and transparent protective covers so students have the best study materials.",
+          icon: Layers,
+          badge: "OUR SERVICES",
           accent: "amber",
         },
         {
-          title: "A human check at every payment",
-          text: "Automatic document reading can help check an amount. An administrator makes the final decision after reviewing the actual payment.",
-          icon: ShieldCheck,
-          badge: "VERIFIED & SECURE",
+          title: "Our Physical Address & Pickup Center",
+          text: `Our main distribution center and walk-in pickup point is located at: ${s.distribution_center_address || "Qanchi, Lahore, Pakistan"} [TODO: fill in exact shop/office address]. Students in Lahore can pick up orders directly or request fast same-day rider delivery.`,
+          icon: MapPin,
+          badge: "PHYSICAL LOCATION",
           accent: "emerald",
         },
       ],
@@ -4277,36 +4525,36 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
     },
     privacy: {
       eyebrow: "PRIVACY POLICY",
-      title: "Privacy policy",
-      subtitle: "How we collect, protect, and handle your order information.",
+      title: "Privacy & Cookie Policy",
+      subtitle: "How we collect, protect, and handle your information, cookies, and advertising choices.",
       sections: [
         {
-          title: "Information we collect",
-          text: "We store your name, WhatsApp number, delivery address, order contents and payment proof to fulfil and support your order. Administrative actions and browser information are recorded for accountability.",
+          title: "Information We Collect",
+          text: "We collect only essential details required to process and deliver your book orders: your name, WhatsApp phone number, delivery address, course book selections, and payment confirmation receipts. We never sell or share your personal data with third parties.",
           icon: ShieldCheck,
           badge: "DATA COLLECTION",
           accent: "cyan",
         },
         {
-          title: "How information is used",
-          text: "Order details are available to authorized staff and, for a selected campus, its authorized administrators. Payment slips are strictly restricted to Super Admin for manual verification.",
+          title: "Cookies & Local Storage",
+          text: "We use essential cookies and local browser storage to keep track of items in your shopping cart, preserve your order access tokens, and remember your display preferences. These essential cookies are necessary for the core functionality of the bookstore.",
           icon: Layers,
-          badge: "DATA USAGE",
+          badge: "ESSENTIAL COOKIES",
           accent: "amber",
         },
         {
-          title: "Your device and your choices",
-          text: "Cart and theme preferences are stored on your device. Essential secure cookies maintain login and guest-order access. Contact support to request access, correction or deletion of information, subject to record-keeping obligations.",
+          title: "Google AdSense & Third-Party Advertising",
+          text: "We may partner with third-party advertising vendors, including Google AdSense, to display non-intrusive advertisements. Google uses cookies (including the DoubleClick cookie) to serve ads based on prior visits to our site or other websites across the Internet.",
           icon: BookOpen,
-          badge: "YOUR RIGHTS",
-          accent: "emerald",
+          badge: "ADVERTISING COOKIES",
+          accent: "purple",
         },
         {
-          title: "Order tracking",
-          text: "Anyone with your Order ID can view its status, books, totals and progress. Customer contact details, delivery addresses and payment documents are available only on the ordering device or to authorized staff.",
-          icon: Package,
-          badge: "TRACKING DATA",
-          accent: "purple",
+          title: "How You Can Opt Out of Personalized Ads",
+          text: "You can easily opt out of personalized Google advertising at any time by visiting Google Ad Settings (https://www.google.com/settings/ads) or by visiting the Network Advertising Initiative opt-out tool (http://www.aboutads.info/choices/). You can also manage or block cookies in your browser settings.",
+          icon: CheckCircle2,
+          badge: "YOUR CHOICES",
+          accent: "emerald",
         },
       ],
     },
@@ -4486,6 +4734,23 @@ function Information({ mode, data }: { mode: string; data: Catalog }) {
   );
 }
 
+
+function isValidSocialLink(url?: string | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  const t = url.trim().toLowerCase();
+  if (
+    !t ||
+    t === "#" ||
+    t.includes("facebook.com/campusbookstore") ||
+    t.includes("twitter.com/campusbookstore") ||
+    t.includes("instagram.com/campusbookstore") ||
+    t.includes("linkedin.com/company/campusbookstore")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function SupportCallout({ data }: { data: Catalog }) {
   const s = data.settings;
   const rawPhone = s.whatsapp || "03034049973";
@@ -4493,7 +4758,7 @@ function SupportCallout({ data }: { data: Catalog }) {
   const email =
     s.support_email && s.support_email !== "Not Available"
       ? s.support_email
-      : "Available on WhatsApp";
+      : (s.support_email && s.support_email !== "Not Available" ? s.support_email : "support@dghhub.com");
   const hours =
     s.support_hours && !s.support_hours.toLowerCase().includes("announced")
       ? s.support_hours
@@ -4722,6 +4987,8 @@ function Footer({ data }: { data: Catalog }) {
                   src={s.logo_url}
                   alt={storeName}
                   className="footer-logo-img"
+                  width={140}
+                  height={36}
                 />
               ) : (
                 <BookOpen size={20} />
@@ -4742,28 +5009,30 @@ function Footer({ data }: { data: Catalog }) {
             </a>
           </div>
 
-          <div className="footer-social-bar">
-            {s.facebook_link && (
-              <a href={s.facebook_link} target="_blank" rel="noreferrer" title="Facebook" className="footer-social-icon">
-                <FacebookIcon size={16} />
-              </a>
-            )}
-            {s.twitter_link && (
-              <a href={s.twitter_link} target="_blank" rel="noreferrer" title="Twitter" className="footer-social-icon">
-                <TwitterIcon size={16} />
-              </a>
-            )}
-            {s.instagram_link && (
-              <a href={s.instagram_link} target="_blank" rel="noreferrer" title="Instagram" className="footer-social-icon">
-                <InstagramIcon size={16} />
-              </a>
-            )}
-            {s.linkedin_link && (
-              <a href={s.linkedin_link} target="_blank" rel="noreferrer" title="LinkedIn" className="footer-social-icon">
-                <LinkedinIcon size={16} />
-              </a>
-            )}
-          </div>
+          {(isValidSocialLink(s.facebook_link) || isValidSocialLink(s.twitter_link) || isValidSocialLink(s.instagram_link) || isValidSocialLink(s.linkedin_link)) && (
+            <div className="footer-social-bar">
+              {isValidSocialLink(s.facebook_link) && (
+                <a href={s.facebook_link!} target="_blank" rel="noreferrer" title="Facebook" className="footer-social-icon">
+                  <FacebookIcon size={16} />
+                </a>
+              )}
+              {isValidSocialLink(s.twitter_link) && (
+                <a href={s.twitter_link!} target="_blank" rel="noreferrer" title="Twitter" className="footer-social-icon">
+                  <TwitterIcon size={16} />
+                </a>
+              )}
+              {isValidSocialLink(s.instagram_link) && (
+                <a href={s.instagram_link!} target="_blank" rel="noreferrer" title="Instagram" className="footer-social-icon">
+                  <InstagramIcon size={16} />
+                </a>
+              )}
+              {isValidSocialLink(s.linkedin_link) && (
+                <a href={s.linkedin_link!} target="_blank" rel="noreferrer" title="LinkedIn" className="footer-social-icon">
+                  <LinkedinIcon size={16} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         <div>

@@ -1,9 +1,15 @@
 import { headers, cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { user } from "./security";
-import { Portal } from "@/components/portal";
 import { pendingOrderCount } from "./orders";
 import { getSettings } from "./catalog";
+
+const Portal = nextDynamic(
+  () => import("@/components/portal").then((m) => m.Portal),
+  { ssr: true },
+);
+
 export async function PortalPage({
   portal,
   segments,

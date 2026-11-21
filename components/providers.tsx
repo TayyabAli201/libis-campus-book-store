@@ -18,6 +18,7 @@ type State = {
   add: (b: Book) => void;
   setCart: (v: CartItem[]) => void;
   user: User | null;
+  setUser: (u: User | null) => void;
   ready: boolean;
 };
 const Context = createContext<State>(null!);
@@ -43,7 +44,27 @@ export function Providers({ children }: { children: ReactNode }) {
     } catch {}
     setHydrated(true);
     api("session")
-      .then((r) => setUser(r.user))
+      .then((r) => {
+        setUser(r.user);
+        if (r.user?.role === "STUDENT") {
+          api("student-cart")
+            .then((sc: any) => {
+              if (Array.isArray(sc?.cart) && sc.cart.length > 0) {
+                setCartState((current) => {
+                  const existingIds = new Set(current.map((c) => c.id));
+                  const merged = [...current];
+                  for (const item of sc.cart) {
+                    if (!existingIds.has(item.id)) {
+                      merged.push(item);
+                    }
+                  }
+                  return merged.slice(0, 30);
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      })
       .catch(() => {})
       .finally(() => setReady(true));
   }, []);
@@ -52,8 +73,14 @@ export function Providers({ children }: { children: ReactNode }) {
       try {
         localStorage.setItem("cbs_cart", JSON.stringify(cart));
       } catch {}
+      if (user?.role === "STUDENT") {
+        api("student-cart", {
+          method: "POST",
+          body: JSON.stringify({ items: cart }),
+        }).catch(() => {});
+      }
     }
-  }, [cart, hydrated]);
+  }, [cart, hydrated, user?.role]);
   const setCart = (v: CartItem[]) => setCartState(v);
   const add = (b: Book) => {
     setCartState((old) => {
@@ -67,7 +94,7 @@ export function Providers({ children }: { children: ReactNode }) {
   };
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-      <Context.Provider value={{ cart, setCart, add, user, ready }}>
+      <Context.Provider value={{ cart, setCart, add, user, setUser, ready }}>
         {children}
         <Toaster richColors position="top-center" duration={2500} />
       </Context.Provider>

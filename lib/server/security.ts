@@ -106,6 +106,7 @@ export async function user(
   const adminSid = cookieValue(req, "cbs_admin_session");
   const campusSid = cookieValue(req, "cbs_campus_session");
   const vendorSid = cookieValue(req, "cbs_vendor_session");
+  const studentSid = cookieValue(req, "cbs_student_session");
   const genericSid = cookieValue(req, "cbs_session");
 
   const urlPath = req.url ? new URL(req.url, "http://localhost").pathname : "";
@@ -135,13 +136,13 @@ export async function user(
   } else if (isVendorContext) {
     candidateSids = [vendorSid, genericSid].filter(Boolean);
   } else {
-    candidateSids = [adminSid, vendorSid, genericSid, campusSid].filter(Boolean);
+    candidateSids = [studentSid, genericSid, adminSid, vendorSid, campusSid].filter(Boolean);
   }
 
   candidateSids = Array.from(new Set(candidateSids));
   if (candidateSids.length === 0) {
     candidateSids = Array.from(
-      new Set([adminSid, vendorSid, genericSid, campusSid].filter(Boolean)),
+      new Set([studentSid, genericSid, adminSid, vendorSid, campusSid].filter(Boolean)),
     );
   }
   if (candidateSids.length === 0) {
@@ -151,7 +152,7 @@ export async function user(
   let foundUser: any = null;
   for (const sid of candidateSids) {
     const row = await one<any>(
-      `SELECT u.id,u.email,u.name,u.role,u.campus_id,c.name AS campus_name,c.code AS campus_code,c.category AS campus_category,u.must_change,c.permissions,c.active AS campus_active,v.id AS vendor_id,v.name AS vendor_name,v.phone AS vendor_phone,v.active AS vendor_active FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN campuses c ON c.id=u.campus_id LEFT JOIN vendors v ON v.user_id=u.id WHERE s.id=? AND s.expires_at>? AND u.active=1`,
+      `SELECT u.id,u.email,u.name,u.role,u.campus_id,c.name AS campus_name,c.code AS campus_code,c.category AS campus_category,u.must_change,c.permissions,c.active AS campus_active,v.id AS vendor_id,v.name AS vendor_name,v.phone AS vendor_phone,v.active AS vendor_active,u.google_id,u.avatar_url FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN campuses c ON c.id=u.campus_id LEFT JOIN vendors v ON v.user_id=u.id WHERE s.id=? AND s.expires_at>? AND u.active=1`,
       hash(sid),
       Date.now(),
     );
@@ -293,4 +294,30 @@ export async function authenticate(
     auditStmt(row.email, "LOGIN", row.id, undefined, { portal }, req),
   ]);
   return { token: t, must_change: row.must_change };
+}
+
+export function parseGoogleJwt(jwtToken: string): {
+  sub: string;
+  email: string;
+  name: string;
+  picture?: string;
+  email_verified?: boolean;
+} | null {
+  try {
+    const parts = jwtToken.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf8"),
+    );
+    if (!payload.sub || !payload.email) return null;
+    return {
+      sub: String(payload.sub),
+      email: String(payload.email).toLowerCase(),
+      name: payload.name || payload.given_name || "VU Student",
+      picture: typeof payload.picture === "string" ? payload.picture : undefined,
+      email_verified: Boolean(payload.email_verified),
+    };
+  } catch {
+    return null;
+  }
 }

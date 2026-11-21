@@ -1,5 +1,12 @@
-import { Login } from "@/components/portal";
+import nextDynamic from "next/dynamic";
 import { getSettings } from "@/lib/server/catalog";
+
+export const dynamic = "force-dynamic";
+
+const Login = nextDynamic(
+  () => import("@/components/portal").then((m) => m.Login),
+  { ssr: true },
+);
 
 export const metadata = {
   title: "Vendor Portal Sign In",
