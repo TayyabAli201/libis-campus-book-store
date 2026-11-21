@@ -33,9 +33,7 @@ import {
   QrCode,
   Maximize2,
   X,
-  User,
 } from "lucide-react";
-import { StudentAuthModal } from "./student-auth-modal";
 
 function FacebookIcon({ size = 18 }: { size?: number }) {
   return (
@@ -309,8 +307,7 @@ function MaintenanceScreen({ settings }: { settings: StoreSettings }) {
   );
 }
 function Header({ settings }: { settings?: StoreSettings }) {
-  const { cart, user } = useApp();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const { cart } = useApp();
   const rawPathname = usePathname() || "/";
   const pathname = rawPathname === "" ? "/" : rawPathname;
   const [hash, setHash] = useState("");
@@ -406,81 +403,6 @@ function Header({ settings }: { settings?: StoreSettings }) {
             <ShoppingBag size={21} />
             <span key={count}>{count}</span>
           </a>
-          {user && user.role === "STUDENT" ? (
-            <button
-              type="button"
-              onClick={() => setAuthModalOpen(true)}
-              className="student-account-btn"
-              title={`Signed in as ${user.name}`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "3px 10px 3px 4px",
-                borderRadius: "9999px",
-                backgroundColor: "rgba(37, 99, 235, 0.12)",
-                border: "1px solid rgba(37, 99, 235, 0.25)",
-                color: "var(--foreground)",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                height: "36px",
-              }}
-            >
-              {user.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt={user.name}
-                  style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "50%",
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {(user.name || "U")[0].toUpperCase()}
-                </div>
-              )}
-              <span style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user.name.split(" ")[0]}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAuthModalOpen(true)}
-              className="student-signin-btn"
-              title="Student Sign In"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "4px 12px",
-                borderRadius: "9999px",
-                backgroundColor: "transparent",
-                border: "1px solid var(--border)",
-                color: "var(--foreground)",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                height: "36px",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <User size={16} />
-              <span>Sign In</span>
-            </button>
-          )}
           <Sheet>
             <SheetTrigger asChild>
               <button
@@ -518,36 +440,12 @@ function Header({ settings }: { settings?: StoreSettings }) {
                     </a>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => setAuthModalOpen(true)}
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 0",
-                    background: "none",
-                    border: "none",
-                    color: "var(--primary)",
-                    fontWeight: 700,
-                    fontSize: "0.95rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <User size={18} />
-                  <span>{user && user.role === "STUDENT" ? `Student Account (${user.name.split(" ")[0]})` : "Student Sign In / Account"}</span>
-                </button>
                 <a href="/campus/login">Campus portal</a>
               </div>
             </SheetContent>
           </Sheet>
         </div>
       </header>
-      <StudentAuthModal
-        open={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-      />
     </>
   );
 }

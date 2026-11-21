@@ -27,7 +27,6 @@ import {
   passwordHash,
   verifyPassword,
   scope,
-  parseGoogleJwt,
 } from "@/lib/server/security";
 import {
   catalog,
@@ -178,109 +177,18 @@ async function handle(req: Request) {
     if (action === "student-auth" && method === "POST") {
       const b = z
         .object({
-          credential: z.string().optional(),
-          access_token: z.string().optional(),
-          email: z.string().trim().email().max(200).optional().nullable(),
+          email: z.string().trim().email().max(200),
           name: z.string().max(100).optional().nullable(),
           picture: z.string().max(1000).optional().nullable(),
-          google_id: z.string().max(100).optional().nullable(),
         })
         .parse(await json(req));
 
-      let email = "";
-      let name = "";
-      let googleId: string | null = null;
-      let avatarUrl: string | null = null;
-
-      if (b.access_token) {
-        try {
-          const uRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${b.access_token}` },
-          });
-          if (uRes.ok) {
-            const info = (await uRes.json()) as any;
-            if (info?.email) {
-              email = String(info.email).toLowerCase();
-              name = info.name || b.name || "VU Student";
-              googleId = info.sub || info.id || b.google_id || null;
-              avatarUrl = info.picture || b.picture || null;
-            }
-          } else {
-            const tRes = await fetch(
-              `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(b.access_token)}`,
-            );
-            if (tRes.ok) {
-              const info = (await tRes.json()) as any;
-              if (info?.email) {
-                email = String(info.email).toLowerCase();
-                name = info.name || b.name || "VU Student";
-                googleId = info.sub || info.user_id || b.google_id || null;
-                avatarUrl = info.picture || b.picture || null;
-              }
-            }
-          }
-        } catch {}
-
-        if (!email && b.email) {
-          email = b.email.toLowerCase();
-          name = b.name?.trim() || "VU Student";
-          googleId = b.google_id || null;
-          avatarUrl = b.picture || null;
-        }
-      }
-
-      if (!email && b.credential) {
-        let verified = false;
-        try {
-          const gRes = await fetch(
-            `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(b.credential)}`,
-          );
-          if (gRes.ok) {
-            const info = (await gRes.json()) as any;
-            if (info?.email) {
-              email = String(info.email).toLowerCase();
-              name = info.name || b.name || "VU Student";
-              googleId = info.sub || info.id || null;
-              avatarUrl = info.picture || b.picture || null;
-              verified = true;
-            }
-          }
-        } catch {}
-
-        if (!verified) {
-          const parsed = parseGoogleJwt(b.credential);
-          if (parsed?.email) {
-            email = parsed.email;
-            name = parsed.name || b.name || "VU Student";
-            googleId = parsed.sub;
-            avatarUrl = parsed.picture || b.picture || null;
-            verified = true;
-          }
-        }
-
-        if (!verified && b.email) {
-          email = b.email.toLowerCase();
-          name = b.name?.trim() || "VU Student";
-          googleId = b.google_id || null;
-          avatarUrl = b.picture || null;
-          verified = true;
-        }
-
-        if (!verified) {
-          throw new AppError(400, "Invalid Google credential.");
-        }
-      } else if (!email && b.email) {
-        email = b.email.toLowerCase();
-        name = b.name?.trim() || "VU Student";
-        googleId = b.google_id || null;
-        avatarUrl = b.picture || null;
-      } else if (!email) {
-        throw new AppError(400, "Google sign-in could not verify your email. Please try again.");
-      }
+      const email = b.email.toLowerCase();
+      const name = b.name?.trim() || "VU Student";
+      const avatarUrl = b.picture || null;
 
       let existing = await one<any>(
-        "SELECT id, email, name, role, google_id, avatar_url FROM users WHERE (google_id IS NOT NULL AND google_id=?) OR lower(email)=?",
-        googleId || "NONE",
+        "SELECT id, email, name, role, avatar_url FROM users WHERE lower(email)=?",
         email,
       );
 
@@ -288,8 +196,7 @@ async function handle(req: Request) {
       if (existing) {
         studentId = existing.id;
         await stmt(
-          "UPDATE users SET google_id=COALESCE(?, google_id), avatar_url=COALESCE(?, avatar_url), name=COALESCE(NULLIF(?, ''), name) WHERE id=?",
-          googleId,
+          "UPDATE users SET avatar_url=COALESCE(?, avatar_url), name=COALESCE(NULLIF(?, ''), name) WHERE id=?",
           avatarUrl,
           name,
           studentId,
@@ -297,12 +204,11 @@ async function handle(req: Request) {
       } else {
         studentId = uid();
         await stmt(
-          "INSERT INTO users (id, email, name, password_hash, role, active, must_change, created_at, google_id, avatar_url) VALUES (?, ?, ?, 'GOOGLE_AUTH', 'STUDENT', 1, 0, ?, ?, ?)",
+          "INSERT INTO users (id, email, name, password_hash, role, active, must_change, created_at, avatar_url) VALUES (?, ?, ?, 'STUDENT_AUTH', 'STUDENT', 1, 0, ?, ?)",
           studentId,
           email,
           name || "VU Student",
           now(),
-          googleId,
           avatarUrl,
         ).run();
       }
@@ -326,7 +232,6 @@ async function handle(req: Request) {
         email,
         name,
         role: "STUDENT" as const,
-        google_id: googleId,
         avatar_url: avatarUrl,
       };
 
