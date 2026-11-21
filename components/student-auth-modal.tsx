@@ -101,13 +101,30 @@ export function StudentAuthModal({ open, onClose }: StudentAuthModalProps) {
     if (!response?.credential) return;
     setBusy(true);
     try {
+      let clientProfile: any = null;
+      try {
+        const parts = response.credential.split(".");
+        if (parts.length === 3) {
+          clientProfile = JSON.parse(
+            atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+          );
+        }
+      } catch {}
+
       const res = await api("student-auth", {
         method: "POST",
-        body: JSON.stringify({ credential: response.credential }),
+        body: JSON.stringify({
+          credential: response.credential,
+          email: clientProfile?.email,
+          name: clientProfile?.name,
+          picture: clientProfile?.picture,
+          google_id: clientProfile?.sub,
+        }),
       });
       if (res?.user) {
         setUser(res.user);
         toast.success(`Welcome back, ${res.user.name || "Student"}!`);
+        onClose();
       }
     } catch (e) {
       toast.error(errorText(e) || "Google sign-in failed. Please try again.");
@@ -125,11 +142,43 @@ export function StudentAuthModal({ open, onClose }: StudentAuthModalProps) {
         client_id: cid,
         scope: "email profile openid",
         callback: async (tokenResponse: any) => {
+          if (tokenResponse?.error) {
+            setBusy(false);
+            if (tokenResponse.error !== "popup_closed_by_user") {
+              toast.error(
+                tokenResponse.error_description ||
+                  tokenResponse.error ||
+                  "Google sign-in was cancelled.",
+              );
+            }
+            return;
+          }
           if (tokenResponse?.access_token) {
             try {
+              let profile: any = null;
+              try {
+                const uRes = await fetch(
+                  "https://www.googleapis.com/oauth2/v3/userinfo",
+                  {
+                    headers: {
+                      Authorization: `Bearer ${tokenResponse.access_token}`,
+                    },
+                  },
+                );
+                if (uRes.ok) {
+                  profile = await uRes.json();
+                }
+              } catch {}
+
               const res = await api("student-auth", {
                 method: "POST",
-                body: JSON.stringify({ access_token: tokenResponse.access_token }),
+                body: JSON.stringify({
+                  access_token: tokenResponse.access_token,
+                  email: profile?.email,
+                  name: profile?.name,
+                  picture: profile?.picture,
+                  google_id: profile?.sub || profile?.id,
+                }),
               });
               if (res?.user) {
                 setUser(res.user);
@@ -145,8 +194,9 @@ export function StudentAuthModal({ open, onClose }: StudentAuthModalProps) {
             setBusy(false);
           }
         },
-        error_callback: () => {
+        error_callback: (err: any) => {
           setBusy(false);
+          if (err?.message) toast.error(err.message);
         },
       });
       tokenClient.requestAccessToken({ prompt: "select_account" });

@@ -180,9 +180,10 @@ async function handle(req: Request) {
         .object({
           credential: z.string().optional(),
           access_token: z.string().optional(),
-          email: z.string().trim().email().max(200).optional(),
-          name: z.string().max(100).optional(),
-          picture: z.string().url().max(500).optional(),
+          email: z.string().trim().email().max(200).optional().nullable(),
+          name: z.string().max(100).optional().nullable(),
+          picture: z.string().max(1000).optional().nullable(),
+          google_id: z.string().max(100).optional().nullable(),
         })
         .parse(await json(req));
 
@@ -198,14 +199,34 @@ async function handle(req: Request) {
           });
           if (uRes.ok) {
             const info = (await uRes.json()) as any;
-            if (info.email && info.sub) {
+            if (info?.email) {
               email = String(info.email).toLowerCase();
               name = info.name || b.name || "VU Student";
-              googleId = info.sub;
+              googleId = info.sub || info.id || b.google_id || null;
               avatarUrl = info.picture || b.picture || null;
+            }
+          } else {
+            const tRes = await fetch(
+              `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(b.access_token)}`,
+            );
+            if (tRes.ok) {
+              const info = (await tRes.json()) as any;
+              if (info?.email) {
+                email = String(info.email).toLowerCase();
+                name = info.name || b.name || "VU Student";
+                googleId = info.sub || info.user_id || b.google_id || null;
+                avatarUrl = info.picture || b.picture || null;
+              }
             }
           }
         } catch {}
+
+        if (!email && b.email) {
+          email = b.email.toLowerCase();
+          name = b.name?.trim() || "VU Student";
+          googleId = b.google_id || null;
+          avatarUrl = b.picture || null;
+        }
       }
 
       if (!email && b.credential) {
@@ -216,10 +237,10 @@ async function handle(req: Request) {
           );
           if (gRes.ok) {
             const info = (await gRes.json()) as any;
-            if (info.email && info.sub) {
+            if (info?.email) {
               email = String(info.email).toLowerCase();
               name = info.name || b.name || "VU Student";
-              googleId = info.sub;
+              googleId = info.sub || info.id || null;
               avatarUrl = info.picture || b.picture || null;
               verified = true;
             }
@@ -228,7 +249,7 @@ async function handle(req: Request) {
 
         if (!verified) {
           const parsed = parseGoogleJwt(b.credential);
-          if (parsed) {
+          if (parsed?.email) {
             email = parsed.email;
             name = parsed.name || b.name || "VU Student";
             googleId = parsed.sub;
@@ -237,15 +258,24 @@ async function handle(req: Request) {
           }
         }
 
+        if (!verified && b.email) {
+          email = b.email.toLowerCase();
+          name = b.name?.trim() || "VU Student";
+          googleId = b.google_id || null;
+          avatarUrl = b.picture || null;
+          verified = true;
+        }
+
         if (!verified) {
           throw new AppError(400, "Invalid Google credential.");
         }
       } else if (!email && b.email) {
         email = b.email.toLowerCase();
         name = b.name?.trim() || "VU Student";
+        googleId = b.google_id || null;
         avatarUrl = b.picture || null;
       } else if (!email) {
-        throw new AppError(400, "Google credential, token, or email is required.");
+        throw new AppError(400, "Google sign-in could not verify your email. Please try again.");
       }
 
       let existing = await one<any>(
